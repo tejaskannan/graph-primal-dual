@@ -1,0 +1,13 @@
+{
+	"learning_rate": 0.001,
+	"gradient_clip": 5,
+	"batch_size": 16,
+	"epochs": 4,
+	"graph_layers": 4,
+	"num_heads": 2,
+	"node_encoding": 8,
+	"output_folder": "trained_models/graph-network",
+	"min_max_sources": [2, 4],
+	"min_max_sinks": [2, 4],
+	"graph_path": "/home/tejask/Documents/TransportationNetworks/SiouxFalls/SiouxFalls_net.tntp"
+}

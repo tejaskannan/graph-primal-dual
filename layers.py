@@ -20,7 +20,7 @@ class Layer:
 
 class Dense(Layer):
     """
-    Single fully connected layer used for testing.
+    Fully connected layer.
     """
 
     def __init__(self, input_size, output_size, activation=None, name='dense'):
@@ -28,12 +28,12 @@ class Dense(Layer):
 
     def build(self, inputs, **kwargs):
         with tf.name_scope(self.name):
-            init_W = tf.random.uniform(shape=(self.input_size, self.output_size), maxval=1.0)
+            init_W = tf.random.uniform(shape=(1, self.input_size, self.output_size), maxval=1.0)
             self.W = tf.Variable(initial_value=init_W,
                                  trainable=True,
                                  name='W')
 
-            init_b = tf.random.uniform(shape=(1, self.output_size), maxval=1.0)
+            init_b = tf.random.uniform(shape=(1, 1, self.output_size), maxval=1.0)
             self.b = tf.Variable(initial_value=init_b,
                                  trainable=True,
                                  name='b')
@@ -56,48 +56,47 @@ class GAT(Layer):
         assert 'bias' in kwargs
         bias = kwargs['bias']
 
-        with tf.name_scope(self.name):
-            # Lists to hold weights for each attention head
-            self.W = []
-            self.a = []
-            self.b = []
+        # Lists to hold weights for each attention head
+        self.W = []
+        self.a = []
+        self.b = []
 
-            heads = []
-            for _ in range(self.num_heads):
-                # Initialize Trainable Variables
-                init_W = tf.random.uniform(shape=(self.input_size, self.output_size), maxval=1.0)
-                W = tf.Variable(initial_value=init_W,
-                                trainable=True,
-                                name='W')
-                self.W.append(W)
+        heads = []
+        for _ in range(self.num_heads):
+            # Initialize Trainable Variables
+            init_W = tf.random.uniform(shape=(1, self.input_size, self.output_size), maxval=1.0)
+            W = tf.Variable(initial_value=init_W,
+                            trainable=False,
+                            name=self.name + '-W')
+            self.W.append(W)
 
-                init_a = tf.random.uniform(shape=(self.output_size, 1), maxval=1.0)
-                a = tf.Variable(initial_value=init_a,
-                                trainable=True,
-                                name='a')
-                self.a.append(a)
+            init_a = tf.random.uniform(shape=(1, self.output_size, 1), maxval=1.0)
+            a = tf.Variable(initial_value=init_a,
+                            trainable=False,
+                            name=self.name + '-a')
+            self.a.append(a)
 
-                init_b = tf.random.uniform(shape=(1, self.output_size), maxval=1.0)
-                b = tf.Variable(initial_value=init_b,
-                                trainable=True,
-                                name='b')
-                self.b.append(b)
+            init_b = tf.random.uniform(shape=(1, 1, self.output_size), maxval=1.0)
+            b = tf.Variable(initial_value=init_b,
+                            trainable=False,
+                            name=self.name + '-b')
+            self.b.append(b)
 
-                # Apply weight matrix to the set of inputs, B x V x F' Tensor
-                transformed_inputs = tf.matmul(inputs, self.W) + self.b
+            # Apply weight matrix to the set of inputs, B x V x F' Tensor
+            transformed_inputs = tf.matmul(inputs, W) + b
 
-                # Create unnormalized attention weights, B x V x V
-                weights = tf.matmul(transformed_inputs, self.a)
-                weights = weights + tf.transpose(weights, [0, 2, 1])
+            # Create unnormalized attention weights, B x V x V
+            weights = tf.matmul(transformed_inputs, a)
+            weights = weights + tf.transpose(weights, [0, 2, 1])
 
-                # Compute normalized attention weights, B x V x V
-                attention_coefs = tf.nn.softmax(tf.nn.leaky_relu(weights) + bias, axis=2)
+            # Compute normalized attention weights, B x V x V
+            attention_coefs = tf.nn.softmax(tf.nn.leaky_relu(weights) + bias, axis=2)
 
-                # Apply attention weights, B x V x F'
-                heads.append(tf.matmul(attention_coefs, transformed_inputs))
+            # Apply attention weights, B x V x F'
+            heads.append(tf.matmul(attention_coefs, transformed_inputs))
 
-            # Average over all attention heads
-            return (1.0 / self.num_heads) * tf.add_n(heads)
+        # Average over all attention heads
+        return (1.0 / self.num_heads) * tf.add_n(heads)
 
 
 class Gate(Layer):
@@ -105,36 +104,30 @@ class Gate(Layer):
     Skip-connection Gating layer from https://arxiv.org/pdf/1805.10988.pdf
     """
 
-    def __init__(self, input_size, name='gate'):
-        super(Gate, self).__init__(input_size, input_size, None, name)
+    def __init__(self, name='gate'):
+        super(Gate, self).__init__(0, 0, None, name)
 
     def build(self, inputs, **kwargs):
         assert isinstance(inputs, tuple) or isinstance(inputs, list)
         assert len(inputs) == 2
 
-        prev_state = inputs
-        curr_state = inputs
+        prev_state = inputs[0]
+        curr_state = inputs[1]
         with tf.name_scope(self.name):
-            # Initialize variables
-            init_W_1 = tf.random.uniform(shape=(self.input_size, 1), maxval=1.0)
-            self.W_1 = tf.Variable(initial_value=init_W_1,
-                                   trainable=True,
-                                   name='W-1')
 
-            init_W_2 = tf.random.uniform(shape=(self.input_size, 1), maxval=1.0)
-            self.W_2 = tf.Variable(initial_value=init_W_2,
-                                   trainable=True,
-                                   name='W-2')
+            prev = tf.layers.dense(inputs=prev_state,
+                                   units=1,
+                                   use_bias=False,
+                                   name=self.name + '-W-1')
 
-            init_b = tf.random.uniform(shape=(self.input_size, 1), maxval=1.0)
-            self.b = tf.Variable(initial_value=init_b,
-                                 trainable=True,
-                                 name='b')
+            curr = tf.layers.dense(inputs=curr_state,
+                                   units=1,
+                                   use_bias=False,
+                                   name=self.name + '-W-2')
 
-            # Compute gate weight, B x V x 1
-            prev = tf.matmul(prev_state, self.W_1)
-            curr = tf.matmul(curr_state, self.W_2)
-            self.z = tf.math.sigmoid(prev + curr + self.b)
+            self.z = tf.contrib.layers.bias_add(prev + curr,
+                                                activation_fn=tf.math.sigmoid,
+                                                scope='b')
 
             # Apply gate
             return self.z * curr_state + (1 - self.z) * prev_state
