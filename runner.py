@@ -1,10 +1,12 @@
 import argparse
 import networkx as nx
 import tensorflow as tf
+import numpy as np
 from utils import load_params, create_node_bias
-from utils import sparse_matrix_to_tensor, create_demand_tensor
+from utils import sparse_matrix_to_tensor, create_batch
 from load import load_to_networkx
 from graph_model import MinCostFlowModel
+from constants import *
 
 
 def main():
@@ -20,7 +22,7 @@ def main():
     graph = load_to_networkx(params['graph_path'])
 
     # Create tensors for global graph properties
-    adj_tensor = sparse_matrix_to_tensor(nx.adjacency_matrix(graph))
+    adj_mat = nx.adjacency_matrix(graph).todense()
     node_bias = create_node_bias(graph)
 
     num_nodes = graph.number_of_nodes()
@@ -52,6 +54,63 @@ def main():
                 cost_fn=tf.square)
     model.init()
 
+    for epoch in range(params['epochs']):
+
+        print(LINE)
+        print('Epoch {0}'.format(epoch))
+        print(LINE)
+
+        num_training_batches = int(params['train_samples'] / params['batch_size']) + 1
+        num_validation_batches = int(params['valid_samples'] / params['batch_size']) + 1
+
+        # Training Batches
+        train_losses = []
+        for i in range(0, params['train_samples'], params['batch_size']):
+
+            # Create random training points
+            node_features, demands = create_batch(graph=graph,
+                                                  batch_size=params['batch_size'],
+                                                  min_max_sources=params['min_max_sources'],
+                                                  min_max_sinks=params['min_max_sinks'])
+
+            feed_dict = {
+                node_ph: node_features,
+                adj_ph: adj_mat,
+                node_bias_ph: node_bias,
+                demands_ph: demands
+            }
+            avg_batch_loss = model.run_train_step(feed_dict=feed_dict)
+
+            batch_num = int(i / params['batch_size']) + 1
+            print('Average training loss for batch {0}/{1}: {2}'.format(batch_num, num_training_batches, avg_batch_loss))
+
+            train_losses.append(avg_batch_loss)
+
+        # Validation Batches
+        valid_costs = []
+        for i in range(0, params['valid_samples'], params['batch_size']):
+             # Create random validation points
+            node_features, demands = create_batch(graph=graph,
+                                                  batch_size=params['batch_size'],
+                                                  min_max_sources=params['min_max_sources'],
+                                                  min_max_sinks=params['min_max_sinks'])
+            feed_dict = {
+                node_ph: node_features,
+                adj_ph: adj_mat,
+                node_bias_ph: node_bias,
+                demands_ph: demands
+            }
+            costs = model.inference(feed_dict=feed_dict)
+
+            valid_costs.append(costs)
+
+        print(LINE)
+
+        avg_train_loss = np.average(train_losses)
+        print('Average training loss: {0}'.format(avg_train_loss))
+
+        avg_valid_cost = np.average(valid_costs)
+        print('Average validation cost: {0}'.format(avg_valid_cost))
 
 
 if __name__ == '__main__':

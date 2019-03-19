@@ -22,9 +22,9 @@ y_valid = np.array([ys[i:i+batch_size] for i in range(num_train, num_samples, ba
 with tf.Session(graph=tf.Graph()) as sess:
 
     x_placeholder = tf.placeholder(dtype=tf.float32,
-                                   shape=[None, 1])
+                                   shape=[None, 1, 1])
     y_placeholder = tf.placeholder(dtype=tf.float32,
-                                   shape=[None, 1])
+                                   shape=[None, 1, 1])
 
     hidden_layer_1 = Dense(input_size=1, output_size=8, activation=tf.nn.tanh)
     hidden_layer_2 = Dense(input_size=8, output_size=8, activation=tf.nn.tanh)
@@ -39,6 +39,7 @@ with tf.Session(graph=tf.Graph()) as sess:
     optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
 
     trainable_vars = sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+    print(trainable_vars)
     gradients = tf.gradients(loss_op, trainable_vars)
     gradients = [(grad, var) for grad, var in zip(gradients, trainable_vars)]
     optimizer_op = optimizer.apply_gradients(gradients)

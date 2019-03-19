@@ -56,44 +56,27 @@ class GAT(Layer):
         assert 'bias' in kwargs
         bias = kwargs['bias']
 
-        # Lists to hold weights for each attention head
-        self.W = []
-        self.a = []
-        self.b = []
-
         heads = []
         for _ in range(self.num_heads):
-            # Initialize Trainable Variables
-            init_W = tf.random.uniform(shape=(1, self.input_size, self.output_size), maxval=1.0)
-            W = tf.Variable(initial_value=init_W,
-                            trainable=False,
-                            name=self.name + '-W')
-            self.W.append(W)
-
-            init_a = tf.random.uniform(shape=(1, self.output_size, 1), maxval=1.0)
-            a = tf.Variable(initial_value=init_a,
-                            trainable=False,
-                            name=self.name + '-a')
-            self.a.append(a)
-
-            init_b = tf.random.uniform(shape=(1, 1, self.output_size), maxval=1.0)
-            b = tf.Variable(initial_value=init_b,
-                            trainable=False,
-                            name=self.name + '-b')
-            self.b.append(b)
-
             # Apply weight matrix to the set of inputs, B x V x F' Tensor
-            transformed_inputs = tf.matmul(inputs, W) + b
+            transformed_inputs = tf.layers.dense(inputs=inputs,
+                                                 units=self.output_size,
+                                                 use_bias=False,
+                                                 name=self.name + '-W')
 
             # Create unnormalized attention weights, B x V x V
-            weights = tf.matmul(transformed_inputs, a)
+            weights = tf.layers.dense(inputs=transformed_inputs,
+                                      units=1,
+                                      use_bias=False,
+                                      name=self.name + '-a')
             weights = weights + tf.transpose(weights, [0, 2, 1])
 
             # Compute normalized attention weights, B x V x V
             attention_coefs = tf.nn.softmax(tf.nn.leaky_relu(weights) + bias, axis=2)
 
             # Apply attention weights, B x V x F'
-            heads.append(tf.matmul(attention_coefs, transformed_inputs))
+            head = tf.contrib.layers.bias_add(tf.matmul(attention_coefs, transformed_inputs))
+            heads.append(head)
 
         # Average over all attention heads
         return (1.0 / self.num_heads) * tf.add_n(heads)

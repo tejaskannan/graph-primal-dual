@@ -15,6 +15,7 @@ class Model:
 
         # Must be set by a concrete subclass
         self.loss_op = None
+        self.optimizer_op = None
         self.output_op = None
 
     def init(self):
@@ -33,12 +34,12 @@ class Model:
             op_result = self._sess.run(self.output_op, feed_dict=feed_dict)
             return op_result
 
-    def clip_gradients(self, gradients, variables):
+    def clip_gradients(self, gradients, variables, multiplier=1):
         clipped_grad, _ = tf.clip_by_global_norm(gradients, self.params['gradient_clip'])
         pruned_gradients = []
         for grad, var in zip(clipped_grad, variables):
             if grad is not None:
-                pruned_gradients.append((grad, var))
+                pruned_gradients.append((multiplier * grad, var))
 
         return self.optimizer.apply_gradients(pruned_gradients)
 

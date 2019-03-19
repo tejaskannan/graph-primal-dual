@@ -55,6 +55,14 @@ def create_demand_tensor(graph, min_max_sources, min_max_sinks):
 
     return demands
 
+def create_batch(graph, batch_size, min_max_sources, min_max_sinks):
+    node_features = []
+    demands = []
+    for i in range(batch_size):
+        demand_tensor = create_demand_tensor(graph, min_max_sources, min_max_sinks)
+        node_features.append(demand_tensor)
+        demands.append(demand_tensor)
+    return np.array(node_features), np.array(demands)
 
 def create_node_bias(graph):
     bias_mat = np.eye(graph.number_of_nodes(), dtype=float)
