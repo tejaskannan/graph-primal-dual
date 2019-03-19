@@ -21,28 +21,25 @@ def plot_costs(costs, labels, save_folder):
     plt.savefig(COSTS_FILE_FORMAT.format(save_folder))
 
 
-# Flows is a |V| x |V| matrix of flow values
+# Flows is a |E| x 1 vector of flow values
 def plot_flow_graph(graph, flows, file_path):
     agraph = nx.drawing.nx_agraph.to_agraph(graph)
-    for node, demand in graph.nodes.data('demand'):
+    for node, data in graph.nodes(data=True):
         n = agraph.get_node(node)
-        if demand < 0:
+        if 'source' in data and data['source'] == True:
             n.attr['color'] = 'green'
-        elif demand > 0:
+        elif 'sink' in data and data['sink'] == True:
             n.attr['color'] = 'blue'
-        n.attr['label'] = str(n) + ' ' + str(round(demand, 2))
+        n.attr['label'] = str(n)
 
     max_flow_val = np.max(flows)
-    for i, (src, dest) in enumerate(graph.edges()):
-        if flows.ndim == 1:
-            flow = flows[i]
-        elif flows.ndim == 2:
-            flow = flows[src, dest]
+    for i, (src, dest, capacity) in enumerate(graph.edges.data('capacity')):
+        flow = flows[i][0]
+        cap = round(capacity[0], 2)
 
         e = agraph.get_edge(src, dest)
         e.attr['color'] = _to_hex(0.0, max_flow_val, flow)
-        e.attr['label'] = str(round(flow, 2))
-
+        e.attr['label'] = '(' + str(cap) + ', ' + str(round(flow, 2)) + ')'
     agraph.draw(file_path, prog='dot')
 
 

@@ -27,19 +27,24 @@ class Model:
         raise NotImplementedError()
 
     def run_train_step(self, feed_dict):
-        raise NotImplementedError()
+        with self._sess.graph.as_default():
+            ops = [self.loss_op, self.optimizer_op]
+            op_result = self._sess.run([ops], feed_dict=feed_dict)
+            return op_result[0][0]
 
     def inference(self, feed_dict):
         with self._sess.graph.as_default():
             op_results = self._sess.run(self.output_ops, feed_dict=feed_dict)
             return op_results
 
-    def apply_gradients(self, gradients, variables, multiplier=1):
+    def _build_optimizer_op(self):
+        trainable_vars = self._sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        gradients = tf.gradients(self.loss_op, trainable_vars)
         clipped_grad, _ = tf.clip_by_global_norm(gradients, self.params['gradient_clip'])
         pruned_gradients = []
-        for grad, var in zip(clipped_grad, variables):
+        for grad, var in zip(clipped_grad, trainable_vars):
             if grad is not None:
-                pruned_gradients.append((multiplier * grad, var))
+                pruned_gradients.append((grad, var))
 
         return self.optimizer.apply_gradients(pruned_gradients)
 

@@ -16,16 +16,22 @@ def load_params(params_file_path):
     return params
 
 
-def add_demands(graph, demands):
+def add_features(graph, labels, capacities):
     graph = graph.copy()
 
     for i, node in enumerate(graph.nodes()):
-        graph.add_node(node, demand=demands[i][0])
+        if labels[i][0] == 1:
+            graph.add_node(node, source=True)
+        elif labels[i][1] == 1:
+            graph.add_node(node, sink=True)
+
+    for i, (src, dest) in enumerate(graph.edges()):
+        graph.add_edge(src, dest, capacity=capacities[i])
 
     return graph
 
 
-def create_demand_tensor(graph, min_max_sources, min_max_sinks):
+def create_tensors(graph, min_max_sources, min_max_sinks):
     # Randomly select the number of sources and sinks
     num_sources = np.random.randint(low=min_max_sources[0], high=min_max_sources[1])
     num_sinks = np.random.randint(low=min_max_sinks[0], high=min_max_sinks[1])
@@ -38,36 +44,65 @@ def create_demand_tensor(graph, min_max_sources, min_max_sinks):
     sources = source_sink_nodes[:num_sources]
     sinks = source_sink_nodes[num_sources:]
 
-    # Randomly set demand values such that the total source and sink values
-    # both sum to one. This property makes the problem feasible.
-    source_demands = softmax(np.random.uniform(size=num_sources))
-    sink_demands = softmax(np.random.uniform(size=num_sinks))
+    # Create labels tensor
+    labels = np.zeros(shape=(graph.number_of_nodes(), 3), dtype=float)
+    for node in graph.nodes():
+        labels[node][0] = 0
+        labels[node][1] = 0
+        labels[node][2] = 1
 
-    # Create demands tensor
-    demands = np.zeros(shape=(graph.number_of_nodes(), 1), dtype=float)
-    for node, d in zip(sources, source_demands):
-        demands[node][0] = -d
+    for node in sources:
+        labels[node][0] = 1
+        labels[node][1] = 0
+        labels[node][2] = 0
 
-    for node, d in zip(sinks, sink_demands):
-        demands[node][0] = d
+    for node in sinks:
+        labels[node][0] = 0
+        labels[node][1] = 1
+        labels[node][2] = 0
 
-    assert np.sum(demands) < SMALL_NUMBER, 'Demands are not balanced.'
+    # Create mask to fetch all edges leaving the source
+    source_edge_mask = np.zeros(shape=(graph.number_of_edges(), 1), dtype=float)
+    for i, (src, dest) in enumerate(graph.edges()):
+        if src in sources:
+            source_edge_mask[i] = 1
 
-    return demands
+    # Randomize capacities
+    capacities = np.random.uniform(size=(graph.number_of_edges(), 1), low=0.1, high=1.0)
+
+    return labels, capacities, source_edge_mask
+
 
 def create_batch(graph, batch_size, min_max_sources, min_max_sinks):
     node_features = []
-    demands = []
+    edge_features = []
+    source_masks = []
     for i in range(batch_size):
-        demand_tensor = create_demand_tensor(graph, min_max_sources, min_max_sinks)
-        node_features.append(demand_tensor)
-        demands.append(demand_tensor)
-    return np.array(node_features), np.array(demands)
+        labels, capacities, source_mask = create_tensors(graph, min_max_sources, min_max_sinks)
+        node_features.append(labels)
+        edge_features.append(capacities)
+        source_masks.append(source_mask)
+    return np.array(node_features), np.array(edge_features), np.array(source_masks)
+
 
 def create_node_bias(graph):
     bias_mat = np.eye(graph.number_of_nodes(), dtype=float)
     for src, dest in graph.edges():
         bias_mat[src, dest] = 1.0
+    return -BIG_NUMBER * (1.0 - bias_mat)
+
+
+def create_edge_bias(graph):
+    bias_mat = np.eye(graph.number_of_edges(), dtype=float)
+    for src, dest in graph.edges():
+        for node in graph.predecessors(src):
+            bias_mat[src, node] = 1.0
+
+        for node in graph.successors(src):
+            bias_mat[src, node] = 1.0
+
+        for node in graph.successors(dest):
+            bias_mat[src, node] = 1.0
     return -BIG_NUMBER * (1.0 - bias_mat)
 
 
