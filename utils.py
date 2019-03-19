@@ -20,7 +20,7 @@ def add_demands(graph, demands):
     graph = graph.copy()
 
     for i, node in enumerate(graph.nodes()):
-        graph.add_node(node, demand=demands[i])
+        graph.add_node(node, demand=demands[i][0])
 
     return graph
 

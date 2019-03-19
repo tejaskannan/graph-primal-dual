@@ -1,7 +1,7 @@
 {
 	"learning_rate": 0.001,
 	"gradient_clip": 5,
-	"train_samples": 1000,
+	"train_samples": 10000,
 	"valid_samples": 100,
 	"batch_size": 256,
 	"epochs": 4,

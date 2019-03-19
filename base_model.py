@@ -11,12 +11,14 @@ class Model:
         self.name = name
         self.params = params
         self._sess = tf.Session(graph=tf.Graph())
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
+        #self.optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
+        self.optimizer = tf.train.MomentumOptimizer(learning_rate=params['learning_rate'],
+                                                    momentum=0.9)
 
         # Must be set by a concrete subclass
         self.loss_op = None
         self.optimizer_op = None
-        self.output_op = None
+        self.output_ops = []
 
     def init(self):
         with self._sess.graph.as_default():
@@ -31,10 +33,10 @@ class Model:
 
     def inference(self, feed_dict):
         with self._sess.graph.as_default():
-            op_result = self._sess.run(self.output_op, feed_dict=feed_dict)
-            return op_result
+            op_results = self._sess.run(self.output_ops, feed_dict=feed_dict)
+            return op_results
 
-    def clip_gradients(self, gradients, variables, multiplier=1):
+    def apply_gradients(self, gradients, variables, multiplier=1):
         clipped_grad, _ = tf.clip_by_global_norm(gradients, self.params['gradient_clip'])
         pruned_gradients = []
         for grad, var in zip(clipped_grad, variables):

@@ -57,26 +57,27 @@ class GAT(Layer):
         bias = kwargs['bias']
 
         heads = []
-        for _ in range(self.num_heads):
+        for i in range(self.num_heads):
             # Apply weight matrix to the set of inputs, B x V x F' Tensor
             transformed_inputs = tf.layers.dense(inputs=inputs,
                                                  units=self.output_size,
                                                  use_bias=False,
-                                                 name=self.name + '-W')
+                                                 name=self.name + '-W-' + str(i))
 
             # Create unnormalized attention weights, B x V x V
             weights = tf.layers.dense(inputs=transformed_inputs,
                                       units=1,
                                       use_bias=False,
-                                      name=self.name + '-a')
+                                      name=self.name + '-a-' + str(i))
             weights = weights + tf.transpose(weights, [0, 2, 1])
 
             # Compute normalized attention weights, B x V x V
             attention_coefs = tf.nn.softmax(tf.nn.leaky_relu(weights) + bias, axis=2)
 
             # Apply attention weights, B x V x F'
-            head = tf.contrib.layers.bias_add(tf.matmul(attention_coefs, transformed_inputs))
-            heads.append(head)
+            attn_head = tf.matmul(attention_coefs, transformed_inputs)
+            attn_head = tf.contrib.layers.bias_add(attn_head, scope=self.name + '-b-' + str(i))
+            heads.append(attn_head)
 
         # Average over all attention heads
         return (1.0 / self.num_heads) * tf.add_n(heads)

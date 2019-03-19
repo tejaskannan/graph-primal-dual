@@ -11,6 +11,7 @@ class MinCostFlowModel(Model):
         adj = kwargs['adj']
         demands = kwargs['demands']
         cost_fn = kwargs['cost_fn']
+        is_primal = kwargs['is_primal']
 
         with self._sess.graph.as_default():
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
@@ -44,30 +45,45 @@ class MinCostFlowModel(Model):
                 node_output = adj * node_output
 
                 # Compute the cost
-                self.output_op = cost_fn(node_output)
+                output_op = cost_fn(node_output)
+
+                self.output_ops = [output_op, node_output]
+
+                # Initialize Dual Variables. Set to be non-trainable as their updating
+                # is handled manually.
+                init_beta = tf.random.uniform(shape=(num_output_features, 1), maxval=1.0)
+                self.beta = tf.Variable(initial_value=init_beta,
+                                        trainable=False,
+                                        name='beta')
+
+                init_gamma = tf.random.uniform(shape=(num_output_features, num_output_features), maxval=1.0)
+                self.gamma = tf.Variable(initial_value=init_gamma,
+                                         trainable=False,
+                                         name='gamma')
 
                 # Create loss operation
-                self.loss_op = self._build_loss_op(self.output_op, demands, num_output_features)
+                self.loss_op = self._build_loss_op(output_op, demands, num_output_features)
 
                 # Create optimizer operation
-                self.optimizer_op = self._build_optimizer_op()
+                if is_primal:
+                    self.optimizer_op = self._build_primal_optimizer_op()
+                else:
+                    self.optimizer_op = self._build_dual_optimizer_op()
 
-
-    def _build_optimizer_op(self):
+    def _build_primal_optimizer_op(self):
 
         primal_vars = self._sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         dual_vars = [self.beta, self.gamma]
 
-        # Compute gradients for the dual variables. Use the negative
-        # because the loss is maximized w.r.t. these vars.
+        # Compute gradients for the dual variables
         dual_grads = tf.gradients(ys=self.loss_op,
                                   xs=dual_vars,
                                   name='dual-gradients',
                                   stop_gradients=primal_vars)
 
-        dual_op = self.clip_gradients(gradients=dual_grads,
-                                      variables=dual_vars,
-                                      multiplier=-1)
+        dual_op = self.apply_gradients(gradients=dual_grads,
+                                       variables=dual_vars,
+                                       multiplier=-1)
 
         # Gradient projection to enforce dual variable is always positive
         self.gamma = tf.nn.relu(self.gamma)
@@ -78,8 +94,37 @@ class MinCostFlowModel(Model):
                                         xs=primal_vars,
                                         name='primal-gradients',
                                         stop_gradients=dual_vars)
-            primal_op = self.clip_gradients(gradients=primal_grads, variables=primal_vars)
+            primal_op = self.apply_gradients(gradients=primal_grads, variables=primal_vars)
             return primal_op
+
+    def _build_dual_optimizer_op(self):
+        primal_vars = self._sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        dual_vars = [self.beta, self.gamma]
+
+        primal_grads = tf.gradients(ys=self.loss_op,
+                                        xs=primal_vars,
+                                        name='primal-gradients',
+                                        stop_gradients=dual_vars)
+        primal_op = self.apply_gradients(gradients=primal_grads, variables=primal_vars)
+
+        # Minimize the primal variables after the dual variable maximization step
+        with tf.control_dependencies([primal_op]):
+
+            # Compute gradients for the dual variables
+            dual_grads = tf.gradients(ys=self.loss_op,
+                                      xs=dual_vars,
+                                      name='dual-gradients',
+                                      stop_gradients=primal_vars)
+
+            dual_op = self.apply_gradients(gradients=dual_grads,
+                                           variables=dual_vars,
+                                           multiplier=-1)
+        
+        # Gradient projection to enforce dual variable is always positive
+        self.gamma = tf.nn.relu(self.gamma)
+
+        with tf.control_dependencies([self.gamma]):
+            return dual_op
 
     def run_train_step(self, feed_dict):
         with self._sess.graph.as_default():
@@ -88,22 +133,9 @@ class MinCostFlowModel(Model):
             return op_result[0][0]
 
     def _build_loss_op(self, preds, demands, num_output_features):
-
-        # Initialize Dual Variables. Set to be non-trainable as their updating
-        # is handled manually.
-        init_beta = tf.random.uniform(shape=(num_output_features, 1), maxval=1.0)
-        self.beta = tf.Variable(initial_value=init_beta,
-                                trainable=False,
-                                name='beta')
-
-        init_gamma = tf.random.uniform(shape=(num_output_features, num_output_features), maxval=1.0)
-        self.gamma = tf.Variable(initial_value=init_gamma,
-                                 trainable=False,
-                                 name='gamma')
-
         # Compute incoming and outgoing flow values, B x V x 1
-        incoming = tf.expand_dims(tf.reduce_sum(preds, axis=1), axis=2)
-        outgoing = tf.expand_dims(tf.reduce_sum(preds, axis=2), axis=2)
+        incoming = tf.expand_dims(tf.reduce_sum(preds, axis=2), axis=2)
+        outgoing = tf.expand_dims(tf.reduce_sum(preds, axis=1), axis=2)
 
         # Compute dual losses
         demand_diff = incoming - outgoing - demands

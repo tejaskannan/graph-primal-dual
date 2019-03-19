@@ -2,10 +2,11 @@ import argparse
 import networkx as nx
 import tensorflow as tf
 import numpy as np
-from utils import load_params, create_node_bias
+from utils import load_params, create_node_bias, add_demands
 from utils import sparse_matrix_to_tensor, create_batch
 from load import load_to_networkx
 from graph_model import MinCostFlowModel
+from plot import plot_flow_graph
 from constants import *
 
 
@@ -51,7 +52,8 @@ def main():
                 demands=demands_ph,
                 num_input_features=num_input_features,
                 num_output_features=num_nodes,
-                cost_fn=tf.square)
+                cost_fn=tf.square,
+                is_primal=True)
     model.init()
 
     for epoch in range(params['epochs']):
@@ -102,7 +104,7 @@ def main():
             }
             costs = model.inference(feed_dict=feed_dict)
 
-            valid_costs.append(costs)
+            valid_costs.append(costs[0])
 
         print(LINE)
 
@@ -111,6 +113,22 @@ def main():
 
         avg_valid_cost = np.average(valid_costs)
         print('Average validation cost: {0}'.format(avg_valid_cost))
+
+    # Create random test point
+    node_features, demands = create_batch(graph=graph,
+                                          batch_size=1,
+                                          min_max_sources=params['min_max_sources'],
+                                          min_max_sinks=params['min_max_sinks'])
+    feed_dict = {
+        node_ph: node_features,
+        adj_ph: adj_mat,
+        node_bias_ph: node_bias,
+        demands_ph: demands
+    }
+    outputs = model.inference(feed_dict=feed_dict)
+    flows = outputs[1][0]
+    demand_graph = add_demands(graph, demands[0])
+    plot_flow_graph(demand_graph, flows, 'test.png')
 
 
 if __name__ == '__main__':
