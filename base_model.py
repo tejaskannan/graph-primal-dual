@@ -11,9 +11,7 @@ class Model:
         self.name = name
         self.params = params
         self._sess = tf.Session(graph=tf.Graph())
-        #self.optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
-        self.optimizer = tf.train.MomentumOptimizer(learning_rate=params['learning_rate'],
-                                                    momentum=0.9)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
 
         # Must be set by a concrete subclass
         self.loss_op = None
