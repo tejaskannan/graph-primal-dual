@@ -1,6 +1,8 @@
 import networkx as nx
 import numpy as np
 from os.path import exists
+from constants import SMALL_NUMBER
+from annoy import AnnoyIndex
 
 
 def load_to_networkx(net_path):
@@ -29,6 +31,40 @@ def load_to_networkx(net_path):
             edge_features[edge] = features
     nx.set_edge_attributes(graph, edge_features)
     return graph
+
+
+def write_dataset(demands, output_path, mode='a'):
+    with open(output_path, mode) as output_file:
+        for demand in demands:
+            demand_lst = [str(i) + ':' + str(d[0]) for i, d in enumerate(demand) if abs(d) > SMALL_NUMBER]
+            output_file.write(' '.join(demand_lst) + '\n')
+
+
+def read_dataset(demands_path, num_nodes):
+    dataset = []
+    with open(demands_path, 'r') as demands_file:
+        for demand_lst in demands_file:
+            demands = np.zeros(shape=(num_nodes, 1), dtype=float)
+            demand_values = demand_lst.strip().split(' ')
+            for value in demand_values:
+                tokens = value.split(':')
+                demands[int(tokens[0])][0] = float(tokens[1])
+            dataset.append(demands)
+    return dataset
+
+
+def load_embeddings(index_path, embedding_size, num_nodes):
+    # Load Annoy index which stores the embedded vectors
+    index = AnnoyIndex(embedding_size)
+    index.load(index_path)
+
+    embeddings = [index.get_item_vector(i) for i in range(num_nodes)]
+
+    # Unload the index to save memory (loading mmaps the index file)
+    index.unload()
+
+    # V x D matrix of embeddings
+    return np.array(embeddings)
 
 
 def _parse_edge_features(edge_elems):

@@ -60,11 +60,10 @@ def create_demands(graph, min_max_sources, min_max_sinks):
     return demands
 
 
-def create_batch(graph, batch_size, min_max_sources, min_max_sinks):
+def create_batches(dataset, batch_size):
     node_features = []
-    for i in range(batch_size):
-        demands = create_demands(graph, min_max_sources, min_max_sinks)
-        node_features.append(demands)
+    for i in range(0, len(dataset), batch_size):
+        node_features.append(dataset[i:i+batch_size])
     return np.array(node_features)
 
 
@@ -105,3 +104,4 @@ def append_row_to_log(row, log_path):
     with open(log_path, 'a') as log_file:
         log_writer = csv.writer(log_file, delimiter=',', quotechar='|')
         log_writer.writerow(row)
+

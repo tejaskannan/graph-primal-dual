@@ -15,7 +15,10 @@ class MinCostFlowModel(Model):
 
         # B x V x D tensor which contains node features
         node_input = kwargs['node_input']
-        
+
+        # V x D' tensor which contains pre-computed node embeddings
+        node_embeddings = kwargs['node_embeddings']
+
         # V x V tensor which contains a neighborhood mask for each node
         node_bias = kwargs['node_bias']
 
@@ -27,8 +30,13 @@ class MinCostFlowModel(Model):
 
         with self._sess.graph.as_default():
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
+                # Concatenate embeddings and explicit features together
+                node_embeddings = tf.expand_dims(node_embeddings, axis=0)
+                node_embeddings = tf.tile(node_embeddings, multiples=(tf.shape(node_input)[0], 1, 1))
+                node_concat = tf.concat([node_input, node_embeddings], axis=2, name='node-concat')
+
                 # Encoder
-                node_encoding = tf.layers.dense(inputs=node_input,
+                node_encoding = tf.layers.dense(inputs=node_concat,
                                                 units=self.params['node_encoding'],
                                                 activation=tf.nn.tanh,
                                                 name='node-encoder')
@@ -102,10 +110,11 @@ class MinCostFlowModel(Model):
                 dual_penalty = tf.reduce_sum(duals * (dual_inflow - dual_outflow - node_input),
                                              axis=[1, 2])
 
+                # B x 1 Tensor which contains the dual cost
                 dual_flow_cost = tf.reduce_sum(self.cost_fn.apply(dual_flows), axis=[1, 2])
                 self.dual_cost = dual_flow_cost + dual_penalty
 
-                self.loss_op = tf.losses.mean_squared_error(self.flow_cost, self.dual_cost)
+                self.loss_op = tf.reduce_mean(tf.square(self.flow_cost - self.dual_cost))
 
                 self.output_ops = [self.flow_cost, self.flow, self.dual_cost]
                 self.optimizer_op = self._build_optimizer_op()
