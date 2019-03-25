@@ -55,14 +55,9 @@ def main():
                                             shape=[num_nodes, num_nodes],
                                             name='node-bias-ph',
                                             ph_type='dense')
-    node_index_ph = model.create_placeholder(dtype=tf.int32,
-                                             shape=[num_nodes],
-                                             name='node-index-ph',
-                                             ph_type='dense')
 
     # Create model
     model.build(node_input=node_ph,
-                node_index=node_index_ph,
                 node_bias=node_bias_ph,
                 adj=adj_ph,
                 num_input_features=num_node_features,
@@ -77,6 +72,10 @@ def main():
     log_headers = ['Epoch', 'Avg Train Loss', 'Avg Valid Loss']
     log_path = output_folder + 'log.csv'
     append_row_to_log(log_headers, log_path)
+
+    # Variables for early stopping
+    convergence_count = 0
+    prev_loss = BIG_NUMBER
 
     for epoch in range(params['epochs']):
 
@@ -139,6 +138,20 @@ def main():
         log_row = [epoch, avg_train_loss, avg_valid_loss]
         append_row_to_log(log_row, log_path)
 
+        if avg_valid_loss < prev_loss:
+            print('Saving model...')
+            model.save(output_folder)
+
+        # Early Stopping
+        if avg_valid_loss > prev_loss or abs(prev_loss - avg_valid_loss) < params['early_stop_threshold']:
+            convergence_count += 1
+        else:
+            convergence_count = 0
+
+        if convergence_count >= params['patience']:
+            print('Early Stopping.')
+            break
+
     # Create random test point
     node_features = create_batch(graph=graph,
                                  batch_size=1,
@@ -153,8 +166,8 @@ def main():
     flow_cost = outputs[1][0]
     dual_cost = outputs[3][0]
 
-    print(flow_cost)
-    print(dual_cost)
+    print('Primal Cost: {0}'.format(flow_cost))
+    print('Dual Cost: {0}'.format(dual_cost))
 
     flows = outputs[2][0]
     demand_graph = add_features(graph, demands=node_features[0], flows=flows)
@@ -164,9 +177,6 @@ def main():
 
     if params['plot_flows']:
         plot_flow_graph(demand_graph, flows, output_folder + 'flows.png')
-
-    # Save model weights
-    model.save(output_folder)
 
 
 if __name__ == '__main__':

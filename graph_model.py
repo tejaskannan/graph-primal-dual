@@ -16,9 +16,6 @@ class MinCostFlowModel(Model):
         # B x V x D tensor which contains node features
         node_input = kwargs['node_input']
         
-        # V x 1 tensor which holds index of each node
-        node_index = kwargs['node_index']
-        
         # V x V tensor which contains a neighborhood mask for each node
         node_bias = kwargs['node_bias']
 
