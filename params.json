@@ -1,7 +1,7 @@
 {
 	"learning_rate": 0.001,
 	"gradient_clip": 5,
-	"train_samples": 100,
+	"train_samples": 1000,
 	"valid_samples": 100,
 	"batch_size": 16,
 	"epochs": 1,
@@ -10,7 +10,7 @@
 	"node_encoding": 8,
 	"edge_encoding": 8,
 	"output_folder": "trained_models",
-	"cost_fn": "exp",
+	"cost_fn": "square",
 	"flow_iters": 1000,
 	"min_max_sources": [2, 4],
 	"min_max_sinks": [2, 4],

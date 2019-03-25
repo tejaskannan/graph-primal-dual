@@ -36,7 +36,8 @@ class Model:
 
     def inference(self, feed_dict):
         with self._sess.graph.as_default():
-            op_results = self._sess.run(self.output_ops, feed_dict=feed_dict)
+            ops = [self.loss_op] + self.output_ops
+            op_results = self._sess.run(ops, feed_dict=feed_dict)
             return op_results
 
     def _build_optimizer_op(self):

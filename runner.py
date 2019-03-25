@@ -35,18 +35,12 @@ def main():
     adj_mat = nx.adjacency_matrix(graph).todense()
     node_bias = create_node_bias(graph)
 
-    # Fetch cost function
-    if not params['cost_fn'] in tf_cost_functions:
-        print('Unknown cost function: {0}'.format(params['cost_fn']))
-        return
-    cost_fn = tf_cost_functions[params['cost_fn']]
-
     # Graph properties
     num_nodes = graph.number_of_nodes()
     num_node_features = 1
 
     # Initialize model
-    model = MinCostFlowModel(cost_fn=cost_fn, params=params, name='min-cost-flow-model')
+    model = MinCostFlowModel(params=params, name='min-cost-flow-model')
 
     # Create model placeholders
     node_ph = model.create_placeholder(dtype=tf.float32,
@@ -80,7 +74,7 @@ def main():
     output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], params['graph_name'], timestamp)
     mkdir(output_folder)
 
-    log_headers = ['Epoch', 'Avg Train Loss', 'Avg Valid Cost']
+    log_headers = ['Epoch', 'Avg Train Loss', 'Avg Valid Loss']
     log_path = output_folder + 'log.csv'
     append_row_to_log(log_headers, log_path)
 
@@ -108,7 +102,8 @@ def main():
                 adj_ph: adj_mat,
                 node_bias_ph: node_bias
             }
-            avg_batch_loss = model.run_train_step(feed_dict=feed_dict)
+            batch_loss = model.run_train_step(feed_dict=feed_dict)
+            avg_batch_loss = batch_loss / params['batch_size']
 
             batch_num = int(i / params['batch_size']) + 1
             print('Average training loss for batch {0}/{1}: {2}'.format(batch_num, num_training_batches, avg_batch_loss))
@@ -116,7 +111,7 @@ def main():
             train_losses.append(avg_batch_loss)
 
         # Validation Batches
-        valid_costs = []
+        valid_losses = []
         for i in range(0, params['valid_samples'], params['batch_size']):
             # Create random validation points
             node_features = create_batch(graph=graph,
@@ -129,19 +124,19 @@ def main():
                 adj_ph: adj_mat,
                 node_bias_ph: node_bias
             }
-            costs = model.inference(feed_dict=feed_dict)
-
-            valid_costs.append(costs[0])
+            outputs = model.inference(feed_dict=feed_dict)
+            avg_loss = outputs[0] / params['batch_size']
+            valid_losses.append(avg_loss)
 
         print(LINE)
 
         avg_train_loss = np.average(train_losses)
         print('Average training loss: {0}'.format(avg_train_loss))
 
-        avg_valid_cost = np.average(valid_costs)
-        print('Average validation cost: {0}'.format(avg_valid_cost))
+        avg_valid_loss = np.average(valid_losses)
+        print('Average validation cost: {0}'.format(avg_valid_loss))
 
-        log_row = [epoch, avg_train_loss, avg_valid_cost]
+        log_row = [epoch, avg_train_loss, avg_valid_loss]
         append_row_to_log(log_row, log_path)
 
     # Create random test point
@@ -155,13 +150,19 @@ def main():
         node_bias_ph: node_bias
     }
     outputs = model.inference(feed_dict=feed_dict)
-    flows = outputs[1][0]
+    flow_cost = outputs[1][0]
+    dual_cost = outputs[3][0]
+
+    print(flow_cost)
+    print(dual_cost)
+
+    flows = outputs[2][0]
     demand_graph = add_features(graph, demands=node_features[0], flows=flows)
 
     # Write output graph to Graph XML
     nx.write_gexf(demand_graph, output_folder + 'graph.gexf')
 
-    if params['plot_flow']:
+    if params['plot_flows']:
         plot_flow_graph(demand_graph, flows, output_folder + 'flows.png')
 
     # Save model weights
