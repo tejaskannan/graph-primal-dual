@@ -2,8 +2,10 @@ import networkx as nx
 import numpy as np
 import tensorflow as tf
 import json
+import csv
 from os.path import exists
 from constants import *
+from scipy.sparse import csr_matrix
 
 
 def load_params(params_file_path):
@@ -16,22 +18,19 @@ def load_params(params_file_path):
     return params
 
 
-def add_features(graph, labels, capacities):
+def add_features(graph, demands, flows):
     graph = graph.copy()
 
-    for i, node in enumerate(graph.nodes()):
-        if labels[i][0] == 1:
-            graph.add_node(node, source=True)
-        elif labels[i][1] == 1:
-            graph.add_node(node, sink=True)
+    for node in graph.nodes():
+        graph.add_node(node, demand=float(demands[node][0]))
 
-    for i, (src, dest) in enumerate(graph.edges()):
-        graph.add_edge(src, dest, capacity=capacities[i])
+    for src, dest in graph.edges():
+        graph.add_edge(src, dest, flow=float(flows[src, dest]))
 
     return graph
 
 
-def create_tensors(graph, min_max_sources, min_max_sinks):
+def create_demands(graph, min_max_sources, min_max_sinks):
     # Randomly select the number of sources and sinks
     num_sources = np.random.randint(low=min_max_sources[0], high=min_max_sources[1])
     num_sinks = np.random.randint(low=min_max_sinks[0], high=min_max_sinks[1])
@@ -44,45 +43,29 @@ def create_tensors(graph, min_max_sources, min_max_sinks):
     sources = source_sink_nodes[:num_sources]
     sinks = source_sink_nodes[num_sources:]
 
+    source_demands = -softmax(np.random.normal(size=num_sources))
+    sink_demands = softmax(np.random.normal(size=num_sinks))
+
     # Create labels tensor
-    labels = np.zeros(shape=(graph.number_of_nodes(), 3), dtype=float)
+    demands = np.zeros(shape=(graph.number_of_nodes(), 1), dtype=float)
     for node in graph.nodes():
-        labels[node][0] = 0
-        labels[node][1] = 0
-        labels[node][2] = 1
+        demands[node][0] = 0.0
 
-    for node in sources:
-        labels[node][0] = 1
-        labels[node][1] = 0
-        labels[node][2] = 0
+    for i, node in enumerate(sources):
+        demands[node][0] = source_demands[i]
 
-    for node in sinks:
-        labels[node][0] = 0
-        labels[node][1] = 1
-        labels[node][2] = 0
+    for i, node in enumerate(sinks):
+        demands[node][0] = sink_demands[i]
 
-    # Create mask to fetch all edges leaving the source
-    source_edge_mask = np.zeros(shape=(graph.number_of_edges(), 1), dtype=float)
-    for i, (src, dest) in enumerate(graph.edges()):
-        if src in sources:
-            source_edge_mask[i] = 1
-
-    # Randomize capacities
-    capacities = np.random.uniform(size=(graph.number_of_edges(), 1), low=0.1, high=1.0)
-
-    return labels, capacities, source_edge_mask
+    return demands
 
 
 def create_batch(graph, batch_size, min_max_sources, min_max_sinks):
     node_features = []
-    edge_features = []
-    source_masks = []
     for i in range(batch_size):
-        labels, capacities, source_mask = create_tensors(graph, min_max_sources, min_max_sinks)
-        node_features.append(labels)
-        edge_features.append(capacities)
-        source_masks.append(source_mask)
-    return np.array(node_features), np.array(edge_features), np.array(source_masks)
+        demands = create_demands(graph, min_max_sources, min_max_sinks)
+        node_features.append(demands)
+    return np.array(node_features)
 
 
 def create_node_bias(graph):
@@ -116,3 +99,9 @@ def sparse_matrix_to_tensor(sparse_mat):
     mat = sparse_mat.tocoo()
     indices = np.mat([mat.row, mat.col]).transpose()
     return tf.SparseTensorValue(indices, mat.data, mat.shape)
+
+
+def append_row_to_log(row, log_path):
+    with open(log_path, 'a') as log_file:
+        log_writer = csv.writer(log_file, delimiter=',', quotechar='|')
+        log_writer.writerow(row)

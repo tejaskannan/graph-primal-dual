@@ -9,8 +9,11 @@
 	"num_heads": 2,
 	"node_encoding": 8,
 	"edge_encoding": 8,
-	"output_folder": "trained_models/graph-network",
+	"output_folder": "trained_models",
+	"cost_fn": "exp",
+	"flow_iters": 1000,
 	"min_max_sources": [2, 4],
 	"min_max_sinks": [2, 4],
-	"graph_path": "/home/tejask/Documents/TransportationNetworks/SiouxFalls/SiouxFalls_net.tntp"
+	"graph_name": "sioux-falls",
+	"plot_flows": true
 }

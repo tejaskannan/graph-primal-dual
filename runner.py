@@ -3,12 +3,16 @@ import networkx as nx
 import tensorflow as tf
 import numpy as np
 from utils import load_params, create_node_bias, add_features
-from utils import create_edge_bias
+from utils import append_row_to_log
 from utils import sparse_matrix_to_tensor, create_batch
 from load import load_to_networkx
-from graph_model import MaxFlowModel
+from graph_model import MinCostFlowModel
 from plot import plot_flow_graph
+from cost_functions import tf_cost_functions
 from constants import *
+from os import mkdir
+from os.path import exists
+from datetime import datetime
 
 
 def main():
@@ -21,50 +25,64 @@ def main():
     params = load_params(args.params)
     
     # Load graph
-    graph = load_to_networkx(params['graph_path'])
+    graph_path = 'graphs/{0}.tntp'.format(params['graph_name'])
+    if not exists(graph_path):
+        print('Unknown graph with name {0}.'.format(params['graph_name']))
+        return
+    graph = load_to_networkx(graph_path)
 
     # Create tensors for global graph properties
     adj_mat = nx.adjacency_matrix(graph).todense()
     node_bias = create_node_bias(graph)
-    edge_bias = create_edge_bias(graph)
 
+    # Fetch cost function
+    if not params['cost_fn'] in tf_cost_functions:
+        print('Unknown cost function: {0}'.format(params['cost_fn']))
+        return
+    cost_fn = tf_cost_functions[params['cost_fn']]
+
+    # Graph properties
     num_nodes = graph.number_of_nodes()
-    num_edges = graph.number_of_edges()
-    num_node_features = 3
-    num_edge_features = 1
+    num_node_features = 1
 
-    model = MaxFlowModel(name='min-cost-flow', params=params)
+    # Initialize model
+    model = MinCostFlowModel(cost_fn=cost_fn, params=params, name='min-cost-flow-model')
 
-    # Create placeholders
-    with model._sess.graph.as_default():
-        node_ph = tf.placeholder(dtype=tf.float32,
-                                 shape=[None, num_nodes, num_node_features],
-                                 name='node-ph')
-        edge_ph = tf.placeholder(dtype=tf.float32,
-                                 shape=[None, num_edges, num_edge_features],
-                                 name='edge-ph')
-        adj_ph = tf.placeholder(dtype=tf.float32,
-                                shape=[num_nodes, num_nodes],
-                                name='adj-ph')
-        node_bias_ph = tf.placeholder(dtype=tf.float32,
+    # Create model placeholders
+    node_ph = model.create_placeholder(dtype=tf.float32,
+                                       shape=[None, num_nodes, num_node_features],
+                                       name='node-ph',
+                                       ph_type='dense')
+    adj_ph = model.create_placeholder(dtype=tf.float32,
                                       shape=[num_nodes, num_nodes],
-                                      name='node-bias-ph')
-        edge_bias_ph = tf.placeholder(dtype=tf.float32,
-                                      shape=[num_edges, num_edges],
-                                      name='edge-bias-ph')
-        source_mask_ph = tf.placeholder(dtype=tf.float32,
-                                        shape=[None, num_edges, 1],
-                                        name='source-mask')
+                                      name='adj-ph',
+                                      ph_type='dense')
+    node_bias_ph = model.create_placeholder(dtype=tf.float32,
+                                            shape=[num_nodes, num_nodes],
+                                            name='node-bias-ph',
+                                            ph_type='dense')
+    node_index_ph = model.create_placeholder(dtype=tf.int32,
+                                             shape=[num_nodes],
+                                             name='node-index-ph',
+                                             ph_type='dense')
 
     # Create model
-    model.build(inputs=(node_ph, edge_ph),
+    model.build(node_input=node_ph,
+                node_index=node_index_ph,
                 node_bias=node_bias_ph,
-                edge_bias=edge_bias_ph,
-                source_mask=source_mask_ph,
                 adj=adj_ph,
                 num_input_features=num_node_features,
                 num_output_features=num_nodes)
     model.init()
+
+    # Create output folder and initialize logging
+    timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
+    output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], params['graph_name'], timestamp)
+    mkdir(output_folder)
+
+    log_headers = ['Epoch', 'Avg Train Loss', 'Avg Valid Cost']
+    log_path = output_folder + 'log.csv'
+    append_row_to_log(log_headers, log_path)
 
     for epoch in range(params['epochs']):
 
@@ -80,17 +98,15 @@ def main():
         for i in range(0, params['train_samples'], params['batch_size']):
 
             # Create random training points
-            node_features, edge_features, source_mask = create_batch(graph=graph,
-                                                                     batch_size=params['batch_size'],
-                                                                     min_max_sources=params['min_max_sources'],
-                                                                     min_max_sinks=params['min_max_sinks'])
+            node_features = create_batch(graph=graph,
+                                         batch_size=params['batch_size'],
+                                         min_max_sources=params['min_max_sources'],
+                                         min_max_sinks=params['min_max_sinks'])
+
             feed_dict = {
                 node_ph: node_features,
-                edge_ph: edge_features,
                 adj_ph: adj_mat,
-                source_mask_ph: source_mask,
-                node_bias_ph: node_bias,
-                edge_bias_ph: edge_bias
+                node_bias_ph: node_bias
             }
             avg_batch_loss = model.run_train_step(feed_dict=feed_dict)
 
@@ -103,17 +119,15 @@ def main():
         valid_costs = []
         for i in range(0, params['valid_samples'], params['batch_size']):
             # Create random validation points
-            node_features, edge_features, source_mask = create_batch(graph=graph,
-                                                                     batch_size=params['batch_size'],
-                                                                     min_max_sources=params['min_max_sources'],
-                                                                     min_max_sinks=params['min_max_sinks'])
+            node_features = create_batch(graph=graph,
+                                         batch_size=params['batch_size'],
+                                         min_max_sources=params['min_max_sources'],
+                                         min_max_sinks=params['min_max_sinks'])
+
             feed_dict = {
                 node_ph: node_features,
-                edge_ph: edge_features,
                 adj_ph: adj_mat,
-                source_mask_ph: source_mask,
-                node_bias_ph: node_bias,
-                edge_bias_ph: edge_bias
+                node_bias_ph: node_bias
             }
             costs = model.inference(feed_dict=feed_dict)
 
@@ -127,23 +141,31 @@ def main():
         avg_valid_cost = np.average(valid_costs)
         print('Average validation cost: {0}'.format(avg_valid_cost))
 
+        log_row = [epoch, avg_train_loss, avg_valid_cost]
+        append_row_to_log(log_row, log_path)
+
     # Create random test point
-    node_features, edge_features, source_mask = create_batch(graph=graph,
-                                                             batch_size=1,
-                                                             min_max_sources=params['min_max_sources'],
-                                                             min_max_sinks=params['min_max_sinks'])
+    node_features = create_batch(graph=graph,
+                                 batch_size=1,
+                                 min_max_sources=params['min_max_sources'],
+                                 min_max_sinks=params['min_max_sinks'])
     feed_dict = {
         node_ph: node_features,
-        edge_ph: edge_features,
         adj_ph: adj_mat,
-        source_mask_ph: source_mask,
-        node_bias_ph: node_bias,
-        edge_bias_ph: edge_bias
+        node_bias_ph: node_bias
     }
     outputs = model.inference(feed_dict=feed_dict)
     flows = outputs[1][0]
-    demand_graph = add_features(graph, labels=node_features[0], capacities=edge_features[0])
-    plot_flow_graph(demand_graph, flows, 'test.png')
+    demand_graph = add_features(graph, demands=node_features[0], flows=flows)
+
+    # Write output graph to Graph XML
+    nx.write_gexf(demand_graph, output_folder + 'graph.gexf')
+
+    if params['plot_flow']:
+        plot_flow_graph(demand_graph, flows, output_folder + 'flows.png')
+
+    # Save model weights
+    model.save(output_folder)
 
 
 if __name__ == '__main__':

@@ -4,10 +4,6 @@ from os.path import exists
 
 
 def load_to_networkx(net_path):
-    if not exists(net_path):
-        print('The path {0} does not exist.'.format(net_path))
-        return
-
     graph = nx.DiGraph()
 
     edge_features = {}

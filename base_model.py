@@ -1,5 +1,7 @@
 import tensorflow as tf
 import numpy as np
+import gzip
+import pickle
 from os.path import exists
 from os import mkdir
 from constants import *
@@ -7,7 +9,7 @@ from constants import *
 
 class Model:
 
-    def __init__(self, name, params):
+    def __init__(self, params, name):
         self.name = name
         self.params = params
         self._sess = tf.Session(graph=tf.Graph())
@@ -23,7 +25,7 @@ class Model:
             init_op = tf.global_variables_initializer()
             self._sess.run(init_op)
 
-    def build(self, inputs, **kwargs):
+    def build(self, **kwargs):
         raise NotImplementedError()
 
     def run_train_step(self, feed_dict):
@@ -48,28 +50,31 @@ class Model:
 
         return self.optimizer.apply_gradients(pruned_gradients)
 
-    def save(self):
-        out_folder = self.params['output_folder']
-        if not exists(out_folder):
-            mkdir(save_folder)
+    def create_placeholder(self, dtype, shape, name, ph_type='dense'):
+        assert ph_type == 'dense' or ph_type == 'sparse'
+        with self._sess.graph.as_default():
+            if ph_type == 'sparse':
+                return tf.sparse.placeholder(dtype, shape=shape, name=name)
+            return tf.placeholder(dtype, shape=shape, name=name)
 
-        params_path = PARAMS_FILE.format(out_folder)
+    def save(self, output_folder):
+        params_path = PARAMS_FILE.format(output_folder)
         with gzip.GzipFile(params_path, 'wb') as out_file:
             pickle.dump(self.params, out_file)
 
         with self._sess.graph.as_default():
-            model_path = MODEL_FILE.format(out_folder, self.name)
+            model_path = MODEL_FILE.format(output_folder, self.name)
             saver = tf.train.Saver()
             saver.save(self._sess, model_path)
 
-    def restore(self, save_folder):
-        params_path = PARAMS_FILE.format(save_folder)
+    def restore(self, output_folder):
+        params_path = PARAMS_FILE.format(output_folder)
         with gzip.GzipFile(params_path, 'rb') as params_file:
             params_dict = pickle.load(params_file)
 
         self.params = params_dict
 
         with self._sess.graph.as_default():
-            model_path = MODEL_FILE.format(save_folder, self.name)
+            model_path = MODEL_FILE.format(output_folder, self.name)
             saver = tf.train.Saver()
             saver.restore(self._sess, model_path)
