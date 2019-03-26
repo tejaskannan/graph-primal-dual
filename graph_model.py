@@ -22,7 +22,7 @@ class MinCostFlowModel(Model):
         # V x V tensor which contains a neighborhood mask for each node
         node_bias = kwargs['node_bias']
 
-        # V x V sparse tensor containing the adjacency matrix
+        # V x V tensor containing the adjacency matrix
         adj = kwargs['adj']
 
         num_input_features = kwargs['num_input_features']
@@ -38,7 +38,7 @@ class MinCostFlowModel(Model):
                 # Encoder
                 node_encoding = tf.layers.dense(inputs=node_concat,
                                                 units=self.params['node_encoding'],
-                                                activation=tf.nn.tanh,
+                                                activation=tf.nn.relu,
                                                 name='node-encoder')
 
                 # Process using Graph Attention Layers
@@ -52,19 +52,17 @@ class MinCostFlowModel(Model):
                     node_gat_output = node_gat_layer.build(node_encoding, bias=node_bias)
 
                     # Apply non-linearity
-                    node_output = tf.nn.tanh(node_gat_output)
+                    node_output = tf.nn.relu(node_gat_output)
 
                     # Gate output form attention layer
                     node_gate_layer = Gate(name='node-gate')
                     node_encoding = node_gate_layer.build(inputs=(node_encoding, node_output))
 
-                # Decoder
+                # Min Cost Flow computation
                 pred_weights = tf.layers.dense(inputs=node_encoding,
                                                units=num_output_features,
-                                               activation=tf.nn.tanh,
                                                name='node-decoder')
 
-                # Min Cost Flow computation
                 # B x |V| x |V| matrix of flow proportions
                 identity = tf.eye(num_output_features) * BIG_NUMBER
                 flow_weight_pred = tf.nn.softmax(pred_weights + node_bias - identity,
@@ -94,27 +92,33 @@ class MinCostFlowModel(Model):
                 self.flow = flow
                 self.flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
                 
-                # Compute loss from the dual problem (B x V x 1 tensor)
-                duals = tf.layers.dense(inputs=node_encoding,
-                                        units=1,
-                                        name='flow-duals')
+                # Compute loss from the dual problem
+                dual_alphas = tf.layers.dense(inputs=node_encoding,
+                                              units=1,
+                                              name='flow-dual-alphas')
+                dual_betas = tf.layers.dense(inputs=node_encoding,
+                                             units=num_output_features,
+                                             activation=tf.nn.relu,
+                                             name='flow-dual-betas')
 
                 # B x V x V tensor which contains the pairwise difference between
                 # dual variables. This matrix is masked to remove flow values on 
                 # non-existent edges.
-                dual_diff = duals - tf.transpose(duals, perm=[0, 2, 1])
+                dual_diff = dual_alphas - tf.transpose(dual_alphas, perm=[0, 2, 1]) + dual_betas
                 dual_flows = adj * self.cost_fn.inv_derivative(dual_diff)
 
                 dual_inflow = tf.reduce_sum(dual_flows, axis=1, keepdims=True)
                 dual_outflow = tf.reduce_sum(dual_flows, axis=2, keepdims=True)
-                dual_penalty = tf.reduce_sum(duals * (dual_inflow - dual_outflow - node_input),
+                dual_penalty = tf.reduce_sum(dual_alphas * (dual_inflow - dual_outflow - node_input),
                                              axis=[1, 2])
+                dual_penalty = dual_penalty - tf.reduce_sum(dual_betas * dual_flows, axis=[1, 2])
 
                 # B x 1 Tensor which contains the dual cost
                 dual_flow_cost = tf.reduce_sum(self.cost_fn.apply(dual_flows), axis=[1, 2])
                 self.dual_cost = dual_flow_cost + dual_penalty
 
-                self.loss_op = tf.reduce_mean(tf.square(self.flow_cost - self.dual_cost))
+                loss = tf.square(self.flow_cost - self.dual_cost) + 0.1 * self.flow_cost 
+                self.loss_op = tf.reduce_mean(loss)
 
-                self.output_ops = [self.flow_cost, self.flow, self.dual_cost]
+                self.output_ops = [self.flow_cost, self.flow, self.dual_cost, dual_flows, dual_inflow, dual_outflow]
                 self.optimizer_op = self._build_optimizer_op()

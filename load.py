@@ -14,6 +14,8 @@ def load_to_networkx(net_path):
         metadata = True
 
         for line in net_file:
+            if len(line) == 0:
+                continue
             if line.startswith('~'):
                 metadata = False
                 continue
@@ -22,6 +24,9 @@ def load_to_networkx(net_path):
 
             edge_elems = line.split('\t')
             init, term, features = _parse_edge_features(edge_elems)
+
+            if init == -1 or term == -1:
+                continue
 
             graph.add_node(init)
             graph.add_node(term)

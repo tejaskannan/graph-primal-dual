@@ -176,8 +176,17 @@ def train(graph, params):
             outputs = model.inference(feed_dict=feed_dict)
             avg_loss = outputs[0]
             valid_losses.append(avg_loss)
+            
+            primal_cost = outputs[1]
+            dual_cost = outputs[3]
 
             print('Average validation loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
+            print('Primal Cost: {0}'.format(primal_cost))
+            print('Dual Cost: {0}'.format(dual_cost))
+
+            print(outputs[4])
+            print(outputs[5])
+            print(outputs[6])
 
         print(LINE)
 
@@ -205,7 +214,7 @@ def train(graph, params):
             break
 
     # Use random test point
-    test_point = np.random.randint(low=0, high=len(valid_dataset)+1)
+    test_point = np.random.randint(low=0, high=len(valid_dataset))
     feed_dict = {
         node_ph: [valid_dataset[test_point]],
         adj_ph: adj_mat,

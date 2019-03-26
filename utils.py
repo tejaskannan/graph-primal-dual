@@ -32,8 +32,8 @@ def add_features(graph, demands, flows):
 
 def create_demands(graph, min_max_sources, min_max_sinks):
     # Randomly select the number of sources and sinks
-    num_sources = np.random.randint(low=min_max_sources[0], high=min_max_sources[1])
-    num_sinks = np.random.randint(low=min_max_sinks[0], high=min_max_sinks[1])
+    num_sources = np.random.randint(low=min_max_sources[0], high=min_max_sources[1]+1)
+    num_sinks = np.random.randint(low=min_max_sinks[0], high=min_max_sinks[1]+1)
 
     # Randomly select sources and sinks
     source_sink_nodes = np.random.choice(graph.nodes(),
