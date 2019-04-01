@@ -7,7 +7,7 @@ from cost_functions import tf_cost_functions
 
 class MinCostFlowModel(Model):
 
-    def __init__(self, params, name='max-cost-flow-model'):
+    def __init__(self, params, name='min-cost-flow-model'):
         super(MinCostFlowModel, self).__init__(params, name)
         self.cost_fn = tf_cost_functions[params['cost_fn']]
 
@@ -77,7 +77,7 @@ class MinCostFlowModel(Model):
                 mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
                 self.flow = mcf_solver(inputs=flow_weight_pred,
                                        adj=adj,
-                                       demand=node_input)
+                                       demands=node_input)
 
                 self.flow_cost = tf.reduce_sum(self.cost_fn.apply(self.flow), axis=[1, 2])
                 
