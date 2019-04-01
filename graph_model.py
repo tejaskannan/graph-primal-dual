@@ -1,6 +1,6 @@
 import tensorflow as tf
 from base_model import Model
-from layers import GAT, Gate, MLP
+from layers import GAT, Gate, MLP, MinCostFlow
 from constants import BIG_NUMBER, FLOW_THRESHOLD
 from cost_functions import tf_cost_functions
 
@@ -73,28 +73,13 @@ class MinCostFlowModel(Model):
                 flow_weight_pred = tf.nn.softmax(pred_weights + node_bias - identity,
                                                  name='normalized-weights')
 
-                def body(flow, prev_flow):
-                    inflow = tf.expand_dims(tf.reduce_sum(adj * flow, axis=1), axis=2)
-                    adjusted_inflow = tf.nn.relu(inflow - node_input, name='adjust-inflow')
-                    prev_flow = flow
-                    flow = flow_weight_pred * adjusted_inflow
-                    return [flow, prev_flow]
+                # Compute min-cost flows from flow proportions
+                mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
+                self.flow = mcf_solver(inputs=flow_weight_pred,
+                                       adj=adj,
+                                       demand=node_input)
 
-                def cond(flow, prev_flow):
-                    return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
-
-                # Iteratively computes flows from flow proportions
-                flow = tf.zeros_like(flow_weight_pred, dtype=tf.float32)
-                prev_flow = flow + BIG_NUMBER
-                shape_invariants = [flow.get_shape(), prev_flow.get_shape()]
-                flow, pflow = tf.while_loop(cond, body,
-                                            loop_vars=[flow, prev_flow],
-                                            parallel_iterations=1,
-                                            shape_invariants=shape_invariants,
-                                            maximum_iterations=self.params['flow_iters'])
-
-                self.flow = flow
-                self.flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
+                self.flow_cost = tf.reduce_sum(self.cost_fn.apply(self.flow), axis=[1, 2])
                 
                 # Compute loss from the dual problem
                 dual_alphas = tf.layers.dense(inputs=node_encoding,

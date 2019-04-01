@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from constants import BIG_NUMBER, FLOW_THRESHOLD
 
 class Layer:
 
@@ -186,3 +187,36 @@ class Gate(Layer):
 
             # Apply gate
             return self.z * curr_state + (1 - self.z) * prev_state
+
+
+class MinCostFlow(Layer):
+
+    def __init__(self, flow_iters, name='min-cost-flow'):
+        super(MinCostFlow, self).__init__(0, 0, None, name)
+        self.flow_iters = flow_iters
+
+    def __call__(self, inputs, **kwargs):
+        adj = kwargs['adj']
+        demand = kwargs['demand']
+        flow_weight_pred = inputs
+
+        def body(flow, prev_flow):
+            inflow = tf.expand_dims(tf.reduce_sum(adj * flow, axis=1), axis=2)
+            adjusted_inflow = tf.nn.relu(inflow - demand, name='adjust-inflow')
+            prev_flow = flow
+            flow = flow_weight_pred * adjusted_inflow
+            return [flow, prev_flow]
+
+        def cond(flow, prev_flow):
+            return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
+
+        # Iteratively computes flows from flow proportions
+        flow = tf.zeros_like(flow_weight_pred, dtype=tf.float32)
+        prev_flow = flow + BIG_NUMBER
+        shape_invariants = [flow.get_shape(), prev_flow.get_shape()]
+        flow, pflow = tf.while_loop(cond, body,
+                                    loop_vars=[flow, prev_flow],
+                                    parallel_iterations=1,
+                                    shape_invariants=shape_invariants,
+                                    maximum_iterations=self.flow_iters)
+        return flow
