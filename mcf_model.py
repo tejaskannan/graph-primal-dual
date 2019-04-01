@@ -36,7 +36,8 @@ class MCFModel(Model):
                               output_size=self.params['node_encoding'],
                               activation=tf.nn.relu,
                               name='node-encoder')
-                node_encoding = encoder(inputs=tf.concat([node_embeddings, demands], axis=1))
+                node_encoding = encoder(inputs=tf.concat([node_embeddings, demands], axis=1),
+                                        dropout_keep_prob=self.params['weight_dropout_keep'])
 
                 node_gat = GAT(input_size=self.params['node_encoding'],
                                output_size=self.params['node_encoding'],
@@ -47,7 +48,10 @@ class MCFModel(Model):
 
                 # Stitch together graph and gating layers
                 for _ in range(self.params['graph_layers']):
-                    next_encoding = node_gat(inputs=node_encoding, bias=node_bias)
+                    next_encoding = node_gat(inputs=node_encoding,
+                                             bias=node_bias,
+                                             weight_dropout_keep=self.params['weight_dropout_keep'],
+                                             attn_dropout_keep=self.params['attn_dropout_keep'])
                     node_encoding = gate(inputs=next_encoding, prev_state=node_encoding)
 
                 # Compute flow proportions
@@ -55,7 +59,8 @@ class MCFModel(Model):
                               output_size=num_output_features,
                               activation=None,
                               name='node-decoder')
-                pred_weights = decoder(inputs=node_encoding)
+                pred_weights = decoder(inputs=node_encoding,
+                                       dropout_keep_prob=self.params['weight_dropout_keep'])
 
                 bias = -BIG_NUMBER * (1.0 - adj)
                 flow_weight_pred = tf.nn.softmax(pred_weights + bias, axis=-1, name='normalized-weights')
