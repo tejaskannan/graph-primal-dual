@@ -15,6 +15,7 @@ from os import mkdir
 from os.path import exists
 from datetime import datetime
 from sparse_mcf import SparseMCF
+from mcf import MCF
 
 
 def main():
@@ -34,7 +35,7 @@ def main():
         print('Unknown graph with name {0}.'.format(params['graph_name']))
         return
     graph = load_to_networkx(graph_path)
-    mcf_solver = SparseMCF(params=params)
+    mcf_solver = MCF(params=params)
 
     if args.train:
         mcf_solver.train()

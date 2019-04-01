@@ -112,9 +112,10 @@ class GAT(Layer):
     """
     Graph Attention Layer from https://arxiv.org/abs/1710.10903
     """
-    def __init__(self, input_size, output_size, num_heads, activation=tf.nn.relu, name='GAT'):
+    def __init__(self, input_size, output_size, num_heads, dims=3, activation=tf.nn.relu, name='GAT'):
         super(GAT, self).__init__(input_size, output_size, activation, name)
         self.num_heads = num_heads
+        self.dims = dims
 
     def __call__(self, inputs, **kwargs):
         bias = kwargs['bias']
@@ -139,10 +140,14 @@ class GAT(Layer):
                                activation=None,
                                name='{0}-a-{1}'.format(self.name, i))
                 attn_weights = attn_mlp(inputs=transformed_inputs, dropout_keep_prob=attn_dropout_keep)
-                attn_weights = attn_weights + tf.transpose(attn_weights, [0, 2, 1])
+                
+                if self.dims == 3:
+                    attn_weights = attn_weights + tf.transpose(attn_weights, [0, 2, 1])
+                else:
+                    attn_weights = attn_weights + tf.transpose(attn_weights, [1, 0])
 
                 # Compute normalized attention weights, B x V x V
-                attention_coefs = tf.nn.softmax(tf.nn.leaky_relu(attn_weights) + bias, axis=2)
+                attention_coefs = tf.nn.softmax(tf.nn.leaky_relu(attn_weights) + bias, axis=-1)
 
                 # Apply attention weights, B x V x F'
                 attn_head = tf.matmul(attention_coefs, transformed_inputs)
@@ -189,17 +194,18 @@ class Gate(Layer):
 
 class MinCostFlow(Layer):
 
-    def __init__(self, flow_iters, name='min-cost-flow'):
+    def __init__(self, flow_iters, dims=3, name='min-cost-flow'):
         super(MinCostFlow, self).__init__(0, 0, None, name)
         self.flow_iters = flow_iters
+        self.dims = dims
 
     def __call__(self, inputs, **kwargs):
-        adj = kwargs['adj']
+        # adj = kwargs['adj']
         demand = kwargs['demands']
         flow_weight_pred = inputs
 
         def body(flow, prev_flow):
-            inflow = tf.expand_dims(tf.reduce_sum(adj * flow, axis=1), axis=2)
+            inflow = tf.expand_dims(tf.reduce_sum(flow, axis=self.dims-2), axis=self.dims-1)
             adjusted_inflow = tf.nn.relu(inflow - demand, name='adjust-inflow')
             prev_flow = flow
             flow = flow_weight_pred * adjusted_inflow
