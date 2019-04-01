@@ -59,7 +59,7 @@ class MinCostFlowModel(Model):
                     node_output = node_gat(node_encoding, bias=node_bias)
 
                     # Gate output from attention layer
-                    node_encoding = node_gate(inputs=(node_encoding, node_output))
+                    node_encoding = node_gate(inputs=node_output, prev_state=node_encoding)
 
                 # Min Cost Flow computation
                 decoder = MLP(hidden_sizes=[],

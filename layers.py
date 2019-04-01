@@ -65,15 +65,14 @@ class SparseGAT(Layer):
     Sparse Graph Attention Layer from https://arxiv.org/abs/1710.10903
     """
 
-    def __init__(self, input_size, output_size, num_heads, activation=tf.nn.relu,
-                 weight_dropout_keep=1.0, attn_dropout_keep=1.0, name='GAT'):
+    def __init__(self, input_size, output_size, num_heads, activation=tf.nn.relu, name='GAT'):
         super(SparseGAT, self).__init__(input_size, output_size, activation, name)
         self.num_heads = num_heads
-        self.weight_dropout_keep = weight_dropout_keep
-        self.attn_dropout_keep = attn_dropout_keep
 
     def __call__(self, inputs, **kwargs):
         adj_matrix = kwargs['adj_matrix']
+        weight_dropout_keep = kwargs['weight_dropout_keep'] if 'weight_dropout_keep' in kwargs else 1.0
+        attn_dropout_keep = kwargs['attn_dropout_keep'] if 'attn_dropout_keep' in kwargs else 1.0
 
         with tf.name_scope(self.name):
             heads = []
@@ -83,17 +82,17 @@ class SparseGAT(Layer):
                                  bias_final=False,
                                  activation=None,
                                  name='{0}-W-{1}'.format(self.name, i))
-                tensors = tensor_mlp(inputs=inputs, dropout_keep_prob=self.weight_dropout_keep)
+                tensors = tensor_mlp(inputs=inputs, dropout_keep_prob=weight_dropout_keep)
 
                 attn_mlp = MLP(hidden_sizes=[],
                                output_size=1,
                                bias_final=False,
                                activation=None,
                                name='{0}-a-{1}'.format(self.name, i))
-                attn_weights = attn_mlp(inputs=tensors, dropout_keep_prob=self.attn_dropout_keep)
+                attn_weights = attn_mlp(inputs=tensors, dropout_keep_prob=attn_dropout_keep)
 
-                masked_1 = neighbor_bias * attn_weights
-                masked_2 = neighbor_bias * tf.transpose(attn_weights, perm=[1, 0])
+                masked_1 = adj_matrix * attn_weights
+                masked_2 = adj_matrix * tf.transpose(attn_weights, perm=[1, 0])
 
                 sparse_sim_mat = tf.sparse.add(masked_1, masked_2)
                 sparse_leaky_relu = tf.SparseTensor(indices=sparse_sim_mat.indices,
@@ -113,15 +112,14 @@ class GAT(Layer):
     """
     Graph Attention Layer from https://arxiv.org/abs/1710.10903
     """
-    def __init__(self, input_size, output_size, num_heads, activation=tf.nn.relu,
-                 weight_dropout_keep=1.0, attn_dropout_keep=1.0, name='GAT'):
+    def __init__(self, input_size, output_size, num_heads, activation=tf.nn.relu, name='GAT'):
         super(GAT, self).__init__(input_size, output_size, activation, name)
         self.num_heads = num_heads
-        self.weight_dropout_keep = weight_dropout_keep
-        self.attn_dropout_keep = attn_dropout_keep
 
     def __call__(self, inputs, **kwargs):
         bias = kwargs['bias']
+        weight_dropout_keep = kwargs['weight_dropout_keep'] if 'weight_dropout_keep' in kwargs else 1.0
+        attn_dropout_keep = kwargs['attn_dropout_keep'] if 'attn_dropout_keep' in kwargs else 1.0
 
         with tf.name_scope(self.name):
             heads = []
@@ -132,7 +130,7 @@ class GAT(Layer):
                                  bias_final=False,
                                  activation=None,
                                  name='{0}-W-{1}'.format(self.name, i))
-                transformed_inputs = input_mlp(inputs=inputs, dropout_keep_prob=self.weight_dropout_keep)
+                transformed_inputs = input_mlp(inputs=inputs, dropout_keep_prob=weight_dropout_keep)
 
                 # Create unnormalized attention weights, B x V x V
                 attn_mlp = MLP(hidden_sizes=[],
@@ -140,7 +138,7 @@ class GAT(Layer):
                                bias_final=False,
                                activation=None,
                                name='{0}-a-{1}'.format(self.name, i))
-                attn_weights = attn_mlp(inputs=transformed_inputs, dropout_keep_prob=self.attn_dropout_keep)
+                attn_weights = attn_mlp(inputs=transformed_inputs, dropout_keep_prob=attn_dropout_keep)
                 attn_weights = attn_weights + tf.transpose(attn_weights, [0, 2, 1])
 
                 # Compute normalized attention weights, B x V x V
@@ -159,27 +157,27 @@ class Gate(Layer):
     """
     Skip-connection Gating layer from https://arxiv.org/pdf/1805.10988.pdf
     """
-
     def __init__(self, name='gate'):
         super(Gate, self).__init__(0, 0, None, name)
 
     def __call__(self, inputs, **kwargs):
-        assert isinstance(inputs, tuple) or isinstance(inputs, list)
-        assert len(inputs) == 2
 
+        dropout_keep_prob = kwargs['dropout_keep_prob'] if 'dropout_keep_prob' in kwargs else 1.0
         with tf.name_scope(self.name):
-            prev_state = inputs[0]
-            curr_state = inputs[1]
+            prev_state = kwargs['prev_state']
+            curr_state = inputs
 
-            prev = tf.layers.dense(inputs=prev_state,
-                                   units=1,
-                                   use_bias=False,
-                                   name='{0}-W-1'.format(self.name))
+            prev_mlp = MLP(hidden_sizes=[],
+                           output_size=1,
+                           bias_final=False,
+                           name='{0}-W-1'.format(self.name))
+            curr_mlp = MLP(hidden_sizes=[],
+                           output_size=1,
+                           bias_final=False,
+                           name='{0}-W-2'.format(self.name))
 
-            curr = tf.layers.dense(inputs=curr_state,
-                                   units=1,
-                                   use_bias=False,
-                                   name='{0}-W-2'.format(self.name))
+            prev = prev_mlp(inputs=prev_state, dropout_keep_prob=dropout_keep_prob)
+            curr = curr_mlp(inputs=curr_state, dropout_keep_prob=dropout_keep_prob)
 
             self.z = tf.contrib.layers.bias_add(prev + curr,
                                                 activation_fn=tf.math.sigmoid,
@@ -224,32 +222,20 @@ class MinCostFlow(Layer):
 class SparseMinCostFlow(Layer):
 
     def __init__(self, flow_iters, name='sparse-min-cost-flow'):
-        super(MinCostFlow, self).__init__(0, 0, None, name)
+        super(SparseMinCostFlow, self).__init__(0, 0, None, name)
         self.flow_iters = flow_iters
 
+
     def __call__(self, inputs, **kwargs):
-        adj = kwargs['adj']  # V x V sparse tensor
-        demand = kwargs['demands'] # V x 1 tensor with demands
-        flow_weight_pred = inputs # V x V tensor with flow proportions
+        demands = kwargs['demands']
 
-        def body(flow, prev_flow):
-            masked_flow = tf.sparse.transpose(adj * flow, perm=[1, 0])
-            inflow = tf.sparse.reduce_sum(masked_flow, axis=1, keepdims=True)
-            adjusted_inflow = tf.nn.relu(inflow - demand, name='adjust-inflow')
-            prev_flow = flow
-            flow = flow_weight_pred * adjusted_inflow
-            return [flow, prev_flow]
+        flow = tf.SparseTensor(indices=np.empty(shape=(0, 2), dtype=np.int64),
+                               values=[],
+                               dense_shape=inputs.dense_shape)
+        for _ in range(self.flow_iters):
+            inflow = tf.sparse.reduce_sum(flow, axis=0)
+            inflow = tf.expand_dims(inflow, axis=1)
+            adjusted_inflow = tf.nn.relu(inflow - demands)
+            flow = inputs * adjusted_inflow
 
-        def cond(flow, prev_flow):
-            return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
-
-        # Iteratively computes flows from flow proportions
-        flow = tf.zeros_like(flow_weight_pred, dtype=tf.float32)
-        prev_flow = flow + BIG_NUMBER
-        shape_invariants = [flow.get_shape(), prev_flow.get_shape()]
-        flow, pflow = tf.while_loop(cond, body,
-                                    loop_vars=[flow, prev_flow],
-                                    parallel_iterations=1,
-                                    shape_invariants=shape_invariants,
-                                    maximum_iterations=self.flow_iters)
-        return flow
+        return tf.sparse.to_dense(flow)

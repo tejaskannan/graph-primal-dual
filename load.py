@@ -5,12 +5,12 @@ from constants import SMALL_NUMBER
 from annoy import AnnoyIndex
 
 
-def load_to_networkx(net_path):
+def load_to_networkx(path):
     graph = nx.DiGraph()
 
     edge_features = {}
 
-    with open(net_path, 'r') as net_file:
+    with open(path, 'r') as net_file:
         metadata = True
 
         for line in net_file:

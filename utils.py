@@ -48,9 +48,6 @@ def create_demands(graph, min_max_sources, min_max_sinks):
 
     # Create labels tensor
     demands = np.zeros(shape=(graph.number_of_nodes(), 1), dtype=float)
-    for node in graph.nodes():
-        demands[node][0] = 0.0
-
     for i, node in enumerate(sources):
         demands[node][0] = source_demands[i]
 
