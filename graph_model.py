@@ -1,6 +1,6 @@
 import tensorflow as tf
 from base_model import Model
-from layers import GAT, Gate
+from layers import GAT, Gate, MLP
 from constants import BIG_NUMBER, FLOW_THRESHOLD
 from cost_functions import tf_cost_functions
 
@@ -36,45 +36,47 @@ class MinCostFlowModel(Model):
                 node_concat = tf.concat([node_input, node_embeddings], axis=2, name='node-concat')
 
                 # Encoder
-                node_encoding = tf.layers.dense(inputs=node_concat,
-                                                units=self.params['node_encoding'],
-                                                activation=tf.nn.relu,
-                                                name='node-encoder')
+                node_encoder = MLP(hidden_sizes=[],
+                                   output_size=self.params['node_encoding'],
+                                   activation=tf.nn.relu,
+                                   name='node-encoder')
+                node_encoding = node_encoder(inputs=node_concat)
+
+                # Graph attention layer
+                node_gat = GAT(input_size=self.params['node_encoding'],
+                               output_size=self.params['node_encoding'],
+                               activation=tf.nn.relu,
+                               num_heads=self.params['num_heads'],
+                               name='node-GAT')
+
+                # Node Gating
+                node_gate = Gate(name='node-gate')
 
                 # Process using Graph Attention Layers
                 graph_layers = []
                 for _ in range(self.params['graph_layers']):
-                    # Graph attention layer
-                    node_gat_layer = GAT(input_size=self.params['node_encoding'],
-                                         output_size=self.params['node_encoding'],
-                                         num_heads=self.params['num_heads'],
-                                         name='node-GAT')
-                    node_gat_output = node_gat_layer.build(node_encoding, bias=node_bias)
+   
+                    node_output = node_gat(node_encoding, bias=node_bias)
 
-                    # Apply non-linearity
-                    node_output = tf.nn.relu(node_gat_output)
-
-                    # Gate output form attention layer
-                    node_gate_layer = Gate(name='node-gate')
-                    node_encoding = node_gate_layer.build(inputs=(node_encoding, node_output))
+                    # Gate output from attention layer
+                    node_encoding = node_gate(inputs=(node_encoding, node_output))
 
                 # Min Cost Flow computation
-                pred_weights = tf.layers.dense(inputs=node_encoding,
-                                               units=num_output_features,
-                                               name='node-decoder')
+                decoder = MLP(hidden_sizes=[],
+                              output_size=num_output_features,
+                              activation=None,
+                              name='node-decoder')
+                pred_weights = decoder(inputs=node_encoding)
 
                 # B x |V| x |V| matrix of flow proportions
                 identity = tf.eye(num_output_features) * BIG_NUMBER
                 flow_weight_pred = tf.nn.softmax(pred_weights + node_bias - identity,
                                                  name='normalized-weights')
 
-                flow = tf.zeros_like(flow_weight_pred, dtype=tf.float32)
-                prev_flow = flow + BIG_NUMBER
-
                 def body(flow, prev_flow):
-                    masked_flow = tf.transpose(adj * flow, perm=[0, 2, 1], name='mask-flow')
-                    inflow = tf.reduce_sum(masked_flow, keepdims=True, axis=2)
+                    inflow = tf.expand_dims(tf.reduce_sum(adj * flow, axis=1), axis=2)
                     adjusted_inflow = tf.nn.relu(inflow - node_input, name='adjust-inflow')
+                    prev_flow = flow
                     flow = flow_weight_pred * adjusted_inflow
                     return [flow, prev_flow]
 
@@ -82,6 +84,8 @@ class MinCostFlowModel(Model):
                     return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
 
                 # Iteratively computes flows from flow proportions
+                flow = tf.zeros_like(flow_weight_pred, dtype=tf.float32)
+                prev_flow = flow + BIG_NUMBER
                 shape_invariants = [flow.get_shape(), prev_flow.get_shape()]
                 flow, pflow = tf.while_loop(cond, body,
                                             loop_vars=[flow, prev_flow],
@@ -104,7 +108,7 @@ class MinCostFlowModel(Model):
                 # B x V x V tensor which contains the pairwise difference between
                 # dual variables. This matrix is masked to remove flow values on 
                 # non-existent edges.
-                dual_diff = dual_alphas - tf.transpose(dual_alphas, perm=[0, 2, 1]) + dual_betas
+                dual_diff = tf.transpose(dual_alphas, perm=[0, 2, 1]) - dual_alphas + dual_betas
                 dual_flows = adj * self.cost_fn.inv_derivative(dual_diff)
 
                 dual_inflow = tf.reduce_sum(dual_flows, axis=1, keepdims=True)
@@ -120,5 +124,5 @@ class MinCostFlowModel(Model):
                 loss = tf.square(self.flow_cost - self.dual_cost) + 0.1 * self.flow_cost 
                 self.loss_op = tf.reduce_mean(loss)
 
-                self.output_ops = [self.flow_cost, self.flow, self.dual_cost, dual_flows, dual_inflow, dual_outflow]
+                self.output_ops = [self.flow_cost, self.flow, self.dual_cost, dual_flows, flow_weight_pred, node_input]
                 self.optimizer_op = self._build_optimizer_op()

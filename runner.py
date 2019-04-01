@@ -181,12 +181,7 @@ def train(graph, params):
             dual_cost = outputs[3]
 
             print('Average validation loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
-            print('Primal Cost: {0}'.format(primal_cost))
-            print('Dual Cost: {0}'.format(dual_cost))
 
-            print(outputs[4])
-            print(outputs[5])
-            print(outputs[6])
 
         print(LINE)
 
@@ -214,9 +209,10 @@ def train(graph, params):
             break
 
     # Use random test point
-    test_point = np.random.randint(low=0, high=len(valid_dataset))
+    test_point_index = np.random.randint(low=0, high=len(valid_dataset))
+    test_point = valid_dataset[test_point_index]
     feed_dict = {
-        node_ph: [valid_dataset[test_point]],
+        node_ph: [test_point],
         adj_ph: adj_mat,
         node_bias_ph: node_bias,
         node_embedding_ph: node_embeddings
@@ -229,13 +225,20 @@ def train(graph, params):
     print('Dual Cost: {0}'.format(dual_cost))
 
     flows = outputs[2][0]
-    demand_graph = add_features(graph, demands=node_features[0], flows=flows)
+    flow_graph = add_features(graph, demands=test_point, flows=flows)
 
     # Write output graph to Graph XML
-    nx.write_gexf(demand_graph, output_folder + 'graph.gexf')
+    nx.write_gexf(flow_graph, output_folder + 'graph.gexf')
 
     if params['plot_flows']:
-        plot_flow_graph(demand_graph, flows, output_folder + 'flows.png')
+        plot_flow_graph(flow_graph, flows, output_folder + 'flows.png')
+
+        dual_graph = add_features(graph, demands=test_point, flows=outputs[4][0])
+        print(outputs[4][0])
+        plot_flow_graph(dual_graph, outputs[4][0], output_folder + 'dual.png')
+
+        weight_graph = add_features(graph, demands=test_point, flows=outputs[5][0])
+        plot_flow_graph(weight_graph, outputs[5][0], output_folder + 'weight.png')
 
 
 if __name__ == '__main__':

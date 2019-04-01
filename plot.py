@@ -34,11 +34,12 @@ def plot_flow_graph(graph, flows, file_path):
         n.attr['label'] = str(round(demand, 2))
 
     max_flow_val = np.max(flows)
+    min_flow_val = min(0.0, np.min(flows))
     for src, dest in graph.edges():
         flow = flows[src, dest]
         e = agraph.get_edge(src, dest)
-        e.attr['color'] = _to_hex(0.0, max_flow_val, flow)
-        if flow > SMALL_NUMBER:
+        e.attr['color'] = _to_hex(min_flow_val, max_flow_val, flow)
+        if abs(flow) > SMALL_NUMBER:
             e.attr['label'] = str(round(flow, 2))
     agraph.draw(file_path, prog='dot')
 
