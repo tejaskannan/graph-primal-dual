@@ -32,7 +32,7 @@ class MCFModel(Model):
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
 
                 # Node encoding
-                encoder = MLP(hidden_sizes=[],
+                encoder = MLP(hidden_sizes=self.params['encoder_hidden'],
                               output_size=self.params['node_encoding'],
                               activation=tf.nn.relu,
                               name='node-encoder')
@@ -51,7 +51,7 @@ class MCFModel(Model):
                     node_encoding = gate(inputs=next_encoding, prev_state=node_encoding)
 
                 # Compute flow proportions
-                decoder = MLP(hidden_sizes=[],
+                decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
                               output_size=num_output_features,
                               activation=None,
                               name='node-decoder')
@@ -66,6 +66,6 @@ class MCFModel(Model):
 
                 flow_cost = tf.reduce_sum(self.cost_fn.apply(flow))
 
-                self.loss_op = tf.reduce_sum(flow)
+                self.loss_op = flow_cost
                 self.output_ops += [flow_cost, flow, flow_weight_pred]
                 self.optimizer_op = self._build_optimizer_op()

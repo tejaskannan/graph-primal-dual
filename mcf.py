@@ -101,10 +101,6 @@ class MCF:
                 avg_loss = model.run_train_step(feed_dict=feed_dict)
                 train_losses.append(avg_loss)
 
-                print('Average training loss for batch {0}/{1}: {2}'.format(i+1, self.params['train_samples'], avg_loss))
-
-            print(LINE)
-
             # Validation Batches
             valid_losses = []
             for i in range(self.params['valid_samples']):
@@ -120,10 +116,6 @@ class MCF:
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
-
-                print('Average validation loss for batch {0}/{1}: {2}'.format(i+1, self.params['valid_samples'], avg_loss))
-
-            print(LINE)
 
             avg_train_loss = np.average(train_losses)
             print('Average training loss: {0}'.format(avg_train_loss))
