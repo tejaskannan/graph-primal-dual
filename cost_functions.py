@@ -53,6 +53,24 @@ class PolyRoot(CostFunction):
         return self.clip(x)
 
 
+class Sqrt(CostFunction):
+
+    def __init__(self, constant):
+        super(Sqrt, self).__init__(constant)
+        assert constant > 0.0
+
+    def apply(self, x):
+        # Shifting mitigates the possibility of zero gradients
+        return self.clip(self.constant * tf.sqrt(x + 1) - self.constant)
+
+    def inv_derivative(self, y):
+        # Pre-clip y because both conditions are executed within the computation graph
+        clipped_y = tf.clip_by_value(y, SMALL_NUMBER, BIG_NUMBER)
+        return tf.where(tf.less_equal(y, SMALL_NUMBER),
+                       x=tf.zeros_like(y, dtype=tf.float32),
+                       y=self.clip(tf.square((2.0 / self.constant) * tf.reciprocal(clipped_y))) - 1)
+
+
 class Exp(CostFunction):
 
     def __init__(self, constant):
@@ -77,4 +95,6 @@ def get_cost_function(name, constant):
         return Cube(constant=constant)
     if name == 'poly_root':
         return PolyRoot(constant=constant)
+    if name == 'sqrt':
+        return Sqrt(constant=constant)
     return None
