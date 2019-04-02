@@ -129,9 +129,10 @@ class MCF:
             if avg_valid_loss < prev_loss:
                 print('Saving model...')
                 model.save(self.output_folder)
+                prev_loss = avg_valid_loss
 
             # Early Stopping
-            if avg_valid_loss > prev_loss or abs(prev_loss - avg_valid_loss) < self.params['early_stop_threshold']:
+            if abs(prev_loss - avg_valid_loss) < self.params['early_stop_threshold']:
                 convergence_count += 1
             else:
                 convergence_count = 0
@@ -154,11 +155,16 @@ class MCF:
         flow_cost = outputs[1]
 
         print('Primal Cost: {0}'.format(flow_cost))
+        print('Dual Cost: {0}'.format(outputs[4]))
 
         flows = outputs[2]
         flow_graph = add_features(graph, demands=test_point, flows=flows)
 
-        print(outputs[3])
+        print('Dual Vars: {0}'.format(outputs[5]))
+        print('Dual Flows: {0}'.format(outputs[6]))
+        print('Dual Demand: {0}'.format(outputs[7]))
+        print('Demand: {0}'.format(test_point))
+        print('Dual Diff: {0}'.format(outputs[8]))
 
         # Write output graph to Graph XML
         nx.write_gexf(flow_graph, self.output_folder + 'graph.gexf')

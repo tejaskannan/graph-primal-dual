@@ -134,6 +134,7 @@ class SparseMCF:
             if avg_valid_loss < prev_loss:
                 print('Saving model...')
                 model.save(self.output_folder)
+                prev_loss = avg_valid_loss
 
             # Early Stopping
             if avg_valid_loss > prev_loss or abs(prev_loss - avg_valid_loss) < self.params['early_stop_threshold']:
