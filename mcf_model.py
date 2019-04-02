@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from base_model import Model
 from layers import MLP, GAT, Gate, MinCostFlow
-from cost_functions import tf_cost_functions
+from cost_functions import get_cost_function
 from constants import BIG_NUMBER
 
 
@@ -10,7 +10,8 @@ class MCFModel(Model):
 
     def __init__(self, params, name='sparse-mcf-model'):
         super(MCFModel, self).__init__(params, name)
-        self.cost_fn = tf_cost_functions[params['cost_fn']]
+        self.cost_fn = get_cost_function(name=params['cost_fn'],
+                                         constant=params['cost_constant'])
 
     def build(self, **kwargs):
 
@@ -68,9 +69,24 @@ class MCFModel(Model):
                 # Compute minimum cost flow from flow weights
                 mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'], dims=2)
                 flow = mcf_solver(inputs=flow_weight_pred, demands=demands)
-
                 flow_cost = tf.reduce_sum(self.cost_fn.apply(flow))
 
-                self.loss_op = flow_cost
-                self.output_ops += [flow_cost, flow, flow_weight_pred]
+                # Compute Dual Problem and associated cost
+                dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
+                                   output_size=1,
+                                   activation=None,
+                                   name='dual-decoder')
+                dual_vars = dual_decoder(inputs=node_encoding,
+                                         dropout_keep_prob=self.params['weight_dropout_keep'])
+
+                # Compute dual flows based on dual variables
+                dual_diff = dual_vars - tf.transpose(dual_vars, perm=[1, 0])
+                dual_flows = adj * tf.nn.relu(self.cost_fn.inv_derivative(dual_diff))
+
+                dual_demand = tf.reduce_sum(dual_vars * demands)
+                dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
+                dual_cost = tf.reduce_sum(dual_flow_cost) - dual_demand
+
+                self.loss_op = flow_cost - dual_cost
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_vars, dual_flows, dual_demand, dual_diff]
                 self.optimizer_op = self._build_optimizer_op()

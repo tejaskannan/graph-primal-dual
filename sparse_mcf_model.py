@@ -2,14 +2,15 @@ import tensorflow as tf
 import numpy as np
 from base_model import Model
 from layers import MLP, SparseGAT, SparseMinCostFlow, Gate, MinCostFlow
-from cost_functions import tf_cost_functions
+from cost_functions import get_cost_function
 
 
 class SparseMCFModel(Model):
 
     def __init__(self, params, name='sparse-mcf-model'):
         super(SparseMCFModel, self).__init__(params, name)
-        self.cost_fn = tf_cost_functions[params['cost_fn']]
+        self.cost_fn = get_cost_function(name=params['cost_fn'],
+                                         constant=params['cost_constant'])
 
     def build(self, **kwargs):
 

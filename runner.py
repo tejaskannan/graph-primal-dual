@@ -9,7 +9,7 @@ from load import load_to_networkx, load_embeddings
 from load import write_dataset, read_dataset
 from graph_model import MinCostFlowModel
 from plot import plot_flow_graph
-from cost_functions import tf_cost_functions
+from cost_functions import get_cost_function
 from constants import *
 from os import mkdir
 from os.path import exists
