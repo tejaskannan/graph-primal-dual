@@ -1,4 +1,5 @@
 import tensorflow as tf
+from constants import COST_MAX, EXP_MAX, BIG_NUMBER
 
 class CostFunction:
 
@@ -11,6 +12,9 @@ class CostFunction:
     def inv_derivative(self, y):
         raise NotImplementedError()
 
+    def clip(self, x):
+        return tf.clip_by_value(x, 0, COST_MAX)
+
 
 class Square(CostFunction):
 
@@ -19,7 +23,7 @@ class Square(CostFunction):
         assert constant > 0
 
     def apply(self, x):
-        return self.constant * tf.square(x)
+        return self.clip(self.constant * tf.square(x))
 
     def inv_derivative(self, y):
         return (1.0 / (2.0 * self.constant)) * y
@@ -29,15 +33,15 @@ class Exp(CostFunction):
 
     def __init__(self, constant):
         super(Exp, self).__init__(constant)
-        assert constant >= 1.0
+        assert constant > 0.0
+        assert constant <= EXP_MAX
 
     def apply(self, x):
-        return tf.exp(self.constant * x) - 1
+        return self.clip(tf.exp(self.constant * x) - 1)
 
     def inv_derivative(self, y):
-        constant = tf.fill(dims=tf.shape(y), value=self.constant)
-        y = tf.where(y > constant, y, constant)
-        return (1.0 / self.constant) * (tf.log(y) - tf.log(constant))
+        y = tf.clip_by_value(y, self.constant, BIG_NUMBER)
+        return self.clip((1.0 / self.constant) * (tf.log(y) - tf.log(self.constant)))
 
 
 def get_cost_function(name, constant):

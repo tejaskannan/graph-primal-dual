@@ -99,6 +99,17 @@ class MCF:
                     node_bias_ph: node_bias
                 }
                 avg_loss = model.run_train_step(feed_dict=feed_dict)
+                # if avg_loss > 1000:
+                #     print(avg_loss)
+                #     outputs = model.inference(feed_dict=feed_dict)
+                #     print('Primal Cost: {0}'.format(outputs[1]))
+                #     print('Dual Cost: {0}'.format(outputs[4]))
+                #     print('Dual Vars: {0}'.format(outputs[5]))
+                #     print('Primal Flows: {0}'.format(outputs[2]))
+                #     print('Dual Flows: {0}'.format(outputs[6]))
+                #     print('Dual Demand: {0}'.format(outputs[7]))
+                #     print('Dual Diff: {0}'.format(outputs[8]))
+
                 train_losses.append(avg_loss)
 
             # Validation Batches
