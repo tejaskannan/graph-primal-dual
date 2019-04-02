@@ -99,17 +99,6 @@ class MCF:
                     node_bias_ph: node_bias
                 }
                 avg_loss = model.run_train_step(feed_dict=feed_dict)
-                # if avg_loss > 1000:
-                #     print(avg_loss)
-                #     outputs = model.inference(feed_dict=feed_dict)
-                #     print('Primal Cost: {0}'.format(outputs[1]))
-                #     print('Dual Cost: {0}'.format(outputs[4]))
-                #     print('Dual Vars: {0}'.format(outputs[5]))
-                #     print('Primal Flows: {0}'.format(outputs[2]))
-                #     print('Dual Flows: {0}'.format(outputs[6]))
-                #     print('Dual Demand: {0}'.format(outputs[7]))
-                #     print('Dual Diff: {0}'.format(outputs[8]))
-
                 train_losses.append(avg_loss)
 
             # Validation Batches
@@ -127,6 +116,7 @@ class MCF:
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
+                print(outputs[6])
 
             avg_train_loss = np.average(train_losses)
             print('Average training loss: {0}'.format(avg_train_loss))
@@ -169,13 +159,8 @@ class MCF:
         print('Dual Cost: {0}'.format(outputs[4]))
 
         flows = outputs[2]
-        flow_graph = add_features(graph, demands=test_point, flows=flows)
-
-        print('Dual Vars: {0}'.format(outputs[5]))
-        print('Dual Flows: {0}'.format(outputs[6]))
-        print('Dual Demand: {0}'.format(outputs[7]))
-        print('Demand: {0}'.format(test_point))
-        print('Dual Diff: {0}'.format(outputs[8]))
+        flow_proportions = outputs[3]
+        flow_graph = add_features(graph, demands=test_point, flows=flows, proportions=flow_proportions)
 
         # Write output graph to Graph XML
         nx.write_gexf(flow_graph, self.output_folder + 'graph.gexf')

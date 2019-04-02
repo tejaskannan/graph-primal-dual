@@ -18,14 +18,16 @@ def load_params(params_file_path):
     return params
 
 
-def add_features(graph, demands, flows):
+def add_features(graph, demands, flows, proportions):
     graph = graph.copy()
 
     for node in graph.nodes():
         graph.add_node(node, demand=float(demands[node][0]))
 
     for src, dest in graph.edges():
-        graph.add_edge(src, dest, flow=float(flows[src, dest]))
+        flow = float(flows[src, dest])
+        prop = float(proportions[src, dest])
+        graph.add_edge(src, dest, flow=flow, proportion=prop)
 
     return graph
 

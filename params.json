@@ -16,7 +16,7 @@
 	"encoder_hidden": [16],
 	"decoder_hidden": [16, 16],
 	"output_folder": "trained_models",
-	"cost_fn": "exp",
+	"cost_fn": "poly_root",
 	"cost_constant": 1.0,
 	"flow_iters": 1000,
 	"min_max_sources": [1, 2],

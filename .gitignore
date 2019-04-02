@@ -1,3 +1,5 @@
 __pycache__/*
 *.pyc
 trained_models/*
+datasets/*
+embeddings/*
