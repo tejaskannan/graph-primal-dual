@@ -7,7 +7,7 @@ from datetime import datetime
 from os import mkdir
 from os.path import exists
 from utils import create_demands, append_row_to_log
-from utils import add_features, create_node_bias
+from utils import add_features, create_node_bias, restore_params
 from plot import plot_flow_graph
 from constants import BIG_NUMBER, LINE
 
@@ -116,7 +116,6 @@ class MCF:
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
-                print(outputs[6])
 
             avg_train_loss = np.average(train_losses)
             print('Average training loss: {0}'.format(avg_train_loss))
@@ -167,3 +166,75 @@ class MCF:
 
         if self.params['plot_flows']:
             plot_flow_graph(flow_graph, flows, self.output_folder + 'flows.png')
+
+    def test(self, model_path):
+        # Load graph
+        graph_path = 'graphs/{0}.tntp'.format(self.params['graph_name'])
+        graph = load_to_networkx(path=graph_path)
+
+        # Create tensors for global graph properties
+        adj_mat = nx.adjacency_matrix(graph).todense()
+        node_bias = create_node_bias(graph)
+
+        # Graph properties
+        num_nodes = graph.number_of_nodes()
+        embedding_size = self.params['node_embedding_size']
+
+        # Load pre-trained embeddings
+        index_path = 'embeddings/{0}.ann'.format(self.params['graph_name'])
+        node_embeddings = load_embeddings(index_path=index_path,
+                                          embedding_size=embedding_size,
+                                          num_nodes=num_nodes)
+
+        # Initialize model
+        model = MCFModel(params=self.params)
+
+        # Model placeholders
+        node_ph = model.create_placeholder(dtype=tf.float32,
+                                           shape=[num_nodes, self.num_node_features],
+                                           name='node-ph',
+                                           ph_type='dense')
+        adj_ph = model.create_placeholder(dtype=tf.float32,
+                                          shape=[num_nodes, num_nodes],
+                                          name='adj-ph',
+                                          ph_type='dense')
+        node_embedding_ph = model.create_placeholder(dtype=tf.float32,
+                                                     shape=[num_nodes, embedding_size],
+                                                     name='node-embedding-ph',
+                                                     ph_type='dense')
+        node_bias_ph = model.create_placeholder(dtype=tf.float32,
+                                                shape=[num_nodes, num_nodes],
+                                                name='node-bias-ph',
+                                                ph_type='dense')
+
+        # Create model
+        model.build(demands=node_ph,
+                    node_embeddings=node_embedding_ph,
+                    adj=adj_ph,
+                    node_bias=node_bias_ph,
+                    num_output_features=num_nodes)
+        model.init()
+        model.restore(model_path)
+
+        for i in range(self.params['test_samples']):
+            # Use random test point
+            test_point = create_demands(graph, self.params['min_max_sources'],
+                                        self.params['min_max_sinks'])
+            feed_dict = {
+                node_ph: test_point,
+                adj_ph: adj_mat,
+                node_embedding_ph: node_embeddings,
+                node_bias_ph: node_bias
+            }
+            outputs = model.inference(feed_dict=feed_dict)
+            flow_cost = outputs[1]
+
+            flows = outputs[2]
+            flow_proportions = outputs[3]
+            flow_graph = add_features(graph, demands=test_point, flows=flows, proportions=flow_proportions)
+
+            # Write output graph to Graph XML
+            nx.write_gexf(flow_graph, '{0}graph-{1}.gexf'.format(model_path, i))
+
+            if self.params['plot_flows']:
+                plot_flow_graph(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, i))

@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 from utils import load_params, create_node_bias, add_features
 from utils import append_row_to_log, create_demands 
-from utils import sparse_matrix_to_tensor, create_batches
+from utils import sparse_matrix_to_tensor, create_batches, restore_params
 from load import load_to_networkx, load_embeddings
 from load import write_dataset, read_dataset
 from graph_model import MinCostFlowModel
@@ -24,17 +24,17 @@ def main():
     parser.add_argument('--params', type=str, help='Parameters JSON file.')
     parser.add_argument('--train', action='store_true', help='Flag to specify training.')
     parser.add_argument('--generate', action='store_true', help='Flag to specify dataset generation.')
+    parser.add_argument('--test', action='store_true', help='Flag to specify testing.')
+    parser.add_argument('--model', type=str, help='Path to trained model.')
     args = parser.parse_args()
 
     # Fetch parameters
-    params = load_params(args.params)
+    if args.params is not None:
+        params = load_params(args.params)
+    else:
+        # Load parameters used to create the given model
+        params = restore_params(args.model)
     
-    # Load graph
-    graph_path = 'graphs/{0}.tntp'.format(params['graph_name'])
-    if not exists(graph_path):
-        print('Unknown graph with name {0}.'.format(params['graph_name']))
-        return
-    graph = load_to_networkx(graph_path)
     mcf_solver = MCF(params=params)
 
     if args.train:
@@ -42,6 +42,8 @@ def main():
         # train(graph, params)
     elif args.generate:
         generate(graph, params)
+    elif args.test:
+        mcf_solver.test(args.model)
 
 
 def generate(graph, params):

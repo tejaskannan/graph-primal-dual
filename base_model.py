@@ -69,12 +69,6 @@ class Model:
             saver.save(self._sess, model_path)
 
     def restore(self, output_folder):
-        params_path = PARAMS_FILE.format(output_folder)
-        with gzip.GzipFile(params_path, 'rb') as params_file:
-            params_dict = pickle.load(params_file)
-
-        self.params = params_dict
-
         with self._sess.graph.as_default():
             model_path = MODEL_FILE.format(output_folder, self.name)
             saver = tf.train.Saver()

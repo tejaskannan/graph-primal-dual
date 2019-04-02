@@ -2,6 +2,8 @@ import networkx as nx
 import numpy as np
 import tensorflow as tf
 import json
+import gzip
+import pickle
 import csv
 from os.path import exists
 from constants import *
@@ -104,3 +106,9 @@ def append_row_to_log(row, log_path):
         log_writer = csv.writer(log_file, delimiter=',', quotechar='|')
         log_writer.writerow(row)
 
+
+def restore_params(model_path):
+    params_path = PARAMS_FILE.format(model_path)
+    with gzip.GzipFile(params_path, 'rb') as params_file:
+        params_dict = pickle.load(params_file)
+    return params_dict
