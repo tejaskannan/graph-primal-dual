@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib import colors
 import numpy as np
 import networkx as nx
 from constants import *
@@ -23,6 +24,10 @@ def plot_costs(costs, labels, save_folder):
 
 # Flows is a |V| x |V| matrix of flow values
 def plot_flow_graph(graph, flows, file_path):
+    cmap = cm.get_cmap(name='Reds')
+
+    max_flow = np.max(flows)
+
     agraph = nx.drawing.nx_agraph.to_agraph(graph)
     for node, data in graph.nodes(data=True):
         n = agraph.get_node(node)
@@ -38,7 +43,7 @@ def plot_flow_graph(graph, flows, file_path):
     for src, dest in graph.edges():
         flow = flows[src, dest]
         e = agraph.get_edge(src, dest)
-        e.attr['color'] = _to_hex(min_flow_val, max_flow_val, flow)
+        e.attr['color'] = colors.rgb2hex(cmap(flow / max_flow)[:3])
         if abs(flow) > SMALL_NUMBER:
             e.attr['label'] = str(round(flow, 2))
     agraph.draw(file_path, prog='dot')

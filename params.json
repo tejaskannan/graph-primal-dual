@@ -1,14 +1,14 @@
 {
 	"learning_rate": 0.001,
 	"gradient_clip": 5,
-	"train_samples": 1000,
-	"valid_samples": 10,
-	"test_samples": 10,
+	"train_samples": 100000,
+	"valid_samples": 1000,
+	"test_samples": 16,
 	"batch_size": 128,
-	"epochs": 2,
+	"epochs": 1,
 	"patience": 5,
 	"early_stop_threshold": 1e-5,
-	"graph_layers": 1,
+	"graph_layers": 5,
 	"num_heads": 4,
 	"node_encoding": 8,
 	"node_embedding_size": 4,
@@ -20,9 +20,9 @@
 	"cost_fn": "square",
 	"cost_constant": 1.0,
 	"flow_iters": 1000,
-	"min_max_sources": [1, 2],
-	"min_max_sinks": [1, 2],
-	"graph_name": "tiny",
+	"min_max_sources": [1, 4],
+	"min_max_sinks": [1, 4],
+	"graph_name": "sioux-falls",
 	"plot_flows": true,
-	"dataset_name": "sioux-falls-10000"
+	"dataset_name": "sioux-falls-100000"
 }

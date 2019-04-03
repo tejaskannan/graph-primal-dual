@@ -41,27 +41,33 @@ def main():
         mcf_solver.train()
         # train(graph, params)
     elif args.generate:
-        generate(graph, params)
+        generate(params)
     elif args.test:
         mcf_solver.test(args.model)
 
 
-def generate(graph, params):
+def generate(params):
+
+    # Load graph
+    graph_path = 'graphs/{0}.tntp'.format(params['graph_name'])
+    graph = load_to_networkx(path=graph_path)
 
     train_file = 'datasets/{0}_train.txt'.format(params['dataset_name'])
     valid_file = 'datasets/{0}_valid.txt'.format(params['dataset_name'])
+    test_file = 'datasets/{0}_test.txt'.format(params['dataset_name'])
 
-    file_paths = [train_file, valid_file]
-    samples = [params['train_samples'], params['valid_samples']]
+    file_paths = [train_file, valid_file, test_file]
+    samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
     for file_path, num_samples in zip(file_paths, samples):
         dataset = []
-        for _ in range(num_samples):
+        for i in range(num_samples):
             d = create_demands(graph=graph,
                                min_max_sources=params['min_max_sources'],
                                min_max_sinks=params['min_max_sinks'])
             dataset.append(d)
             if len(dataset) == WRITE_THRESHOLD:
                 write_dataset(dataset, file_path)
+                print('Wrote {0} samples to {1}'.format(i, file_path))
                 dataset = []
 
         # Clean up

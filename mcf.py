@@ -2,11 +2,11 @@ import numpy as np
 import networkx as nx
 import tensorflow as tf
 from mcf_model import MCFModel
-from load import load_to_networkx, load_embeddings
+from load import load_to_networkx, load_embeddings, read_dataset
 from datetime import datetime
 from os import mkdir
 from os.path import exists
-from utils import create_demands, append_row_to_log
+from utils import create_demands, append_row_to_log, create_batches
 from utils import add_features, create_node_bias, restore_params
 from plot import plot_flow_graph
 from constants import BIG_NUMBER, LINE
@@ -44,7 +44,7 @@ class MCF:
 
         # Model placeholders
         node_ph = model.create_placeholder(dtype=tf.float32,
-                                           shape=[num_nodes, self.num_node_features],
+                                           shape=[None, num_nodes, self.num_node_features],
                                            name='node-ph',
                                            ph_type='dense')
         adj_ph = model.create_placeholder(dtype=tf.float32,
@@ -76,11 +76,29 @@ class MCF:
         log_path = self.output_folder + 'log.csv'
         append_row_to_log(log_headers, log_path)
 
+        # Load training and validation datasets
+        train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
+        valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
+
+        train_dataset = read_dataset(demands_path=train_file, num_nodes=num_nodes)
+        valid_dataset = read_dataset(demands_path=valid_file, num_nodes=num_nodes)
+
         # Variables for early stopping
         convergence_count = 0
         prev_loss = BIG_NUMBER
 
         for epoch in range(self.params['epochs']):
+
+            # Shuffle datasets for each epoch
+            np.random.shuffle(train_dataset)
+            np.random.shuffle(valid_dataset)
+
+            # Create batches
+            train_batches = create_batches(dataset=train_dataset, batch_size=self.params['batch_size'])
+            valid_batches = create_batches(dataset=valid_dataset, batch_size=self.params['batch_size'])
+
+            num_train_batches = len(train_batches)
+            num_valid_batches = len(valid_batches)
 
             print(LINE)
             print('Epoch {0}'.format(epoch))
@@ -88,10 +106,8 @@ class MCF:
 
             # Training Batches
             train_losses = []
-            for i in range(self.params['train_samples']):
-                node_features = create_demands(graph,
-                                               self.params['min_max_sources'],
-                                               self.params['min_max_sinks'])
+            for i, node_features in enumerate(train_batches):
+
                 feed_dict = {
                     node_ph: node_features,
                     adj_ph: adj_mat,
@@ -101,12 +117,14 @@ class MCF:
                 avg_loss = model.run_train_step(feed_dict=feed_dict)
                 train_losses.append(avg_loss)
 
+                print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
+
+            print(LINE)
+
             # Validation Batches
             valid_losses = []
-            for i in range(self.params['valid_samples']):
-                node_features = create_demands(graph,
-                                               self.params['min_max_sources'],
-                                               self.params['min_max_sinks'])
+            for i, node_features in enumerate(valid_batches):
+
                 feed_dict = {
                     node_ph: node_features,
                     adj_ph: adj_mat,
@@ -116,6 +134,10 @@ class MCF:
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
+
+                print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
+
+            print(LINE)
 
             avg_train_loss = np.average(train_losses)
             print('Average training loss: {0}'.format(avg_train_loss))
@@ -141,32 +163,6 @@ class MCF:
                 print('Early Stopping.')
                 break
 
-        # Use random test point
-        test_point = create_demands(graph,
-                                    self.params['min_max_sources'],
-                                    self.params['min_max_sinks'])
-        feed_dict = {
-            node_ph: test_point,
-            adj_ph: adj_mat,
-            node_embedding_ph: node_embeddings,
-            node_bias_ph: node_bias
-        }
-        outputs = model.inference(feed_dict=feed_dict)
-        flow_cost = outputs[1]
-
-        print('Primal Cost: {0}'.format(flow_cost))
-        print('Dual Cost: {0}'.format(outputs[4]))
-
-        flows = outputs[2]
-        flow_proportions = outputs[3]
-        flow_graph = add_features(graph, demands=test_point, flows=flows, proportions=flow_proportions)
-
-        # Write output graph to Graph XML
-        nx.write_gexf(flow_graph, self.output_folder + 'graph.gexf')
-
-        if self.params['plot_flows']:
-            plot_flow_graph(flow_graph, flows, self.output_folder + 'flows.png')
-
     def test(self, model_path):
         # Load graph
         graph_path = 'graphs/{0}.tntp'.format(self.params['graph_name'])
@@ -191,7 +187,7 @@ class MCF:
 
         # Model placeholders
         node_ph = model.create_placeholder(dtype=tf.float32,
-                                           shape=[num_nodes, self.num_node_features],
+                                           shape=[None, num_nodes, self.num_node_features],
                                            name='node-ph',
                                            ph_type='dense')
         adj_ph = model.create_placeholder(dtype=tf.float32,
@@ -216,25 +212,34 @@ class MCF:
         model.init()
         model.restore(model_path)
 
-        for i in range(self.params['test_samples']):
-            # Use random test point
-            test_point = create_demands(graph, self.params['min_max_sources'],
-                                        self.params['min_max_sinks'])
+        # Load test data
+        test_file = 'datasets/{0}_test.txt'.format(self.params['dataset_name'])
+        test_dataset = read_dataset(demands_path=test_file, num_nodes=num_nodes)
+        test_batches = create_batches(dataset=test_dataset, batch_size=self.params['batch_size'])
+
+        for i, node_features in enumerate(test_batches):
+
             feed_dict = {
-                node_ph: test_point,
+                node_ph: node_features,
                 adj_ph: adj_mat,
                 node_embedding_ph: node_embeddings,
                 node_bias_ph: node_bias
             }
             outputs = model.inference(feed_dict=feed_dict)
-            flow_cost = outputs[1]
 
-            flows = outputs[2]
-            flow_proportions = outputs[3]
-            flow_graph = add_features(graph, demands=test_point, flows=flows, proportions=flow_proportions)
+            for j in range(len(outputs[1])):
+                flow_cost = outputs[1][j]
+                flows = outputs[2][j]
+                flow_proportions = outputs[3][j]
+                flow_graph = add_features(graph, demands=node_features[j], flows=flows,
+                                          proportions=flow_proportions)
 
-            # Write output graph to Graph XML
-            nx.write_gexf(flow_graph, '{0}graph-{1}.gexf'.format(model_path, i))
+                print(flow_proportions)
 
-            if self.params['plot_flows']:
-                plot_flow_graph(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, i))
+                # Write output graph to Graph XML
+                index = i * self.params['batch_size'] + j
+                nx.write_gexf(flow_graph, '{0}graph-{1}.gexf'.format(model_path, index))
+
+                if self.params['plot_flows']:
+                    plot_flow_graph(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, index))
+                    plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}.png'.format(model_path, index))
