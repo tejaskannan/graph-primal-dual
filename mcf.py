@@ -234,8 +234,6 @@ class MCF:
                 flow_graph = add_features(graph, demands=node_features[j], flows=flows,
                                           proportions=flow_proportions)
 
-                print(flow_proportions)
-
                 # Write output graph to Graph XML
                 index = i * self.params['batch_size'] + j
                 nx.write_gexf(flow_graph, '{0}graph-{1}.gexf'.format(model_path, index))

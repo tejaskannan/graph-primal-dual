@@ -4,7 +4,6 @@ from base_model import Model
 from layers import MLP, GAT, Gate, MinCostFlow
 from cost_functions import get_cost_function
 from constants import BIG_NUMBER
-from utils import sharpened_softmax
 
 
 class MCFModel(Model):
@@ -74,7 +73,6 @@ class MCFModel(Model):
                 bias = -BIG_NUMBER * (1.0 - adj)
                 pred_weights = tf.square(pred_weights)
                 flow_weight_pred = tf.nn.softmax(pred_weights + bias, axis=-1, name='normalized-weights')
-                # flow_weight_pred = sharpened_softmax(pred_weights + bias, axis=-1, is_sparse=False)
 
                 # Compute minimum cost flow from flow weights
                 mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'], dims=3)
@@ -98,5 +96,5 @@ class MCFModel(Model):
                 dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
                 self.loss_op = tf.reduce_mean(flow_cost - dual_cost)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_vars, dual_flows, dual_diff]
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows]
                 self.optimizer_op = self._build_optimizer_op()
