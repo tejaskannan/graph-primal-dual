@@ -23,6 +23,8 @@ class SparseMCFModel(Model):
         # V x V sparse tensor containing the adjacency matrix
         adj = kwargs['adj']
 
+        dropout_keep_prob = kwargs['dropout_keep_prob']
+
         num_output_features = kwargs['num_output_features']
 
         with self._sess.graph.as_default():
@@ -58,44 +60,30 @@ class SparseMCFModel(Model):
                 flow_weight_pred = tf.sparse.softmax(adj * pred_weights, name='normalized-weights')
 
                 # Compute minimum cost flow from flow weights
-                #mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
-                #flow = mcf_solver(inputs=flow_weight_pred, demands=demands)
+                mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
+                flow = mcf_solver(inputs=flow_weight_pred, demands=demands)
 
-                # flow = tf.SparseTensor(indices=np.empty(shape=(0, 2), dtype=np.int64),
-                #                values=[],
-                #                dense_shape=flow_weight_pred.dense_shape)
-                flow = flow_weight_pred
-                prev_flow = flow
-                index = tf.constant(0, dtype=tf.int64)
-
-                def body(flow):
-                    inflow = tf.sparse_reduce_sum(flow, axis=0)
-                    inflow = tf.expand_dims(inflow, axis=1)
-                    adjusted_inflow = tf.nn.relu(inflow - demands)
-                    new_flow = flow_weight_pred * adjusted_inflow
-                    return new_flow
-
-                flow = tf.while_loop(cond=lambda x: True,
-                                     body=body,
-                                     loop_vars=[flow],
-                                     parallel_iterations=1,
-                                     maximum_iterations=self.params['flow_iters'],
-                                     return_same_structure=True,
-                                     name='flow-calculation')
-
-                # inflow = tf.sparse_reduce_sum(flow, axis=0)
-                # inflow = tf.expand_dims(inflow, axis=1)
-                # adjusted_inflow = tf.nn.relu(inflow - demands)
-                # flow = flow_weight_pred * adjusted_inflow
-
-                # flow = tf.sparse.to_dense(flow)
+                # This operation assumes that the c(0) = 0
                 flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
-                # flow_cost = tf.sparse.reduce_sum(flow)
 
-                # flow = tf.sparse.to_dense(flow)
+                # Compute Dual Problem and associated cost
+                dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
+                                   output_size=1,
+                                   activation=None,
+                                   name='dual-decoder')
+                dual_vars = dual_decoder(inputs=node_encoding)
 
-                # self.loss_op = tf.reduce_sum(tf.sparse.to_dense(flow_weight_pred))
-                self.loss = tf.sparse.reduce_sum(flow_weight_pred, axis=1)
-                self.loss_op = flow_cost
+                # Compute dual flows based on dual variables
+                # This operation is expensive (requires O(|V|) memory)
+                dual_diff = dual_vars - tf.transpose(dual_vars, perm=[1, 0])
+                dual_flows = adj * tf.nn.relu(self.cost_fn.inv_derivative(dual_diff))
+
+                dual_demand = tf.reduce_sum(dual_vars * demands)
+                diff_values = (dual_flows * dual_diff).values
+                dual_flow_cost = self.cost_fn.apply(dual_flows.values) - diff_values
+                dual_cost = tf.reduce_sum(dual_flow_cost) - dual_demand
+
+                self.loss = flow_cost - dual_cost
+                self.loss_op = flow_cost - dual_cost
                 self.output_ops += [flow_cost, flow, flow_weight_pred]
                 self.optimizer_op = self._build_optimizer_op()

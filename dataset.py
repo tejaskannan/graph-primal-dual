@@ -109,6 +109,9 @@ class DatasetManager:
         return batch, indices
 
     def report_losses(self, losses, indices):
+        if not isinstance(losses, Iterable):
+            losses = [losses]
+
         for loss, index in zip(losses, indices):
             self.losses[index] = loss
 
