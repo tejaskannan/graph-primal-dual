@@ -262,21 +262,26 @@ class SparseMinCostFlow(Layer):
     def __call__(self, inputs, **kwargs):
         demands = kwargs['demands']
         flow_weight_pred = inputs
-        flow = flow_weight_pred
 
-        def body(flow):
+        def body(flow, prev):
             inflow = tf.sparse_reduce_sum(flow, axis=0)
             inflow = tf.expand_dims(inflow, axis=1)
             adjusted_inflow = tf.nn.relu(inflow - demands)
             new_flow = flow_weight_pred * adjusted_inflow
-            return new_flow
+            return [new_flow, flow.values]
 
-        flow = tf.while_loop(cond=lambda x: True,
-                             body=body,
-                             loop_vars=[flow],
-                             parallel_iterations=1,
-                             maximum_iterations=self.flow_iters,
-                             return_same_structure=True,
-                             name='{0}-flow-calculation'.format(self.name))
+        def cond(flow, prev):
+            return tf.reduce_any((flow.values - prev) > FLOW_THRESHOLD)
+
+        flow = flow_weight_pred
+        prev = tf.zeros_like(flow_weight_pred.values, dtype=tf.float32)
+
+        flow, prev = tf.while_loop(cond=cond,
+                                   body=body,
+                                   loop_vars=[flow, prev],
+                                   parallel_iterations=1,
+                                   maximum_iterations=self.flow_iters,
+                                   return_same_structure=True,
+                                   name='{0}-flow-calculation'.format(self.name))
 
         return flow
