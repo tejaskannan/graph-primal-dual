@@ -28,6 +28,6 @@
 	"batch_params": {
 		"selection_beg": 1e8,
 		"selection_end": 1e2,
-		"sort_threshold": 500
+		"sort_freq": 0.5
 	}
 }

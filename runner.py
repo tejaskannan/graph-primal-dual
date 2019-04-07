@@ -2,7 +2,7 @@ import argparse
 import networkx as nx
 import numpy as np
 from utils import load_params, restore_params
-from utils import append_row_to_log, create_demands 
+from utils import append_row_to_log, create_demands
 from load import load_to_networkx, load_embeddings
 from load import write_dataset
 from constants import *
@@ -26,7 +26,7 @@ def main():
     else:
         # Load parameters used to create the given model
         params = restore_params(args.model)
-    
+
     mcf_solver = MCF(params=params)
 
     if args.train:

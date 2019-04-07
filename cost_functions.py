@@ -1,6 +1,7 @@
 import tensorflow as tf
 from constants import COST_MAX, EXP_MAX, BIG_NUMBER, SMALL_NUMBER
 
+
 class CostFunction:
 
     def __init__(self, constant):
@@ -67,8 +68,8 @@ class Sqrt(CostFunction):
         # Pre-clip y because both conditions are executed within the computation graph
         clipped_y = tf.clip_by_value(y, SMALL_NUMBER, BIG_NUMBER)
         return tf.where(tf.less_equal(y, SMALL_NUMBER),
-                       x=tf.zeros_like(y, dtype=tf.float32),
-                       y=self.clip(tf.square((2.0 / self.constant) * tf.reciprocal(clipped_y))) - 1)
+                        x=tf.zeros_like(y, dtype=tf.float32),
+                        y=self.clip(tf.square((2.0 / self.constant) * tf.reciprocal(clipped_y))) - 1)
 
 
 class Exp(CostFunction):

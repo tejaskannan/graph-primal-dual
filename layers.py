@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 from constants import BIG_NUMBER, FLOW_THRESHOLD
 
+
 class Layer:
 
     def __init__(self, input_size, output_size, activation, name):
@@ -13,6 +14,7 @@ class Layer:
 
     def __call__(self, inputs, **kwargs):
         raise NotImplementedError()
+
 
 class MLP(Layer):
     """
@@ -127,10 +129,10 @@ class GAT(Layer):
             for i in range(self.num_heads):
                 # Apply weight matrix to the set of inputs, B x V x D' Tensor
                 input_mlp = MLP(hidden_sizes=[],
-                                 output_size=self.output_size,
-                                 bias_final=False,
-                                 activation=None,
-                                 name='{0}-W-{1}'.format(self.name, i))
+                                output_size=self.output_size,
+                                bias_final=False,
+                                activation=None,
+                                name='{0}-W-{1}'.format(self.name, i))
                 transformed_inputs = input_mlp(inputs=inputs, dropout_keep_prob=weight_dropout_keep)
 
                 # Create unnormalized attention weights, B x V x V
@@ -140,7 +142,7 @@ class GAT(Layer):
                                activation=None,
                                name='{0}-a-{1}'.format(self.name, i))
                 attn_weights = attn_mlp(inputs=transformed_inputs, dropout_keep_prob=attn_dropout_keep)
-                
+
                 if self.dims == 3:
                     attn_weights = attn_weights + tf.transpose(attn_weights, [0, 2, 1])
                 else:
@@ -225,12 +227,12 @@ class MinCostFlow(Layer):
                                     maximum_iterations=self.flow_iters)
         return flow
 
+
 class SparseMinCostFlow(Layer):
 
     def __init__(self, flow_iters, name='sparse-min-cost-flow'):
         super(SparseMinCostFlow, self).__init__(0, 0, None, name)
         self.flow_iters = flow_iters
-
 
     def __call__(self, inputs, **kwargs):
         demands = kwargs['demands']

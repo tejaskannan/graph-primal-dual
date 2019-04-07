@@ -15,12 +15,10 @@ class Series(Enum):
 
 class Counters:
 
-    def __init__(self, samples, epoch, sort, recompute_loss):
+    def __init__(self, samples, epoch, sort):
         self.samples = samples
         self.epoch = epoch
         self.sort = sort
-        self.recompute_loss = recompute_loss
-        self.is_train_initialized = False
 
 
 class DatasetManager:
@@ -40,7 +38,7 @@ class DatasetManager:
     def load(self, series, num_nodes):
         assert series is not None
 
-        if not isinstance(series, Iterable):        
+        if not isinstance(series, Iterable):
             series = [series]
 
         for s in series:
@@ -52,7 +50,7 @@ class DatasetManager:
         """
         data = self.dataset[series]
         np.random.shuffle(data)
-        
+
         node_features = []
         for i in range(0, len(data), batch_size):
             node_features.append(data[i:i+batch_size])
@@ -84,7 +82,8 @@ class DatasetManager:
                     self.cumulative_probs[i] = self.cumulative_probs[i-1] + self.probs[i]
 
         # Re-sort data based on losses
-        if self.counters.samples - self.counters.sort > self.params['sort_threshold']:
+        sort_threshold = self.params['sort_freq'] * self.num_train_points
+        if self.counters.samples - self.counters.sort > sort_threshold:
             self.counters.sort = self.counters.samples
 
             # Sort samples based on losses
@@ -122,7 +121,7 @@ class DatasetManager:
         self.indices = np.arange(start=0, stop=self.num_train_points, step=1)
 
         # Initialize counters
-        self.counters = Counters(samples=0, epoch=-self.num_train_points, sort=0, recompute_loss=0)
+        self.counters = Counters(samples=0, epoch=-self.num_train_points, sort=0)
 
         # Intialize selection pressure
         s_beg = self.params['selection_beg']
@@ -132,11 +131,11 @@ class DatasetManager:
 
         # Intialize probabilities
         self.probs = np.full(shape=self.num_train_points, fill_value=1.0/float(self.num_train_points))
-        
+
         # Initialize cumulative probabilities
         self.cumulative_probs = np.zeros(shape=self.num_train_points, dtype=float)
         self.cumulative_probs[0] = 1.0 / float(self.num_train_points)
         for i in range(1, self.num_train_points):
-                self.cumulative_probs[i] = self.cumulative_probs[i-1] + self.probs[i]
+            self.cumulative_probs[i] = self.cumulative_probs[i-1] + self.probs[i]
 
         self.is_train_initialized = True
