@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--train', action='store_true', help='Flag to specify training.')
     parser.add_argument('--generate', action='store_true', help='Flag to specify dataset generation.')
     parser.add_argument('--test', action='store_true', help='Flag to specify testing.')
+    parser.add_argument('--random-walks', action='store_true')
     parser.add_argument('--model', type=str, help='Path to trained model.')
     args = parser.parse_args()
 
@@ -35,6 +36,8 @@ def main():
         generate(params)
     elif args.test:
         mcf_solver.test(args.model)
+    elif args.random_walks:
+        random_walks(params)
 
 
 def generate(params):
@@ -65,6 +68,23 @@ def generate(params):
         if len(dataset) > 0:
             write_dataset(dataset, file_path)
 
+
+def random_walks(params):
+    # Load graph
+    graph_path = 'graphs/{0}.tntp'.format(params['graph_name'])
+    graph = load_to_networkx(path=graph_path)
+
+    adj = nx.adjacency_matrix(graph).todense()
+    mat = np.eye(graph.number_of_nodes())
+    total = graph.number_of_nodes()**2
+
+    print('Number of Entries: {0}'.format(total))
+    for i in range(20):
+        nonzero = np.count_nonzero(mat)
+        frac = (total - nonzero) / total
+        print('Frac of zero entries for walks of length {0}: {1}'.format(i, frac))
+
+        mat = mat.dot(adj)
 
 if __name__ == '__main__':
     main()

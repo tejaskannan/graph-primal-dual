@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from base_model import Model
-from layers import MLP, GAT, Gate, MinCostFlow
+from layers import MLP, GAT, Gate, MinCostFlow, GRU
 from cost_functions import get_cost_function
 from constants import BIG_NUMBER
 
@@ -27,6 +27,9 @@ class MCFModel(Model):
         # V x V tensor contain the node biases for softmax
         node_bias = kwargs['node_bias']
 
+        # Scalars for dropout values
+        dropout_keep_prob = kwargs['dropout_keep_prob'] 
+
         num_output_features = kwargs['num_output_features']
 
         with self._sess.graph.as_default():
@@ -45,7 +48,7 @@ class MCFModel(Model):
                               activation=tf.nn.relu,
                               name='node-encoder')
                 node_encoding = encoder(inputs=tf.concat([node_embeddings, demands], axis=2),
-                                        dropout_keep_prob=self.params['weight_dropout_keep'])
+                                        dropout_keep_prob=dropout_keep_prob)
 
                 node_gat = GAT(input_size=self.params['node_encoding'],
                                output_size=self.params['node_encoding'],
@@ -58,8 +61,8 @@ class MCFModel(Model):
                 for _ in range(self.params['graph_layers']):
                     next_encoding = node_gat(inputs=node_encoding,
                                              bias=node_bias,
-                                             weight_dropout_keep=self.params['weight_dropout_keep'],
-                                             attn_dropout_keep=self.params['attn_dropout_keep'])
+                                             weight_dropout_keep=dropout_keep_prob,
+                                             attn_dropout_keep=dropout_keep_prob)
                     node_encoding = gate(inputs=next_encoding, prev_state=node_encoding)
 
                 # Compute flow proportions
@@ -68,7 +71,7 @@ class MCFModel(Model):
                               activation=None,
                               name='node-decoder')
                 pred_weights = decoder(inputs=node_encoding,
-                                       dropout_keep_prob=self.params['weight_dropout_keep'])
+                                       dropout_keep_prob=dropout_keep_prob)
 
                 bias = -BIG_NUMBER * (1.0 - adj)
                 pred_weights = tf.square(pred_weights)
@@ -85,7 +88,7 @@ class MCFModel(Model):
                                    activation=None,
                                    name='dual-decoder')
                 dual_vars = dual_decoder(inputs=node_encoding,
-                                         dropout_keep_prob=self.params['weight_dropout_keep'])
+                                         dropout_keep_prob=dropout_keep_prob)
 
                 # Compute dual flows based on dual variables
                 dual_diff = dual_vars - tf.transpose(dual_vars, perm=[0, 2, 1])

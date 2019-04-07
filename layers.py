@@ -62,6 +62,31 @@ class MLP(Layer):
             return output
 
 
+class GRU(Layer):
+
+    def __init__(self, output_size, activation=tf.nn.tanh, name='GRU'):
+        super(GRU, self).__init__(0, output_size, activation, name)
+
+    def __call__(self, inputs, **kwargs):
+        """
+        inputs and state must be 2D tensors
+        """
+        dropout_keep_prob = kwargs['dropout_keep_prob'] if 'dropout_keep_prob' in kwargs else 1.0
+        state = kwargs['state']
+
+        with tf.name_scope(self.name):
+            rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=self.output_size,
+                                              activation=self.activation,
+                                              reuse=True,
+                                              kernel_initializer=self.initializer,
+                                              name='{0}-gru'.format(self.name),
+                                              dtype=tf.float32)
+            rnn_cell = tf.nn.rnn_cell.DropoutWrapper(rnn_cell,
+                                                     state_keep_prob=dropout_keep_prob)
+            new_state = rnn_cell(inputs=inputs, state=state)[1]
+        return new_state
+
+
 class SparseGAT(Layer):
     """
     Sparse Graph Attention Layer from https://arxiv.org/abs/1710.10903

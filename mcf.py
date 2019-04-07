@@ -53,26 +53,31 @@ class MCF:
         node_ph = model.create_placeholder(dtype=tf.float32,
                                            shape=[None, num_nodes, self.num_node_features],
                                            name='node-ph',
-                                           ph_type='dense')
+                                           is_sparse=False)
         adj_ph = model.create_placeholder(dtype=tf.float32,
                                           shape=[num_nodes, num_nodes],
                                           name='adj-ph',
-                                          ph_type='dense')
+                                          is_sparse=False)
         node_embedding_ph = model.create_placeholder(dtype=tf.float32,
                                                      shape=[num_nodes, embedding_size],
                                                      name='node-embedding-ph',
-                                                     ph_type='dense')
+                                                     is_sparse=False)
         node_bias_ph = model.create_placeholder(dtype=tf.float32,
                                                 shape=[num_nodes, num_nodes],
                                                 name='node-bias-ph',
-                                                ph_type='dense')
+                                                is_sparse=False)
+        dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
+                                                   shape=(),
+                                                   name='dropout-keep-ph',
+                                                   is_sparse=False)
 
         # Create model
         model.build(demands=node_ph,
                     node_embeddings=node_embedding_ph,
                     adj=adj_ph,
                     node_bias=node_bias_ph,
-                    num_output_features=num_nodes)
+                    num_output_features=num_nodes,
+                    dropout_keep_prob=dropout_keep_ph)
         model.init()
 
         # Create output folder and initialize logging
@@ -112,7 +117,8 @@ class MCF:
                     node_ph: node_features,
                     adj_ph: adj_mat,
                     node_embedding_ph: node_embeddings,
-                    node_bias_ph: node_bias
+                    node_bias_ph: node_bias,
+                    dropout_keep_ph: self.params['dropout_keep_prob']
                 }
                 outputs = model.run_train_step(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -135,7 +141,8 @@ class MCF:
                     node_ph: node_features,
                     adj_ph: adj_mat,
                     node_embedding_ph: node_embeddings,
-                    node_bias_ph: node_bias
+                    node_bias_ph: node_bias,
+                    dropout_keep_ph: 1.0
                 }
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -208,13 +215,18 @@ class MCF:
                                                 shape=[num_nodes, num_nodes],
                                                 name='node-bias-ph',
                                                 ph_type='dense')
+        dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
+                                                   shape=(),
+                                                   name='dropout-keep-ph',
+                                                   is_sparse=False)
 
         # Create model
         model.build(demands=node_ph,
                     node_embeddings=node_embedding_ph,
                     adj=adj_ph,
                     node_bias=node_bias_ph,
-                    num_output_features=num_nodes)
+                    num_output_features=num_nodes,
+                    dropout_keep_prob=dropout_keep_ph)
         model.init()
         model.restore(model_path)
 
@@ -228,7 +240,8 @@ class MCF:
                 node_ph: node_features,
                 adj_ph: adj_mat,
                 node_embedding_ph: node_embeddings,
-                node_bias_ph: node_bias
+                node_bias_ph: node_bias,
+                dropout_keep_prob: 1.0
             }
             outputs = model.inference(feed_dict=feed_dict)
 

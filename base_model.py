@@ -52,10 +52,9 @@ class Model:
 
         return self.optimizer.apply_gradients(pruned_gradients)
 
-    def create_placeholder(self, dtype, shape, name, ph_type='dense'):
-        assert ph_type == 'dense' or ph_type == 'sparse'
+    def create_placeholder(self, dtype, shape, name, is_sparse=False):
         with self._sess.graph.as_default():
-            if ph_type == 'sparse':
+            if is_sparse:
                 return tf.sparse.placeholder(dtype, shape=shape, name=name)
             return tf.placeholder(dtype, shape=shape, name=name)
 
