@@ -95,6 +95,7 @@ class MCFModel(Model):
                 dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
                 dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
-                self.loss_op = tf.reduce_mean(flow_cost - dual_cost)
+                self.loss = flow_cost - dual_cost
+                self.loss_op = tf.reduce_mean(self.loss)
                 self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows]
                 self.optimizer_op = self._build_optimizer_op()

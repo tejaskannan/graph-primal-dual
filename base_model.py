@@ -17,6 +17,7 @@ class Model:
 
         # Must be set by a concrete subclass
         self.loss_op = None
+        self.loss = None
         self.optimizer_op = None
         self.output_ops = []
 
@@ -30,9 +31,9 @@ class Model:
 
     def run_train_step(self, feed_dict):
         with self._sess.graph.as_default():
-            ops = [self.loss_op, self.optimizer_op]
-            op_result = self._sess.run([ops], feed_dict=feed_dict)
-            return op_result[0][0]
+            ops = [self.loss_op, self.loss, self.optimizer_op]
+            op_result = self._sess.run(ops, feed_dict=feed_dict)
+            return op_result[0:2]
 
     def inference(self, feed_dict):
         with self._sess.graph.as_default():

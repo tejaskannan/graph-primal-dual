@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from load import read_dataset
 from enum import Enum
 from collections.abc import Iterable
@@ -65,36 +66,45 @@ class DatasetManager:
         # Recompute selection probabilities once per epoch
         if self.counters.samples - self.counters.epoch > self.num_train_points:
             self.counters.epoch = self.counters.samples
-            curr_epoch = self.counters.epoch / self.num_train_points
+            curr_epoch = int(self.counters.epoch / self.num_train_points)
 
             # Update selection
-            self.selection *= self.selection_factor
+            if curr_epoch > 0:
+                self.selection *= self.selection_factor
 
-            # Update probabilities
-            self.probs[0] = 1.0
-            factor = 1.0 / math.exp(math.log(selection) / self.num_train_points)
-            for i in range(1, self.num_train_points):
-                self.probs[i] = self.probs[i-1] * factor
-            self.probs = self.probs / np.sum(self.probs)
+                # Update probabilities
+                self.probs[0] = 1.0
+                factor = 1.0 / math.exp(math.log(self.selection) / self.num_train_points)
 
-            for i in range(1, self.num_train_points):
-                self.cumulative_probs = self.cumulative_probs[i-1] + self.probs[i]
+                for i in range(1, self.num_train_points):
+                    self.probs[i] = self.probs[i-1] * factor
+                self.probs = self.probs / np.sum(self.probs)
+
+                for i in range(1, self.num_train_points):
+                    self.cumulative_probs[i] = self.cumulative_probs[i-1] + self.probs[i]
 
         # Re-sort data based on losses
         if self.counters.samples - self.counters.sort > self.params['sort_threshold']:
             self.counters.sort = self.counters.samples
 
             # Sort samples based on losses
-            sorted_samples = list(zip(self.losses, self.indices)).sort(key=lambda t: t[1])
-            self.losses, self.indices = zip(*sorted_samples)
+            samples = list(zip(self.losses, self.indices))
+            samples.sort(key=lambda t: t[0], reverse=True)
+            losses, indices = zip(*samples)
+            self.losses, self.indices = np.array(losses), np.array(indices)
 
         batch = []
         indices = []
         for i in range(batch_size):
             r = min(np.random.random(), self.cumulative_probs[-1])
-            index = bisect_right(self.cumulative_probs, r)
+            index = bisect_right(self.cumulative_probs, r, lo=0, hi=len(self.cumulative_probs))
 
-            batch.append(self.dataset[self.indices[index]])
+            # Prevent any out of bounds errors
+            if index >= len(self.cumulative_probs):
+                index = len(self.cumulative_probs) - 1
+
+            data_index = self.indices[index]
+            batch.append(self.dataset[Series.TRAIN][data_index])
             indices.append(index)
 
         return batch, indices
@@ -112,12 +122,12 @@ class DatasetManager:
         self.indices = np.arange(start=0, stop=self.num_train_points, step=1)
 
         # Initialize counters
-        self.counters = Counters(samples=0, epochs=-self.num_train_points, sort=0, recompute_loss=0)
+        self.counters = Counters(samples=0, epoch=-self.num_train_points, sort=0, recompute_loss=0)
 
         # Intialize selection pressure
         s_beg = self.params['selection_beg']
         s_end = self.params['selection_end']
-        self.selection_factor = math.exp(math.log(s_end / s_beg)) / (num_epochs)
+        self.selection_factor = math.exp(math.log(s_end / s_beg) / (num_epochs))
         self.selection = s_beg
 
         # Intialize probabilities
@@ -127,6 +137,6 @@ class DatasetManager:
         self.cumulative_probs = np.zeros(shape=self.num_train_points, dtype=float)
         self.cumulative_probs[0] = 1.0 / float(self.num_train_points)
         for i in range(1, self.num_train_points):
-                self.cumulative_probs = self.cumulative_probs[i-1] + self.probabilities[i]
+                self.cumulative_probs[i] = self.cumulative_probs[i-1] + self.probs[i]
 
         self.is_train_initialized = True

@@ -5,7 +5,7 @@
 	"valid_samples": 1000,
 	"test_samples": 16,
 	"batch_size": 128,
-	"epochs": 1,
+	"epochs": 10,
 	"patience": 5,
 	"early_stop_threshold": 1e-5,
 	"graph_layers": 5,
@@ -19,15 +19,15 @@
 	"output_folder": "trained_models",
 	"cost_fn": "square",
 	"cost_constant": 1.0,
-	"flow_iters": 5000,
+	"flow_iters": 1000,
 	"min_max_sources": [1, 2],
 	"min_max_sinks": [1, 2],
 	"graph_name": "tiny",
 	"plot_flows": true,
 	"dataset_name": "tiny-small",
 	"batch_params": {
-		"selection_beg": 10000,
-		"selection_end": 1000,
-		"sort_threshold": 10000
+		"selection_beg": 1e8,
+		"selection_end": 1e2,
+		"sort_threshold": 500
 	}
 }

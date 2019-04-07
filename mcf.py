@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import networkx as nx
 import tensorflow as tf
 from mcf_model import MCFModel
@@ -85,6 +86,7 @@ class MCF:
         # Load training and validation datasets
         self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes)
         self.dataset.load(series=Series.VALID, num_nodes=num_nodes)
+        self.dataset.init(num_epochs=self.params['epochs'])
 
         # Variables for early stopping
         convergence_count = 0
@@ -94,33 +96,38 @@ class MCF:
 
             # Create batches
             train_batches = self.dataset.create_shuffled_batches(series=Series.TRAIN, batch_size=self.params['batch_size'])
-            valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID, batch_size=self.params['batch_size'])
-
-            num_train_batches = len(train_batches)
-            num_valid_batches = len(valid_batches)
 
             print(LINE)
             print('Epoch {0}'.format(epoch))
             print(LINE)
 
             # Training Batches
+            num_train_batches = self.dataset.num_train_points / self.params['batch_size']
+            num_train_batches = int(math.ceil(num_train_batches))
             train_losses = []
-            for i, node_features in enumerate(train_batches):
+            for i in range(num_train_batches):
 
+                node_features, indices = self.dataset.get_train_batch(batch_size=self.params['batch_size'])
                 feed_dict = {
                     node_ph: node_features,
                     adj_ph: adj_mat,
                     node_embedding_ph: node_embeddings,
                     node_bias_ph: node_bias
                 }
-                avg_loss = model.run_train_step(feed_dict=feed_dict)
+                outputs = model.run_train_step(feed_dict=feed_dict)
+                avg_loss = outputs[0]
+                loss = outputs[1]
+
                 train_losses.append(avg_loss)
+                self.dataset.report_losses(loss, indices)
 
                 print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
 
             print(LINE)
 
             # Validation Batches
+            valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID, batch_size=self.params['batch_size'])
+            num_valid_batches = len(valid_batches)
             valid_losses = []
             for i, node_features in enumerate(valid_batches):
 
@@ -147,16 +154,16 @@ class MCF:
             log_row = [epoch, avg_train_loss, avg_valid_loss]
             append_row_to_log(log_row, log_path)
 
-            if avg_valid_loss < prev_loss:
-                print('Saving model...')
-                model.save(self.output_folder)
-                prev_loss = avg_valid_loss
-
-            # Early Stopping
+            # Early Stopping Counters
             if abs(prev_loss - avg_valid_loss) < self.params['early_stop_threshold']:
                 convergence_count += 1
             else:
                 convergence_count = 0
+
+            if avg_valid_loss < prev_loss:
+                print('Saving model...')
+                model.save(self.output_folder)
+                prev_loss = avg_valid_loss
 
             if convergence_count >= self.params['patience']:
                 print('Early Stopping.')
