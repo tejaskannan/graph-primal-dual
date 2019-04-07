@@ -3,11 +3,11 @@ import math
 import networkx as nx
 import tensorflow as tf
 from mcf_model import MCFModel
-from load import load_to_networkx, load_embeddings, read_dataset
+from load import load_to_networkx, read_dataset
 from datetime import datetime
 from os import mkdir
 from os.path import exists
-from utils import create_demands, append_row_to_log, create_batches
+from utils import create_demands, append_row_to_log, create_node_embeddings
 from utils import add_features, create_node_bias, restore_params
 from plot import plot_flow_graph
 from constants import BIG_NUMBER, LINE
@@ -38,13 +38,10 @@ class MCF:
 
         # Graph properties
         num_nodes = graph.number_of_nodes()
-        embedding_size = self.params['node_embedding_size']
 
-        # Load pre-trained embeddings
-        index_path = 'embeddings/{0}.ann'.format(self.params['graph_name'])
-        node_embeddings = load_embeddings(index_path=index_path,
-                                          embedding_size=embedding_size,
-                                          num_nodes=num_nodes)
+        # Create node embeddings
+        node_embeddings = create_node_embeddings(graph)
+        embedding_size = node_embeddings.shape[1]
 
         # Initialize model
         model = MCFModel(params=self.params)
@@ -187,13 +184,10 @@ class MCF:
 
         # Graph properties
         num_nodes = graph.number_of_nodes()
-        embedding_size = self.params['node_embedding_size']
 
-        # Load pre-trained embeddings
-        index_path = 'embeddings/{0}.ann'.format(self.params['graph_name'])
-        node_embeddings = load_embeddings(index_path=index_path,
-                                          embedding_size=embedding_size,
-                                          num_nodes=num_nodes)
+        # Create node embeddings
+        node_embeddings = create_node_embeddings(graph)
+        embedding_size = node_embeddings.shape[1]
 
         # Initialize model
         model = MCFModel(params=self.params)
@@ -202,19 +196,19 @@ class MCF:
         node_ph = model.create_placeholder(dtype=tf.float32,
                                            shape=[None, num_nodes, self.num_node_features],
                                            name='node-ph',
-                                           ph_type='dense')
+                                           is_sparse=False)
         adj_ph = model.create_placeholder(dtype=tf.float32,
                                           shape=[num_nodes, num_nodes],
                                           name='adj-ph',
-                                          ph_type='dense')
+                                          is_sparse=False)
         node_embedding_ph = model.create_placeholder(dtype=tf.float32,
                                                      shape=[num_nodes, embedding_size],
                                                      name='node-embedding-ph',
-                                                     ph_type='dense')
+                                                     is_sparse=False)
         node_bias_ph = model.create_placeholder(dtype=tf.float32,
                                                 shape=[num_nodes, num_nodes],
                                                 name='node-bias-ph',
-                                                ph_type='dense')
+                                                is_sparse=False)
         dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
                                                    shape=(),
                                                    name='dropout-keep-ph',
@@ -241,7 +235,7 @@ class MCF:
                 adj_ph: adj_mat,
                 node_embedding_ph: node_embeddings,
                 node_bias_ph: node_bias,
-                dropout_keep_prob: 1.0
+                dropout_keep_ph: 1.0
             }
             outputs = model.inference(feed_dict=feed_dict)
 

@@ -1,7 +1,7 @@
 import argparse
 import networkx as nx
 import numpy as np
-from utils import load_params, restore_params
+from utils import load_params, restore_params, create_node_embeddings
 from utils import append_row_to_log, create_demands
 from load import load_to_networkx, load_embeddings
 from load import write_dataset
