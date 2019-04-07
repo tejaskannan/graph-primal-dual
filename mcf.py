@@ -10,6 +10,7 @@ from utils import create_demands, append_row_to_log, create_batches
 from utils import add_features, create_node_bias, restore_params
 from plot import plot_flow_graph
 from constants import BIG_NUMBER, LINE
+from dataset import DatasetManager, Series
 
 
 class MCF:
@@ -19,6 +20,11 @@ class MCF:
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
         self.output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], params['graph_name'], self.timestamp)
         self.num_node_features = 1
+
+        train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
+        valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
+        test_file = 'datasets/{0}_test.txt'.format(self.params['dataset_name'])
+        self.dataset = DatasetManager(train_file, valid_file, test_file, params=self.params['batch_params'])
 
     def train(self):
         # Load graph
@@ -77,11 +83,8 @@ class MCF:
         append_row_to_log(log_headers, log_path)
 
         # Load training and validation datasets
-        train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
-        valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
-
-        train_dataset = read_dataset(demands_path=train_file, num_nodes=num_nodes)
-        valid_dataset = read_dataset(demands_path=valid_file, num_nodes=num_nodes)
+        self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes)
+        self.dataset.load(series=Series.VALID, num_nodes=num_nodes)
 
         # Variables for early stopping
         convergence_count = 0
@@ -89,13 +92,9 @@ class MCF:
 
         for epoch in range(self.params['epochs']):
 
-            # Shuffle datasets for each epoch
-            np.random.shuffle(train_dataset)
-            np.random.shuffle(valid_dataset)
-
             # Create batches
-            train_batches = create_batches(dataset=train_dataset, batch_size=self.params['batch_size'])
-            valid_batches = create_batches(dataset=valid_dataset, batch_size=self.params['batch_size'])
+            train_batches = self.dataset.create_shuffled_batches(series=Series.TRAIN, batch_size=self.params['batch_size'])
+            valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID, batch_size=self.params['batch_size'])
 
             num_train_batches = len(train_batches)
             num_valid_batches = len(valid_batches)

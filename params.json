@@ -19,10 +19,15 @@
 	"output_folder": "trained_models",
 	"cost_fn": "square",
 	"cost_constant": 1.0,
-	"flow_iters": 1000,
-	"min_max_sources": [1, 4],
-	"min_max_sinks": [1, 4],
-	"graph_name": "sioux-falls",
+	"flow_iters": 5000,
+	"min_max_sources": [1, 2],
+	"min_max_sinks": [1, 2],
+	"graph_name": "tiny",
 	"plot_flows": true,
-	"dataset_name": "sioux-falls-100000"
+	"dataset_name": "tiny-small",
+	"batch_params": {
+		"selection_beg": 10000,
+		"selection_end": 1000,
+		"sort_threshold": 10000
+	}
 }
