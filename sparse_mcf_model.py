@@ -58,11 +58,44 @@ class SparseMCFModel(Model):
                 flow_weight_pred = tf.sparse.softmax(adj * pred_weights, name='normalized-weights')
 
                 # Compute minimum cost flow from flow weights
-                mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
-                flow = mcf_solver(inputs=flow_weight_pred, demands=demands)
+                #mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
+                #flow = mcf_solver(inputs=flow_weight_pred, demands=demands)
 
-                flow_cost = tf.reduce_sum(self.cost_fn.apply(flow))
+                # flow = tf.SparseTensor(indices=np.empty(shape=(0, 2), dtype=np.int64),
+                #                values=[],
+                #                dense_shape=flow_weight_pred.dense_shape)
+                flow = flow_weight_pred
+                prev_flow = flow
+                index = tf.constant(0, dtype=tf.int64)
 
-                self.loss_op = tf.reduce_sum(flow)
+                def body(flow):
+                    inflow = tf.sparse_reduce_sum(flow, axis=0)
+                    inflow = tf.expand_dims(inflow, axis=1)
+                    adjusted_inflow = tf.nn.relu(inflow - demands)
+                    new_flow = flow_weight_pred * adjusted_inflow
+                    return new_flow
+
+                flow = tf.while_loop(cond=lambda x: True,
+                                     body=body,
+                                     loop_vars=[flow],
+                                     parallel_iterations=1,
+                                     maximum_iterations=self.params['flow_iters'],
+                                     return_same_structure=True,
+                                     name='flow-calculation')
+
+                # inflow = tf.sparse_reduce_sum(flow, axis=0)
+                # inflow = tf.expand_dims(inflow, axis=1)
+                # adjusted_inflow = tf.nn.relu(inflow - demands)
+                # flow = flow_weight_pred * adjusted_inflow
+
+                # flow = tf.sparse.to_dense(flow)
+                flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
+                # flow_cost = tf.sparse.reduce_sum(flow)
+
+                # flow = tf.sparse.to_dense(flow)
+
+                # self.loss_op = tf.reduce_sum(tf.sparse.to_dense(flow_weight_pred))
+                self.loss = tf.sparse.reduce_sum(flow_weight_pred, axis=1)
+                self.loss_op = flow_cost
                 self.output_ops += [flow_cost, flow, flow_weight_pred]
                 self.optimizer_op = self._build_optimizer_op()

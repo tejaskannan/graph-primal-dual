@@ -28,7 +28,10 @@ def main():
         # Load parameters used to create the given model
         params = restore_params(args.model)
 
-    mcf_solver = MCF(params=params)
+    if params['sparse']:
+        mcf_solver = SparseMCF(params=params)
+    else:
+        mcf_solver = MCF(params=params)
 
     if args.train:
         mcf_solver.train()

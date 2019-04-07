@@ -1,15 +1,18 @@
 import numpy as np
+import math
 import networkx as nx
 import tensorflow as tf
 from sparse_mcf_model import SparseMCFModel
-from load import load_to_networkx, load_embeddings
+from load import load_to_networkx, read_dataset
 from datetime import datetime
 from os import mkdir
 from os.path import exists
-from utils import create_demands, append_row_to_log
-from utils import sparse_matrix_to_tensor, add_features
-from plot import plot_flow_graph
+from utils import create_demands, append_row_to_log, create_node_embeddings
+from utils import add_features_sparse, create_node_bias, restore_params
+from utils import sparse_matrix_to_tensor
+from plot import plot_flow_graph_sparse
 from constants import BIG_NUMBER, LINE
+from dataset import DatasetManager, Series
 
 
 class SparseMCF:
@@ -20,46 +23,40 @@ class SparseMCF:
         self.output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], params['graph_name'], self.timestamp)
         self.num_node_features = 1
 
+        train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
+        valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
+        test_file = 'datasets/{0}_test.txt'.format(self.params['dataset_name'])
+        self.dataset = DatasetManager(train_file, valid_file, test_file, params=self.params['batch_params'])
+
     def train(self):
         # Load graph
         graph_path = 'graphs/{0}.tntp'.format(self.params['graph_name'])
         graph = load_to_networkx(path=graph_path)
 
         # Create tensors for global graph properties
-        adj_mat = sparse_matrix_to_tensor(nx.adjacency_matrix(graph))
+        adj_mat = nx.adjacency_matrix(graph)
+        adj_tensor = sparse_matrix_to_tensor(adj_mat)
 
         # Graph properties
         num_nodes = graph.number_of_nodes()
-        embedding_size = self.params['node_embedding_size']
 
-        # Load pre-trained embeddings
-        index_path = 'embeddings/{0}.ann'.format(self.params['graph_name'])
-        node_embeddings = load_embeddings(index_path=index_path,
-                                          embedding_size=embedding_size,
-                                          num_nodes=num_nodes)
+        # Create node embeddings
+        node_embeddings = create_node_embeddings(graph)
+        embedding_size = node_embeddings.shape[1]
 
         # Initialize model
         model = SparseMCFModel(params=self.params)
 
         # Model placeholders
-        node_ph = model.create_placeholder(dtype=tf.float32,
-                                           shape=[num_nodes, self.num_node_features],
-                                           name='node-ph',
-                                           ph_type='dense')
-        adj_ph = model.create_placeholder(dtype=tf.float32,
-                                          shape=[None, num_nodes],
-                                          name='adj-ph',
-                                          ph_type='sparse')
-        node_embedding_ph = model.create_placeholder(dtype=tf.float32,
-                                                     shape=[num_nodes, embedding_size],
-                                                     name='node-embedding-ph',
-                                                     ph_type='dense')
+        node_ph, adj_ph, node_embedding_ph, \
+            dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
 
         # Create model
         model.build(demands=node_ph,
                     node_embeddings=node_embedding_ph,
                     adj=adj_ph,
-                    num_output_features=num_nodes)
+                    num_output_features=num_nodes,
+                    dropout_keep_prob=dropout_keep_ph)
         model.init()
 
         # Create output folder and initialize logging
@@ -70,10 +67,10 @@ class SparseMCF:
         log_path = self.output_folder + 'log.csv'
         append_row_to_log(log_headers, log_path)
 
-
         # Load training and validation datasets
-        train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
-        valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
+        self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes)
+        self.dataset.load(series=Series.VALID, num_nodes=num_nodes)
+        self.dataset.init(num_epochs=self.params['epochs'])
 
         # Variables for early stopping
         convergence_count = 0
@@ -81,44 +78,53 @@ class SparseMCF:
 
         for epoch in range(self.params['epochs']):
 
+            # Create batches
+            train_batches = self.dataset.create_shuffled_batches(series=Series.TRAIN, batch_size=self.params['batch_size'])
+
             print(LINE)
             print('Epoch {0}'.format(epoch))
             print(LINE)
 
             # Training Batches
+            num_train_batches = self.dataset.num_train_points
             train_losses = []
-            for i in range(self.params['train_samples']):
-                node_features = create_demands(graph,
-                                               self.params['min_max_sources'],
-                                               self.params['min_max_sinks'])
-                feed_dict = {
-                    node_ph: node_features,
-                    adj_ph: adj_mat,
-                    node_embedding_ph: node_embeddings
-                }
-                avg_loss = model.run_train_step(feed_dict=feed_dict)
-                train_losses.append(avg_loss)
+            for i in range(num_train_batches):
 
-                print('Average training loss for batch {0}/{1}: {2}'.format(i+1, self.params['train_samples'], avg_loss))
+                node_features, indices = self.dataset.get_train_batch(batch_size=1)
+                feed_dict = {
+                    node_ph: node_features[0],
+                    adj_ph: adj_tensor,
+                    node_embedding_ph: node_embeddings,
+                    dropout_keep_ph: self.params['dropout_keep_prob']
+                }
+                outputs = model.run_train_step(feed_dict=feed_dict)
+                avg_loss = outputs[0]
+                loss = outputs[1]
+
+                train_losses.append(avg_loss)
+                self.dataset.report_losses(loss, indices)
+
+                print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
 
             print(LINE)
 
             # Validation Batches
+            valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID, batch_size=1)
+            num_valid_batches = len(valid_batches)
             valid_losses = []
-            for i in range(self.params['valid_samples']):
-                node_features = create_demands(graph,
-                                               self.params['min_max_sources'],
-                                               self.params['min_max_sinks'])
+            for i, node_features in enumerate(valid_batches):
+
                 feed_dict = {
-                    node_ph: node_features,
-                    adj_ph: adj_mat,
-                    node_embedding_ph: node_embeddings
+                    node_ph: node_features[0],
+                    adj_ph: adj_tensor,
+                    node_embedding_ph: node_embeddings,
+                    dropout_keep_ph: 1.0
                 }
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
 
-                print('Average validation loss for batch {0}/{1}: {2}'.format(i+1, self.params['valid_samples'], avg_loss))
+                print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
 
             print(LINE)
 
@@ -131,42 +137,95 @@ class SparseMCF:
             log_row = [epoch, avg_train_loss, avg_valid_loss]
             append_row_to_log(log_row, log_path)
 
+            # Early Stopping Counters
+            if abs(prev_loss - avg_valid_loss) < self.params['early_stop_threshold']:
+                convergence_count += 1
+            else:
+                convergence_count = 0
+
             if avg_valid_loss < prev_loss:
                 print('Saving model...')
                 model.save(self.output_folder)
                 prev_loss = avg_valid_loss
 
-            # Early Stopping
-            if avg_valid_loss > prev_loss or abs(prev_loss - avg_valid_loss) < self.params['early_stop_threshold']:
-                convergence_count += 1
-            else:
-                convergence_count = 0
-
             if convergence_count >= self.params['patience']:
                 print('Early Stopping.')
                 break
 
-        # Use random test point
-        test_point = create_demands(graph,
-                                    self.params['min_max_sources'],
-                                    self.params['min_max_sinks'])
-        feed_dict = {
-            node_ph: test_point,
-            adj_ph: adj_mat,
-            node_embedding_ph: node_embeddings
-        }
-        outputs = model.inference(feed_dict=feed_dict)
-        flow_cost = outputs[1]
+    def test(self, model_path):
+        # Load graph
+        graph_path = 'graphs/{0}.tntp'.format(self.params['graph_name'])
+        graph = load_to_networkx(path=graph_path)
 
-        print('Primal Cost: {0}'.format(flow_cost))
+        # Create tensors for global graph properties
+        adj_mat = nx.adjacency_matrix(graph)
+        adj_tensor = sparse_matrix_to_tensor(adj_mat)
 
-        flows = outputs[2]
-        flow_graph = add_features(graph, demands=test_point, flows=flows)
+        # Graph properties
+        num_nodes = graph.number_of_nodes()
 
-        print(outputs[3])
+        # Create node embeddings
+        node_embeddings = create_node_embeddings(graph)
+        embedding_size = node_embeddings.shape[1]
 
-        # Write output graph to Graph XML
-        nx.write_gexf(flow_graph, self.output_folder + 'graph.gexf')
+        # Initialize model
+        model = SparseMCFModel(params=self.params)
 
-        if self.params['plot_flows']:
-            plot_flow_graph(flow_graph, flows, self.output_folder + 'flows.png')
+        # Model placeholders
+        node_ph, adj_ph, node_embedding_ph, \
+            dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
+
+        # Create model
+        model.build(demands=node_ph,
+                    node_embeddings=node_embedding_ph,
+                    adj=adj_ph,
+                    num_output_features=num_nodes,
+                    dropout_keep_prob=dropout_keep_ph)
+        model.init()
+        model.restore(model_path)
+
+        # Load test data
+        self.dataset.load(series=Series.TEST, num_nodes=num_nodes)
+        test_batches = self.dataset.create_shuffled_batches(series=Series.TEST, batch_size=1)
+
+        for i, node_features in enumerate(test_batches):
+
+            feed_dict = {
+                node_ph: node_features[0],
+                adj_ph: adj_tensor,
+                node_embedding_ph: node_embeddings,
+                dropout_keep_ph: 1.0
+            }
+            outputs = model.inference(feed_dict=feed_dict)
+
+            flow_cost = outputs[1]
+            flows = outputs[2]
+            flow_proportions = outputs[3]
+            flow_graph = add_features_sparse(graph, demands=node_features[0], flows=flows,
+                                             proportions=flow_proportions)
+
+            # Write output graph to Graph XML
+            nx.write_gexf(flow_graph, '{0}graph-{1}.gexf'.format(model_path, i))
+
+            if self.params['plot_flows']:
+                plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, i))
+                plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}.png'.format(model_path, i))
+
+    def create_placeholders(self, model, num_nodes, embedding_size):
+        node_ph = model.create_placeholder(dtype=tf.float32,
+                                           shape=[num_nodes, self.num_node_features],
+                                           name='node-ph',
+                                           is_sparse=False)
+        adj_ph = model.create_placeholder(dtype=tf.float32,
+                                          shape=[None, num_nodes],
+                                          name='adj-ph',
+                                          is_sparse=True)
+        node_embedding_ph = model.create_placeholder(dtype=tf.float32,
+                                                     shape=[num_nodes, embedding_size],
+                                                     name='node-embedding-ph',
+                                                     is_sparse=False)
+        dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
+                                                   shape=(),
+                                                   name='dropout-keep-ph',
+                                                   is_sparse=False)
+        return node_ph, adj_ph, node_embedding_ph, dropout_keep_ph

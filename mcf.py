@@ -47,26 +47,8 @@ class MCF:
         model = MCFModel(params=self.params)
 
         # Model placeholders
-        node_ph = model.create_placeholder(dtype=tf.float32,
-                                           shape=[None, num_nodes, self.num_node_features],
-                                           name='node-ph',
-                                           is_sparse=False)
-        adj_ph = model.create_placeholder(dtype=tf.float32,
-                                          shape=[num_nodes, num_nodes],
-                                          name='adj-ph',
-                                          is_sparse=False)
-        node_embedding_ph = model.create_placeholder(dtype=tf.float32,
-                                                     shape=[num_nodes, embedding_size],
-                                                     name='node-embedding-ph',
-                                                     is_sparse=False)
-        node_bias_ph = model.create_placeholder(dtype=tf.float32,
-                                                shape=[num_nodes, num_nodes],
-                                                name='node-bias-ph',
-                                                is_sparse=False)
-        dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
-                                                   shape=(),
-                                                   name='dropout-keep-ph',
-                                                   is_sparse=False)
+        node_ph, adj_ph, node_embedding_ph, \
+            node_bias_ph, dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
 
         # Create model
         model.build(demands=node_ph,
@@ -193,26 +175,8 @@ class MCF:
         model = MCFModel(params=self.params)
 
         # Model placeholders
-        node_ph = model.create_placeholder(dtype=tf.float32,
-                                           shape=[None, num_nodes, self.num_node_features],
-                                           name='node-ph',
-                                           is_sparse=False)
-        adj_ph = model.create_placeholder(dtype=tf.float32,
-                                          shape=[num_nodes, num_nodes],
-                                          name='adj-ph',
-                                          is_sparse=False)
-        node_embedding_ph = model.create_placeholder(dtype=tf.float32,
-                                                     shape=[num_nodes, embedding_size],
-                                                     name='node-embedding-ph',
-                                                     is_sparse=False)
-        node_bias_ph = model.create_placeholder(dtype=tf.float32,
-                                                shape=[num_nodes, num_nodes],
-                                                name='node-bias-ph',
-                                                is_sparse=False)
-        dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
-                                                   shape=(),
-                                                   name='dropout-keep-ph',
-                                                   is_sparse=False)
+        node_ph, adj_ph, node_embedding_ph, \
+            node_bias_ph, dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
 
         # Create model
         model.build(demands=node_ph,
@@ -253,3 +217,26 @@ class MCF:
                 if self.params['plot_flows']:
                     plot_flow_graph(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, index))
                     plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}.png'.format(model_path, index))
+
+    def create_placeholders(self, model, num_nodes, embedding_size):
+        node_ph = model.create_placeholder(dtype=tf.float32,
+                                           shape=[None, num_nodes, self.num_node_features],
+                                           name='node-ph',
+                                           is_sparse=False)
+        adj_ph = model.create_placeholder(dtype=tf.float32,
+                                          shape=[num_nodes, num_nodes],
+                                          name='adj-ph',
+                                          is_sparse=False)
+        node_embedding_ph = model.create_placeholder(dtype=tf.float32,
+                                                     shape=[num_nodes, embedding_size],
+                                                     name='node-embedding-ph',
+                                                     is_sparse=False)
+        node_bias_ph = model.create_placeholder(dtype=tf.float32,
+                                                shape=[num_nodes, num_nodes],
+                                                name='node-bias-ph',
+                                                is_sparse=False)
+        dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
+                                                   shape=(),
+                                                   name='dropout-keep-ph',
+                                                   is_sparse=False)
+        return node_ph, adj_ph, node_embedding_ph, node_bias_ph, dropout_keep_ph

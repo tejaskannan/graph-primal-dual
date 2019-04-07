@@ -35,6 +35,21 @@ def add_features(graph, demands, flows, proportions):
     return graph
 
 
+def add_features_sparse(graph, demands, flows, proportions):
+    graph = graph.copy()
+
+    for node in graph.nodes():
+        graph.add_node(node, demand=float(demands[node][0]))
+
+    for edge, flow in zip(flows.indices, flows.values):
+        graph.add_edge(edge[0], edge[1], flow=float(flow))
+
+    for edge, prop in zip(proportions.indices, proportions.values):
+        graph.add_edge(edge[0], edge[1], proportion=float(prop))
+
+    return graph
+
+
 def create_demands(graph, min_max_sources, min_max_sinks):
     # Randomly select the number of sources and sinks
     num_sources = np.random.randint(low=min_max_sources[0], high=min_max_sources[1]+1)

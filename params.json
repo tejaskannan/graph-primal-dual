@@ -5,7 +5,7 @@
 	"valid_samples": 1000,
 	"test_samples": 16,
 	"batch_size": 128,
-	"epochs": 10,
+	"epochs": 1,
 	"patience": 5,
 	"early_stop_threshold": 1e-5,
 	"graph_layers": 5,
@@ -24,6 +24,7 @@
 	"graph_name": "tiny",
 	"plot_flows": true,
 	"dataset_name": "tiny-small",
+	"sparse": true,
 	"batch_params": {
 		"selection_beg": 1e8,
 		"selection_end": 1e2,
