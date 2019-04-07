@@ -219,9 +219,8 @@ class MCF:
         model.restore(model_path)
 
         # Load test data
-        test_file = 'datasets/{0}_test.txt'.format(self.params['dataset_name'])
-        test_dataset = read_dataset(demands_path=test_file, num_nodes=num_nodes)
-        test_batches = create_batches(dataset=test_dataset, batch_size=self.params['batch_size'])
+        self.dataset.load(series=Series.TEST, num_nodes=num_nodes)
+        test_batches = self.dataset.create_shuffled_batches(series=Series.TEST, batch_size=self.params['batch_size'])
 
         for i, node_features in enumerate(test_batches):
 
