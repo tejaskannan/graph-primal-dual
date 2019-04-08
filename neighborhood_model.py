@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 from base_model import Model
 from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow
+from layers import AttentionNeighborhood
 from cost_functions import get_cost_function
 
 
@@ -48,10 +49,11 @@ class NeighborhoodModel(Model):
                 node_encoding = encoder(inputs=tf.concat([node_embeddings, node_features], axis=-1),
                                         dropout_keep_prob=dropout_keep_prob)
 
-                node_neighborhood = Neighborhood(output_size=self.params['node_encoding'],
-                                                 is_sparse=is_sparse,
-                                                 activation=tf.nn.tanh,
-                                                 name='node-neighborhood')
+                node_neighborhood = AttentionNeighborhood(output_size=self.params['node_encoding'],
+                                                          is_sparse=is_sparse,
+                                                          num_heads=self.params['num_heads'],
+                                                          activation=tf.nn.tanh,
+                                                          name='node-neighborhood')
                 node_gru = GRU(output_size=self.params['node_encoding'],
                                activation=tf.nn.tanh,
                                name='node-gru')

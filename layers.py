@@ -304,6 +304,89 @@ class Neighborhood(Layer):
         return self.activation(weighted_features), attn_coefs
 
 
+class AttentionNeighborhood(Layer):
+    """
+    Uses GAT for local neighborhood aggregation before using attention to weight each
+    neighborhood individually.
+    """
+
+    def __init__(self, output_size, num_heads, is_sparse, activation=tf.nn.tanh, name='neighborhood'):
+        super(AttentionNeighborhood, self).__init__(0, output_size, activation, name)
+        self.is_sparse = is_sparse
+        self.num_heads = num_heads
+
+    def __call__(self, inputs, **kwargs):
+
+        # List of 'num_neighborhoods' V x V matrices
+        neighborhoods = kwargs['neighborhoods']
+
+        dropout_keep_prob = kwargs['dropout_keep_prob']
+
+        if self.is_sparse:
+            agg_layer = SparseGAT(input_size=0,
+                                  output_size=self.output_size,
+                                  num_heads=self.num_heads,
+                                  activation=self.activation,
+                                  name='{0}-sparse-GAT'.format(self.name))
+        else:
+            agg_layer = GAT(input_size=0,
+                            output_size=self.output_size,
+                            num_heads=self.num_heads,
+                            activation=self.activation,
+                            name='{0}-GAT'.format(self.name))
+
+
+        # Layer to compute attention weights for each aggregated neighborhood
+        attn_layer = MLP(hidden_sizes=[],
+                 output_size=1,
+                 bias_final=False,
+                 activation=tf.nn.leaky_relu,
+                 activate_final=True,
+                 name='{0}-attn-weights'.format(self.name))
+
+        neighborhood_features = []
+        neighborhood_attn = []
+        for neighborhood_mat in neighborhoods:
+
+            # V x F tensor of aggregated node features over the given neighborhood
+            if self.is_sparse:
+                neighborhood_agg = agg_layer(inputs=inputs,
+                                             adj_matrix=neighborhood_mat,
+                                             weight_dropout_keep=dropout_keep_prob,
+                                             attn_dropout_keep=dropout_keep_prob)
+            else:
+                neighborhood_agg = agg_layer(inputs=inputs,
+                                             bias=neighborhood_mat,
+                                             weight_dropout_keep=dropout_keep_prob,
+                                             attn_dropout_keep=dropout_keep_prob)
+
+            # V x 1 tensor of attention weights
+            attn_weights = attn_layer(inputs=neighborhood_agg, dropout_keep_prob=dropout_keep_prob)
+
+            neighborhood_features.append(tf.expand_dims(neighborhood_agg, axis=-1))
+            neighborhood_attn.append(attn_weights)
+
+        # V x F x K
+        neighborhood_concat = tf.concat(neighborhood_features, axis=-1)
+
+        # V x K
+        attn_concat = tf.concat(neighborhood_attn, axis=-1)
+
+        # V x K tensor of normalized attention coefficients
+        attn_coefs = tf.nn.softmax(attn_concat, axis=-1)
+
+        # V x K x 1 tensor of normalized attention coefficients
+        attn_coefs_expanded = tf.expand_dims(attn_coefs, axis=-1)
+
+        # V x F x 1 tensor of weighted neighborhood features
+        weighted_features = tf.matmul(neighborhood_concat, attn_coefs_expanded)
+        weighted_features = tf.squeeze(weighted_features, axis=-1)
+        weighted_features = tf.contrib.layers.bias_add(weighted_features,
+                                                       scope='{0}-b'.format(self.name))
+
+        return self.activation(weighted_features), attn_coefs
+
+
 class MinCostFlow(Layer):
 
     def __init__(self, flow_iters, dims=3, name='min-cost-flow'):

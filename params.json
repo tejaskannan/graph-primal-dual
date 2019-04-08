@@ -9,7 +9,7 @@
 	"patience": 5,
 	"early_stop_threshold": 1e-5,
 	"graph_layers": 2,
-	"num_heads": 4,
+	"num_heads": 1,
 	"node_encoding": 8,
 	"num_neighborhoods": 3,
 	"node_embedding_size": 4,

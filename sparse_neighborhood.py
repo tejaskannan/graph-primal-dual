@@ -201,7 +201,7 @@ class SparseNeighborhoodMCF:
         embedding_size = node_embeddings.shape[1]
 
         # Initialize model
-        model = SparseNeighborhoodModel(params=self.params)
+        model = NeighborhoodModel(params=self.params)
 
         # Model placeholders
         node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
