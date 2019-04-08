@@ -2,11 +2,12 @@ import argparse
 import networkx as nx
 import numpy as np
 from utils import load_params, restore_params, create_node_embeddings
-from utils import append_row_to_log, create_demands
+from utils import append_row_to_log, create_demands, random_walk_neighborhoods
 from load import load_to_networkx, load_embeddings
 from load import write_dataset
 from constants import *
 from sparse_mcf import SparseMCF
+from sparse_neighborhood import SparseNeighborhoodMCF
 from mcf import MCF
 
 
@@ -29,7 +30,8 @@ def main():
         params = restore_params(args.model)
 
     if params['sparse']:
-        mcf_solver = SparseMCF(params=params)
+        # mcf_solver = SparseMCF(params=params)
+        mcf_solver = SparseNeighborhoodMCF(params=params)
     else:
         mcf_solver = MCF(params=params)
 

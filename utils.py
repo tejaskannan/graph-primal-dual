@@ -8,7 +8,7 @@ import pickle
 import csv
 from os.path import exists
 from constants import *
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, eye
 
 
 def load_params(params_file_path):
@@ -160,6 +160,17 @@ def sparse_matrix_to_tensor_multiple(sparse_mat, k):
 
     data_expanded = np.repeat(mat.data, repeats=k, axis=0)
     return tf.SparseTensorValue(indices_expanded, data_expanded, expanded_shape)
+
+
+def random_walk_neighborhoods(adj_matrix, k):
+    mat = eye(adj_matrix.shape[0])
+    neighborhoods = [mat]
+
+    for _ in range(k):
+        mat = mat.dot(adj_matrix)
+        mat.data[:] = 1
+        neighborhoods.append(mat)
+    return neighborhoods
 
 
 def append_row_to_log(row, log_path):
