@@ -136,6 +136,25 @@ def sparse_matrix_to_tensor(sparse_mat):
     return tf.SparseTensorValue(indices, mat.data, mat.shape)
 
 
+def sparse_matrix_to_tensor_multiple(sparse_mat, k):
+    mat = sparse_mat.tocoo()
+    indices = np.mat([mat.row, mat.col]).transpose()
+    num_indices = indices.shape[0]
+
+    expanded_shape = (indices.shape[0] * k, indices.shape[1] + 1)
+    indices_expanded = np.zeros(shape=expanded_shape)
+
+    for i in range(k):
+        for j in range(num_indices):
+            index = i * num_indices + j
+            indices_expanded[index][0] = i # Repetition Number
+            for t in range(1, indices.shape[1]+1):
+                indices_expanded[index][t] = indices[j,t-1]
+
+    data_expanded = np.repeat(mat.data, repeats=k, axis=0)
+    return tf.SparseTensorValue(indices_expanded, data_expanded, expanded_shape)
+
+
 def append_row_to_log(row, log_path):
     with open(log_path, 'a') as log_file:
         log_writer = csv.writer(log_file, delimiter=',', quotechar='|')
