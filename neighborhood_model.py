@@ -4,6 +4,7 @@ from base_model import Model
 from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow
 from layers import AttentionNeighborhood
 from cost_functions import get_cost_function
+from constants import BIG_NUMBER
 
 
 class NeighborhoodModel(Model):
@@ -40,6 +41,15 @@ class NeighborhoodModel(Model):
         with self._sess.graph.as_default():
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
 
+                # Handle dimensions for dense mode
+                if not is_sparse:
+                    adj = tf.expand_dims(adj, axis=0)
+
+                    neighborhoods = [tf.expand_dims(n, axis=0) for n in neighborhoods]
+
+                    node_embeddings = tf.expand_dims(node_embeddings, axis=0)
+                    node_embeddings = tf.tile(node_embeddings, multiples=(tf.shape(demands)[0], 1, 1))
+
                 # Node encoding
                 encoder = MLP(hidden_sizes=self.params['encoder_hidden'],
                               output_size=self.params['node_encoding'],
@@ -74,17 +84,25 @@ class NeighborhoodModel(Model):
                               name='node-decoder')
                 pred_weights = decoder(inputs=node_encoding)
 
-                flow_weight_pred = tf.sparse.softmax(adj * pred_weights, name='normalized-weights')
+                perm = [1, 0] if is_sparse else [0, 2, 1]
+                pred_weights = pred_weights * tf.transpose(pred_weights, perm=perm)
 
                 # Compute minimum cost flow from flow weights
                 if is_sparse:
+                    flow_weight_pred = tf.sparse.softmax(adj * pred_weights, name='normalized-weights')
                     mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
                 else:
+                    weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
+                    flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='normalized-weights')
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
+                
                 flow = mcf_solver(inputs=flow_weight_pred, demands=demands)
 
                 # This operation assumes that the c(0) = 0
-                flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
+                if is_sparse:
+                    flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
+                else:
+                    flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
                 # Compute Dual Problem and associated cost
                 dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
@@ -94,17 +112,24 @@ class NeighborhoodModel(Model):
                 dual_vars = dual_decoder(inputs=node_encoding)
 
                 # Compute dual flows based on dual variables
-                # This operation is expensive (requires O(|V|) memory)
-                perm = [1, 0] if is_sparse else [0, 2, 1]
-                dual_diff = dual_vars - tf.transpose(dual_vars, perm=perm)
-                dual_flows = adj * tf.nn.relu(self.cost_fn.inv_derivative(dual_diff))
+                if is_sparse:
+                    # This operation is expensive (requires O(|V|^2) memory)
+                    dual_diff = dual_vars - tf.transpose(dual_vars, perm=[1, 0])
+                    dual_flows = adj * tf.nn.relu(self.cost_fn.inv_derivative(dual_diff))
 
-                dual_demand = tf.reduce_sum(dual_vars * demands)
-                diff_values = (dual_flows * dual_diff).values
-                dual_flow_cost = self.cost_fn.apply(dual_flows.values) - diff_values
-                dual_cost = tf.reduce_sum(dual_flow_cost) - dual_demand
+                    dual_demand = tf.reduce_sum(dual_vars * demands)
+                    diff_values = (dual_flows * dual_diff).values
+                    dual_flow_cost = self.cost_fn.apply(dual_flows.values) - diff_values
+                    dual_cost = tf.reduce_sum(dual_flow_cost) - dual_demand
+                else:
+                    dual_diff = dual_vars - tf.transpose(dual_vars, perm=[0, 2, 1])
+                    dual_flows = adj * tf.nn.relu(self.cost_fn.inv_derivative(dual_diff))
+
+                    dual_demand = tf.reduce_sum(dual_vars * demands, axis=[1, 2])
+                    dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
+                    dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
                 self.loss = flow_cost - dual_cost
-                self.loss_op = flow_cost - dual_cost
-                self.output_ops += [flow_cost, flow, flow_weight_pred, attn_coefs]
+                self.loss_op = tf.reduce_mean(flow_cost - dual_cost)
+                self.output_ops += [flow_cost, flow, flow_weight_pred, attn_coefs, node_encoding]
                 self.optimizer_op = self._build_optimizer_op()

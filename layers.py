@@ -335,7 +335,6 @@ class AttentionNeighborhood(Layer):
                             activation=self.activation,
                             name='{0}-GAT'.format(self.name))
 
-
         # Layer to compute attention weights for each aggregated neighborhood
         attn_layer = MLP(hidden_sizes=[],
                  output_size=1,

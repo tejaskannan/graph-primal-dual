@@ -117,6 +117,11 @@ def create_node_bias(graph):
     return -BIG_NUMBER * (1.0 - bias_mat)
 
 
+def adj_mat_to_node_bias(adj_mat):
+    bias_mat = adj_mat.todense()
+    return -BIG_NUMBER * (1.0 - bias_mat)
+
+
 def create_edge_bias(graph):
     bias_mat = np.eye(graph.number_of_edges(), dtype=float)
     for src, dest in graph.edges():

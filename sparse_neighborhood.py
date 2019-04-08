@@ -10,7 +10,8 @@ from os.path import exists
 from utils import create_demands, append_row_to_log, create_node_embeddings
 from utils import add_features_sparse, create_node_bias, restore_params
 from utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
-from plot import plot_flow_graph_sparse
+from utils import add_features, adj_mat_to_node_bias
+from plot import plot_flow_graph_sparse, plot_flow_graph
 from constants import BIG_NUMBER, LINE
 from dataset import DatasetManager, Series
 
@@ -18,7 +19,7 @@ from dataset import DatasetManager, Series
 PRINT_THRESHOLD = 100
 
 
-class SparseNeighborhoodMCF:
+class NeighborhoodMCF:
 
     def __init__(self, params):
         self.params = params
@@ -38,7 +39,11 @@ class SparseNeighborhoodMCF:
 
         # Create tensors for global graph properties
         adj_mat = nx.adjacency_matrix(graph)
-        adj_tensor = sparse_matrix_to_tensor(adj_mat)
+
+        if self.params['sparse']:
+            adj_tensor = sparse_matrix_to_tensor(adj_mat)
+        else:
+            adj_tensor = adj_mat.todense()
 
         # Graph properties
         num_nodes = graph.number_of_nodes()
@@ -46,7 +51,11 @@ class SparseNeighborhoodMCF:
         # Create neighborhoods
         n_neighborhoods = self._num_neighborhoods(graph)
         neighborhoods = random_walk_neighborhoods(adj_mat, k=n_neighborhoods)
-        neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
+
+        if self.params['sparse']:
+            neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
+        else:
+            neighborhood_tensors = [adj_mat_to_node_bias(m) for m in neighborhoods]
 
         # Create node embeddings
         node_embeddings = create_node_embeddings(graph)
@@ -86,24 +95,30 @@ class SparseNeighborhoodMCF:
         convergence_count = 0
         prev_loss = BIG_NUMBER
 
-        for epoch in range(self.params['epochs']):
+        batch_size = 1 if self.params['sparse'] else self.params['batch_size']
 
-            # Create batches
-            train_batches = self.dataset.create_shuffled_batches(series=Series.TRAIN, batch_size=self.params['batch_size'])
+        for epoch in range(self.params['epochs']):
 
             print(LINE)
             print('Epoch {0}'.format(epoch))
             print(LINE)
 
             # Training Batches
-            num_train_batches = self.dataset.num_train_points
+            num_train_batches = int(math.ceil(self.dataset.num_train_points / batch_size))
             train_losses = []
             for i in range(num_train_batches):
 
-                node_features, indices = self.dataset.get_train_batch(batch_size=1)
+                node_features, indices = self.dataset.get_train_batch(batch_size=batch_size)
+
+                if self.params['sparse']:
+                    node_features = node_features[0]
+                    demands = features_to_demands(node_features)
+                else:
+                    demands = [features_to_demands(n) for n in node_features]
+
                 feed_dict = {
-                    node_ph: node_features[0],
-                    demands_ph: features_to_demands(node_features[0]),
+                    node_ph: node_features,
+                    demands_ph: demands,
                     adj_ph: adj_tensor,
                     node_embedding_ph: node_embeddings,
                     dropout_keep_ph: self.params['dropout_keep_prob']
@@ -120,22 +135,29 @@ class SparseNeighborhoodMCF:
                 train_losses.append(avg_loss)
                 self.dataset.report_losses(loss, indices)
 
-                if (i+1) % PRINT_THRESHOLD == 0:
-                    start = (i+1) - PRINT_THRESHOLD
-                    avg_loss = np.average(train_losses[start:i+1])
+                if not self.params['sparse'] or (i+1) % PRINT_THRESHOLD == 0:
+                    if self.params['sparse']:
+                        start = (i+1) - PRINT_THRESHOLD
+                        avg_loss = np.average(train_losses[start:i+1])
                     print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
 
             print(LINE)
 
             # Validation Batches
-            valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID, batch_size=1)
+            valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID, batch_size=batch_size)
             num_valid_batches = len(valid_batches)
             valid_losses = []
             for i, node_features in enumerate(valid_batches):
 
+                if self.params['sparse']:
+                    node_features = node_features[0]
+                    demands = features_to_demands(node_features)
+                else:
+                    demands = [features_to_demands(n) for n in node_features]
+
                 feed_dict = {
-                    node_ph: node_features[0],
-                    demands_ph: features_to_demands(node_features[0]),
+                    node_ph: node_features,
+                    demands_ph: demands,
                     adj_ph: adj_tensor,
                     node_embedding_ph: node_embeddings,
                     dropout_keep_ph: 1.0
@@ -148,9 +170,10 @@ class SparseNeighborhoodMCF:
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
 
-                if (i+1) % PRINT_THRESHOLD == 0:
-                    start = (i+1) - PRINT_THRESHOLD
-                    avg_loss = np.average(valid_losses[start:i+1])
+                if not self.params['sparse'] or (i+1) % PRINT_THRESHOLD == 0:
+                    if self.params['sparse']:
+                        start = (i+1) - PRINT_THRESHOLD
+                        avg_loss = np.average(valid_losses[start:i+1])
                     print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
 
             print(LINE)
@@ -186,12 +209,20 @@ class SparseNeighborhoodMCF:
 
         # Create tensors for global graph properties
         adj_mat = nx.adjacency_matrix(graph)
-        adj_tensor = sparse_matrix_to_tensor(adj_mat)
+
+        if self.params['sparse']:
+            adj_tensor = sparse_matrix_to_tensor(adj_mat)
+        else:
+            adj_tensor = adj_mat.todense()
 
         # Create neighborhoods
         n_neighborhoods = self._num_neighborhoods(graph)
         neighborhoods = random_walk_neighborhoods(adj_mat, k=n_neighborhoods)
-        neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
+        
+        if self.params['sparse']:
+            neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
+        else:
+            neighborhood_tensors = [adj_mat_to_node_bias(m) for m in neighborhoods]
 
         # Graph properties
         num_nodes = graph.number_of_nodes()
@@ -224,9 +255,15 @@ class SparseNeighborhoodMCF:
 
         for i, node_features in enumerate(test_batches):
 
+            if self.params['sparse']:
+                node_features = node_features[0]
+                demands = features_to_demands(node_features)
+            else:
+                demands = [features_to_demands(n) for n in node_features]
+
             feed_dict = {
-                node_ph: node_features[0],
-                demands_ph: features_to_demands(node_features[0]),
+                node_ph: node_features,
+                demands_ph: demands,
                 adj_ph: adj_tensor,
                 node_embedding_ph: node_embeddings,
                 dropout_keep_ph: 1.0
@@ -240,36 +277,53 @@ class SparseNeighborhoodMCF:
             flow_cost = outputs[1]
             flows = outputs[2]
             flow_proportions = outputs[3]
-            flow_graph = add_features_sparse(graph, demands=node_features[0], flows=flows,
-                                             proportions=flow_proportions)
+
+            if self.params['sparse']:
+                flow_graph = add_features_sparse(graph, demands=node_features[0], flows=flows,
+                                                 proportions=flow_proportions)
+            else:
+                flow_graph = add_features(graph, demands=node_features[0], flows=flows[0],
+                                          proportions=flow_proportions[0])
 
             # Write output graph to Graph XML
             nx.write_gexf(flow_graph, '{0}graph-{1}.gexf'.format(model_path, i))
 
             if self.params['plot_flows']:
-                plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, i))
-                plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}.png'.format(model_path, i))
+                if self.params['sparse']:
+                    plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, i))
+                    plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}.png'.format(model_path, i))
+                else:
+                    plot_flow_graph(flow_graph, flows[0], '{0}flows-{1}.png'.format(model_path, i))
+                    plot_flow_graph(flow_graph, flow_proportions[0], '{0}flow-prop-{1}.png'.format(model_path, i))
+
 
     def create_placeholders(self, model, num_nodes, embedding_size, num_neighborhoods):
+        node_shape = [None, num_nodes, self.num_node_features]
+        demands_shape = [None, num_nodes, 1]
+
+        if self.params['sparse']:
+            node_shape = node_shape[1:]
+            demands_shape = demands_shape[1:]
+
         node_ph = model.create_placeholder(dtype=tf.float32,
-                                           shape=[num_nodes, self.num_node_features],
+                                           shape=node_shape,
                                            name='node-ph',
                                            is_sparse=False)
         demands_ph = model.create_placeholder(dtype=tf.float32,
-                                              shape=[num_nodes, 1],
+                                              shape=demands_shape,
                                               name='demands-ph',
                                               is_sparse=False)
         adj_ph = model.create_placeholder(dtype=tf.float32,
                                           shape=[None, num_nodes],
                                           name='adj-ph',
-                                          is_sparse=True)
+                                          is_sparse=self.params['sparse'])
 
         neighborhoods = []
         for i in range(num_neighborhoods+1):
             ph = model.create_placeholder(dtype=tf.float32,
                                           shape=[None, num_nodes],
                                           name='neighborhood-{0}-ph'.format(i),
-                                          is_sparse=True)
+                                          is_sparse=self.params['sparse'])
             neighborhoods.append(ph)
 
         node_embedding_ph = model.create_placeholder(dtype=tf.float32,
@@ -281,7 +335,6 @@ class SparseNeighborhoodMCF:
                                                    name='dropout-keep-ph',
                                                    is_sparse=False)
         return node_ph, demands_ph, adj_ph, neighborhoods, node_embedding_ph, dropout_keep_ph
-
     
     def _num_neighborhoods(self, graph):
         if 'num_neighborhoods' in self.params:

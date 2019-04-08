@@ -7,7 +7,7 @@ from load import load_to_networkx, load_embeddings
 from load import write_dataset
 from constants import *
 from sparse_mcf import SparseMCF
-from sparse_neighborhood import SparseNeighborhoodMCF
+from sparse_neighborhood import NeighborhoodMCF
 from mcf import MCF
 
 
@@ -29,11 +29,7 @@ def main():
         # Load parameters used to create the given model
         params = restore_params(args.model)
 
-    if params['sparse']:
-        # mcf_solver = SparseMCF(params=params)
-        mcf_solver = SparseNeighborhoodMCF(params=params)
-    else:
-        mcf_solver = MCF(params=params)
+    mcf_solver = NeighborhoodMCF(params=params)
 
     if args.train:
         mcf_solver.train()
