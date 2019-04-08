@@ -77,7 +77,6 @@ class GRU(Layer):
         with tf.name_scope(self.name):
             rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=self.output_size,
                                               activation=self.activation,
-                                              reuse=True,
                                               kernel_initializer=self.initializer,
                                               name='{0}-gru'.format(self.name),
                                               dtype=tf.float32)
@@ -219,15 +218,15 @@ class Gate(Layer):
             return self.z * curr_state + (1 - self.z) * prev_state
 
 
-class SparseNeighborhood(Layer):
+class Neighborhood(Layer):
 
-    def __init__(self, output_size, activation=tf.nn.tanh, name='sparse-neighborhood'):
-        super(SparseNeighborhood, self).__init__(0, output_size, activation, name)
-        self.num_neighborhoods = num_neighborhoods
+    def __init__(self, output_size, is_sparse, activation=tf.nn.tanh, name='neighborhood'):
+        super(Neighborhood, self).__init__(0, output_size, activation, name)
+        self.is_sparse = is_sparse
 
     def __call__(self, inputs, **kwargs):
 
-        # List of 'num_neighborhoods' sparse V x V matrices
+        # List of 'num_neighborhoods' V x V matrices
         neighborhoods = kwargs['neighborhoods']
 
         dropout_keep_prob = kwargs['dropout_keep_prob']
@@ -250,13 +249,17 @@ class SparseNeighborhood(Layer):
 
         neighborhood_features = []
         neighborhood_attn = []
-        for neighborhood_mat in range(neighborhoods):
+        for neighborhood_mat in neighborhoods:
 
             # V x F tensor of aggregated node features over the given neighborhood
-            neighborhood_sum = tf.sparse.matmul(neighborhood_mat, transformed_inputs)
+            if self.is_sparse:
+                neighborhood_sum = tf.sparse.matmul(neighborhood_mat, transformed_inputs)
+            else:
+                neighborhood_sum = tf.matmul(neighborhood_mat, transformed_inputs)
 
             # V x 1 tensor of attention weights
-            attn_weights = attn_layer(inputs=neighborhood_sum, dropout_keep_prob=dropout_keep_prob)
+            node_neighbor_concat = tf.concat([neighborhood_sum, transformed_inputs], axis=-1)
+            attn_weights = attn_layer(inputs=node_neighbor_concat, dropout_keep_prob=dropout_keep_prob)
 
             neighborhood_features.append(tf.expand_dims(neighborhood_sum, axis=-1))
             neighborhood_attn.append(attn_weights)
@@ -265,7 +268,7 @@ class SparseNeighborhood(Layer):
         neighborhood_concat = tf.concat(neighborhood_features, axis=-1)
 
         # V x K
-        attn_concat = tf.concat(attn_weights, axis=-1)
+        attn_concat = tf.concat(neighborhood_attn, axis=-1)
 
         # V x K tensor of normalized attention coefficients
         attn_coefs = tf.nn.softmax(attn_concat, axis=-1)
@@ -279,7 +282,7 @@ class SparseNeighborhood(Layer):
         weighted_features = tf.contrib.layers.bias_add(weighted_features,
                                                        scope='{0}-b'.format(self.name))
 
-        return self.activation(weighted_features)
+        return self.activation(weighted_features), attn_coefs
 
 
 class MinCostFlow(Layer):

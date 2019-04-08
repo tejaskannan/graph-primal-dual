@@ -2,7 +2,7 @@ import numpy as np
 import math
 import networkx as nx
 import tensorflow as tf
-from sparse_mcf_model import SparseMCFModel
+from sparse_neighborhood_model import SparseNeighborhoodModel
 from load import load_to_networkx, read_dataset
 from datetime import datetime
 from os import mkdir
@@ -53,7 +53,7 @@ class SparseNeighborhoodMCF:
         embedding_size = node_embeddings.shape[1]
 
         # Initialize model
-        model = SparseMCFModel(params=self.params)
+        model = SparseNeighborhoodModel(params=self.params)
 
         # Model placeholders
         node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
@@ -109,6 +109,7 @@ class SparseNeighborhoodMCF:
                     dropout_keep_ph: self.params['dropout_keep_prob']
                 }
 
+                # Provide neighborhood matrices
                 for j in range(len(neighborhood_tensors)):
                     feed_dict[neighborhoods_ph[j]] = neighborhood_tensors[j]
 
@@ -200,7 +201,7 @@ class SparseNeighborhoodMCF:
         embedding_size = node_embeddings.shape[1]
 
         # Initialize model
-        model = SparseMCFModel(params=self.params)
+        model = SparseNeighborhoodModel(params=self.params)
 
         # Model placeholders
         node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
@@ -230,10 +231,11 @@ class SparseNeighborhoodMCF:
                 node_embedding_ph: node_embeddings,
                 dropout_keep_ph: 1.0
             }
-            outputs = model.inference(feed_dict=feed_dict)
 
             for j in range(len(neighborhood_tensors)):
                 feed_dict[neighborhoods_ph[j]] = neighborhood_tensors[j]
+
+            outputs = model.inference(feed_dict=feed_dict)
 
             flow_cost = outputs[1]
             flows = outputs[2]
@@ -282,4 +284,6 @@ class SparseNeighborhoodMCF:
 
     
     def _num_neighborhoods(self, graph):
+        if 'num_neighborhoods' in self.params:
+            return self.params['num_neighborhoods']
         return max(2, int(math.log(graph.number_of_nodes())))

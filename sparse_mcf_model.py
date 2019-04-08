@@ -54,7 +54,7 @@ class SparseMCFModel(Model):
                     node_encoding = gate(inputs=next_encoding, prev_state=node_encoding)
 
                 # Compute flow proportions
-                decoder = MLP(hidden_sizes=[],
+                decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
                               output_size=num_output_features,
                               activation=None,
                               name='node-decoder')
