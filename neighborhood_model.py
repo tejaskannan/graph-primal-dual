@@ -5,10 +5,10 @@ from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow
 from cost_functions import get_cost_function
 
 
-class SparseNeighborhoodModel(Model):
+class NeighborhoodModel(Model):
 
-    def __init__(self, params, name='sparse-neighborhood-model'):
-        super(SparseNeighborhoodModel, self).__init__(params, name)
+    def __init__(self, params, name='neighborhood-model'):
+        super(NeighborhoodModel, self).__init__(params, name)
         self.cost_fn = get_cost_function(name=params['cost_fn'],
                                          constant=params['cost_constant'])
 
@@ -40,7 +40,7 @@ class SparseNeighborhoodModel(Model):
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
 
                 # Node encoding
-                encoder = MLP(hidden_sizes=[],
+                encoder = MLP(hidden_sizes=self.params['encoder_hidden'],
                               output_size=self.params['node_encoding'],
                               activation=tf.nn.tanh,
                               activate_final=True,

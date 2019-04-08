@@ -68,22 +68,41 @@ class GRU(Layer):
         super(GRU, self).__init__(0, output_size, activation, name)
 
     def __call__(self, inputs, **kwargs):
-        """
-        inputs and state must be 2D tensors
-        """
         dropout_keep_prob = kwargs['dropout_keep_prob'] if 'dropout_keep_prob' in kwargs else 1.0
         state = kwargs['state']
 
         with tf.name_scope(self.name):
-            rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=self.output_size,
-                                              activation=self.activation,
-                                              kernel_initializer=self.initializer,
-                                              name='{0}-gru'.format(self.name),
-                                              dtype=tf.float32)
-            rnn_cell = tf.nn.rnn_cell.DropoutWrapper(rnn_cell,
-                                                     state_keep_prob=dropout_keep_prob)
-            new_state = rnn_cell(inputs=inputs, state=state)[1]
-        return new_state
+
+            update_gate = MLP(hidden_sizes=[],
+                              output_size=self.output_size,
+                              bias_final=False,
+                              activation=tf.math.sigmoid,
+                              activate_final=True,
+                              name='{0}-update-gate'.format(self.name))
+            reset_gate = MLP(hidden_sizes=[],
+                             output_size=self.output_size,
+                             bias_final=False,
+                             activation=tf.math.sigmoid,
+                             activate_final=True,
+                             name='{0}-reset-gate'.format(self.name))
+            hidden_gate = MLP(hidden_sizes=[],
+                              output_size=self.output_size,
+                              bias_final=False,
+                              activation=tf.nn.tanh,
+                              activate_final=True,
+                              name='{0}-hidden-gate'.format(self.name))
+
+            features_concat = tf.concat([inputs, state], axis=-1)
+
+            update_vector = update_gate(inputs=features_concat, dropout_keep_prob=dropout_keep_prob)
+            reset_vector = reset_gate(inputs=features_concat, dropout_keep_prob=dropout_keep_prob)
+
+            hidden_concat = tf.concat([inputs, reset_vector * state], axis=-1)
+            hidden_vector = hidden_gate(inputs=hidden_concat, dropout_keep_prob=dropout_keep_prob)
+
+            new_state = (1.0 - update_vector) * state + update_vector * hidden_vector
+
+        return self.activation(new_state)
 
 
 class SparseGAT(Layer):

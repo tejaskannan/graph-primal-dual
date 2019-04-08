@@ -36,7 +36,7 @@ class SparseMCFModel(Model):
                 adj_self_loops = tf.sparse.add(adj, tf.sparse.eye(num_rows=tf.shape(adj)[0]))
 
                 # Node encoding
-                encoder = MLP(hidden_sizes=[],
+                encoder = MLP(hidden_sizes=self.params['encoder_hidden'],
                               output_size=self.params['node_encoding'],
                               activation=tf.nn.relu,
                               name='node-encoder')

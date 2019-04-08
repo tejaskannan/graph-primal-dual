@@ -2,7 +2,7 @@ import numpy as np
 import math
 import networkx as nx
 import tensorflow as tf
-from sparse_neighborhood_model import SparseNeighborhoodModel
+from neighborhood_model import NeighborhoodModel
 from load import load_to_networkx, read_dataset
 from datetime import datetime
 from os import mkdir
@@ -53,7 +53,7 @@ class SparseNeighborhoodMCF:
         embedding_size = node_embeddings.shape[1]
 
         # Initialize model
-        model = SparseNeighborhoodModel(params=self.params)
+        model = NeighborhoodModel(params=self.params)
 
         # Model placeholders
         node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
