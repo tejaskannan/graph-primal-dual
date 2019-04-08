@@ -8,7 +8,7 @@ from datetime import datetime
 from os import mkdir
 from os.path import exists
 from utils import create_demands, append_row_to_log, create_node_embeddings
-from utils import add_features, create_node_bias, restore_params
+from utils import add_features, create_node_bias, restore_params, features_to_demands
 from plot import plot_flow_graph
 from constants import BIG_NUMBER, LINE
 from dataset import DatasetManager, Series
@@ -20,7 +20,7 @@ class MCF:
         self.params = params
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
         self.output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], params['graph_name'], self.timestamp)
-        self.num_node_features = 1
+        self.num_node_features = 2
 
         train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
         valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
@@ -47,11 +47,12 @@ class MCF:
         model = MCFModel(params=self.params)
 
         # Model placeholders
-        node_ph, adj_ph, node_embedding_ph, \
+        node_ph, demands_ph, adj_ph, node_embedding_ph, \
             node_bias_ph, dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
 
         # Create model
-        model.build(demands=node_ph,
+        model.build(node_features=node_ph,
+                    demands=demands_ph,
                     node_embeddings=node_embedding_ph,
                     adj=adj_ph,
                     node_bias=node_bias_ph,
@@ -94,6 +95,7 @@ class MCF:
                 node_features, indices = self.dataset.get_train_batch(batch_size=self.params['batch_size'])
                 feed_dict = {
                     node_ph: node_features,
+                    demands_ph: [features_to_demands(n) for n in node_features],
                     adj_ph: adj_mat,
                     node_embedding_ph: node_embeddings,
                     node_bias_ph: node_bias,
@@ -118,6 +120,7 @@ class MCF:
 
                 feed_dict = {
                     node_ph: node_features,
+                    demands_ph: [features_to_demands(n) for n in node_features],
                     adj_ph: adj_mat,
                     node_embedding_ph: node_embeddings,
                     node_bias_ph: node_bias,
@@ -175,11 +178,12 @@ class MCF:
         model = MCFModel(params=self.params)
 
         # Model placeholders
-        node_ph, adj_ph, node_embedding_ph, \
+        node_ph, demands_ph, adj_ph, node_embedding_ph, \
             node_bias_ph, dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
 
         # Create model
-        model.build(demands=node_ph,
+        model.build(node_features=node_ph,
+                    demands=demands_ph,
                     node_embeddings=node_embedding_ph,
                     adj=adj_ph,
                     node_bias=node_bias_ph,
@@ -196,6 +200,7 @@ class MCF:
 
             feed_dict = {
                 node_ph: node_features,
+                demands_ph: [features_to_demands(n) for n in node_features],
                 adj_ph: adj_mat,
                 node_embedding_ph: node_embeddings,
                 node_bias_ph: node_bias,
@@ -223,6 +228,10 @@ class MCF:
                                            shape=[None, num_nodes, self.num_node_features],
                                            name='node-ph',
                                            is_sparse=False)
+        demands_ph = model.create_placeholder(dtype=tf.float32,
+                                              shape=[None, num_nodes, 1],
+                                              name='demands-ph',
+                                              is_sparse=False)
         adj_ph = model.create_placeholder(dtype=tf.float32,
                                           shape=[num_nodes, num_nodes],
                                           name='adj-ph',
@@ -239,4 +248,4 @@ class MCF:
                                                    shape=(),
                                                    name='dropout-keep-ph',
                                                    is_sparse=False)
-        return node_ph, adj_ph, node_embedding_ph, node_bias_ph, dropout_keep_ph
+        return node_ph, demands_ph, adj_ph, node_embedding_ph, node_bias_ph, dropout_keep_ph

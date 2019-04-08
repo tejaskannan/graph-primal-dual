@@ -14,8 +14,11 @@ class SparseMCFModel(Model):
 
     def build(self, **kwargs):
 
-        # V x 1 tensor which contains node features
+        # V x 1 tensor which contains node demands
         demands = kwargs['demands']
+
+        # V x F tensor which contains node features
+        node_features = kwargs['node_features']
 
         # V x D' tensor which contains pre-computed node embeddings
         node_embeddings = kwargs['node_embeddings']
@@ -37,7 +40,7 @@ class SparseMCFModel(Model):
                               output_size=self.params['node_encoding'],
                               activation=tf.nn.relu,
                               name='node-encoder')
-                node_encoding = encoder(inputs=tf.concat([node_embeddings, demands], axis=1))
+                node_encoding = encoder(inputs=tf.concat([node_embeddings, node_features], axis=1))
 
                 node_gat = SparseGAT(input_size=self.params['node_encoding'],
                                      output_size=self.params['node_encoding'],

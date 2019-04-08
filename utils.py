@@ -25,7 +25,7 @@ def add_features(graph, demands, flows, proportions):
     graph = graph.copy()
 
     for node in graph.nodes():
-        graph.add_node(node, demand=float(demands[node][0]))
+        graph.add_node(node, demand=float(demands[node][0] - demands[node][1]))
 
     for src, dest in graph.edges():
         flow = float(flows[src, dest])
@@ -39,7 +39,7 @@ def add_features_sparse(graph, demands, flows, proportions):
     graph = graph.copy()
 
     for node in graph.nodes():
-        graph.add_node(node, demand=float(demands[node][0]))
+        graph.add_node(node, demand=float(demands[node][0] - demands[node][1]))
 
     for edge, flow in zip(flows.indices, flows.values):
         graph.add_edge(edge[0], edge[1], flow=float(flow))
@@ -48,6 +48,13 @@ def add_features_sparse(graph, demands, flows, proportions):
         graph.add_edge(edge[0], edge[1], proportion=float(prop))
 
     return graph
+
+
+def features_to_demands(node_features):
+    demands = np.zeros(shape=(node_features.shape[0], 1), dtype=float)
+    for i in range(node_features.shape[0]):
+        demands[i][0] = node_features[i][0] - node_features[i][1]
+    return demands
 
 
 def create_demands(graph, min_max_sources, min_max_sinks):

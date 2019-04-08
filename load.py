@@ -49,11 +49,18 @@ def read_dataset(demands_path, num_nodes):
     dataset = []
     with open(demands_path, 'r') as demands_file:
         for demand_lst in demands_file:
-            demands = np.zeros(shape=(num_nodes, 1), dtype=float)
+            demands = np.zeros(shape=(num_nodes, 2), dtype=float)
             demand_values = demand_lst.strip().split(' ')
             for value in demand_values:
                 tokens = value.split(':')
-                demands[int(tokens[0])][0] = float(tokens[1])
+                demand_val = float(tokens[1])
+                node = int(tokens[0])
+
+                if demand_val > 0:
+                    demands[node][0] = demand_val
+                elif demand_val < 0:
+                    demands[node][1] = -demand_val
+
             dataset.append(demands)
     return dataset
 

@@ -9,10 +9,13 @@ from os import mkdir
 from os.path import exists
 from utils import create_demands, append_row_to_log, create_node_embeddings
 from utils import add_features_sparse, create_node_bias, restore_params
-from utils import sparse_matrix_to_tensor
+from utils import sparse_matrix_to_tensor, features_to_demands
 from plot import plot_flow_graph_sparse
 from constants import BIG_NUMBER, LINE
 from dataset import DatasetManager, Series
+
+
+PRINT_THRESHOLD = 100
 
 
 class SparseMCF:
@@ -21,7 +24,7 @@ class SparseMCF:
         self.params = params
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
         self.output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], params['graph_name'], self.timestamp)
-        self.num_node_features = 1
+        self.num_node_features = 2
 
         train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
         valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
@@ -48,11 +51,12 @@ class SparseMCF:
         model = SparseMCFModel(params=self.params)
 
         # Model placeholders
-        node_ph, adj_ph, node_embedding_ph, \
+        node_ph, demands_ph, adj_ph, node_embedding_ph, \
             dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
 
         # Create model
-        model.build(demands=node_ph,
+        model.build(node_features=node_ph,
+                    demands=demands_ph,
                     node_embeddings=node_embedding_ph,
                     adj=adj_ph,
                     num_output_features=num_nodes,
@@ -93,6 +97,7 @@ class SparseMCF:
                 node_features, indices = self.dataset.get_train_batch(batch_size=1)
                 feed_dict = {
                     node_ph: node_features[0],
+                    demands_ph: features_to_demands(node_features[0]),
                     adj_ph: adj_tensor,
                     node_embedding_ph: node_embeddings,
                     dropout_keep_ph: self.params['dropout_keep_prob']
@@ -104,7 +109,10 @@ class SparseMCF:
                 train_losses.append(avg_loss)
                 self.dataset.report_losses(loss, indices)
 
-                print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
+                if (i+1) % PRINT_THRESHOLD == 0:
+                    start = (i+1) - PRINT_THRESHOLD
+                    avg_loss = np.average(train_losses[start:i+1])
+                    print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
 
             print(LINE)
 
@@ -116,6 +124,7 @@ class SparseMCF:
 
                 feed_dict = {
                     node_ph: node_features[0],
+                    demands_ph: features_to_demands(node_features[0]),
                     adj_ph: adj_tensor,
                     node_embedding_ph: node_embeddings,
                     dropout_keep_ph: 1.0
@@ -124,7 +133,10 @@ class SparseMCF:
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
 
-                print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
+                if (i+1) % PRINT_THRESHOLD == 0:
+                    start = (i+1) - PRINT_THRESHOLD
+                    avg_loss = np.average(valid_losses[start:i+1])
+                    print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
 
             print(LINE)
 
@@ -172,11 +184,12 @@ class SparseMCF:
         model = SparseMCFModel(params=self.params)
 
         # Model placeholders
-        node_ph, adj_ph, node_embedding_ph, \
+        node_ph, demands_ph, adj_ph, node_embedding_ph, \
             dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size)
 
         # Create model
-        model.build(demands=node_ph,
+        model.build(node_features=node_ph,
+                    demands=demands_ph,
                     node_embeddings=node_embedding_ph,
                     adj=adj_ph,
                     num_output_features=num_nodes,
@@ -192,6 +205,7 @@ class SparseMCF:
 
             feed_dict = {
                 node_ph: node_features[0],
+                demands_ph: features_to_demands(node_features[0]),
                 adj_ph: adj_tensor,
                 node_embedding_ph: node_embeddings,
                 dropout_keep_ph: 1.0
@@ -216,6 +230,10 @@ class SparseMCF:
                                            shape=[num_nodes, self.num_node_features],
                                            name='node-ph',
                                            is_sparse=False)
+        demands_ph = model.create_placeholder(dtype=tf.float32,
+                                              shape=[num_nodes, 1],
+                                              name='demands-ph',
+                                              is_sparse=False)
         adj_ph = model.create_placeholder(dtype=tf.float32,
                                           shape=[None, num_nodes],
                                           name='adj-ph',
@@ -228,4 +246,4 @@ class SparseMCF:
                                                    shape=(),
                                                    name='dropout-keep-ph',
                                                    is_sparse=False)
-        return node_ph, adj_ph, node_embedding_ph, dropout_keep_ph
+        return node_ph, demands_ph, adj_ph, node_embedding_ph, dropout_keep_ph

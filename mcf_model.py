@@ -15,8 +15,11 @@ class MCFModel(Model):
 
     def build(self, **kwargs):
 
-        # B x V x 1 tensor which contains node features
+        # B x V x 1 tensor which contains node demands
         demands = kwargs['demands']
+
+        # B x V x F tensor which contains node features
+        node_features = kwargs['node_features']
 
         # V x D' tensor which contains pre-computed node embeddings
         node_embeddings = kwargs['node_embeddings']
@@ -47,7 +50,7 @@ class MCFModel(Model):
                               output_size=self.params['node_encoding'],
                               activation=tf.nn.relu,
                               name='node-encoder')
-                node_encoding = encoder(inputs=tf.concat([node_embeddings, demands], axis=2),
+                node_encoding = encoder(inputs=tf.concat([node_embeddings, node_features], axis=2),
                                         dropout_keep_prob=dropout_keep_prob)
 
                 node_gat = GAT(input_size=self.params['node_encoding'],
