@@ -94,10 +94,6 @@ def create_node_embeddings(graph):
     in_deg = nx.in_degree_centrality(graph)
     out_deg = nx.out_degree_centrality(graph)
 
-    # Betweenness Centrality
-    samples = int(math.log(graph.number_of_nodes()))
-    btwn = nx.betweenness_centrality(graph, k=samples, normalized=True)
-
     # PageRank (Uses power iteration over sparse matrices)
     pagerank =  nx.pagerank_scipy(graph, alpha=0.85, max_iter=50, tol=1e-5)
 
@@ -105,7 +101,7 @@ def create_node_embeddings(graph):
     eigen = nx.eigenvector_centrality_numpy(graph, max_iter=50, tol=1e-5)
 
     for n in graph.nodes():
-        embedding = np.array([in_deg[n], out_deg[n], btwn[n], pagerank[n], eigen[n]])
+        embedding = np.array([in_deg[n], out_deg[n], pagerank[n], eigen[n]])
         embeddings.append(embedding)
     return np.array(embeddings)
 

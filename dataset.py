@@ -45,11 +45,16 @@ class DatasetManager:
             self.dataset[s] = read_dataset(demands_path=self.file_paths[s], num_nodes=num_nodes)
 
     def create_shuffled_batches(self, series, batch_size):
+        return self.create_batches(series, batch_size, shuffle=True)
+
+    def create_batches(self, series, batch_size, shuffle):
         """
         Returns all batches for a single series using uniform shuffling without replacement.
         """
         data = self.dataset[series]
-        np.random.shuffle(data)
+
+        if shuffle:
+            np.random.shuffle(data)
 
         node_features = []
         for i in range(0, len(data), batch_size):

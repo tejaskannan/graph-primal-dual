@@ -79,7 +79,7 @@ class NeighborhoodModel(Model):
 
                 # Compute flow proportions
                 decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
-                              output_size=num_output_features,
+                              output_size=1,
                               activation=None,
                               name='node-decoder')
                 pred_weights = decoder(inputs=node_encoding)
@@ -131,5 +131,5 @@ class NeighborhoodModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(flow_cost - dual_cost)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, attn_coefs, node_encoding]
+                self.output_ops += [flow_cost, flow, flow_weight_pred, weights, node_encoding]
                 self.optimizer_op = self._build_optimizer_op()

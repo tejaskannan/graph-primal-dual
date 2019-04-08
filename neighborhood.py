@@ -251,7 +251,7 @@ class NeighborhoodMCF:
 
         # Load test data
         self.dataset.load(series=Series.TEST, num_nodes=num_nodes)
-        test_batches = self.dataset.create_shuffled_batches(series=Series.TEST, batch_size=1)
+        test_batches = self.dataset.create_batches(series=Series.TEST, batch_size=1, shuffle=False)
 
         for i, node_features in enumerate(test_batches):
 

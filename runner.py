@@ -7,7 +7,7 @@ from load import load_to_networkx, load_embeddings
 from load import write_dataset
 from constants import *
 from sparse_mcf import SparseMCF
-from sparse_neighborhood import NeighborhoodMCF
+from neighborhood import NeighborhoodMCF
 from mcf import MCF
 
 

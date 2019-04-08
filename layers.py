@@ -337,11 +337,10 @@ class AttentionNeighborhood(Layer):
 
         # Layer to compute attention weights for each aggregated neighborhood
         attn_layer = MLP(hidden_sizes=[],
-                 output_size=1,
-                 bias_final=False,
-                 activation=tf.nn.leaky_relu,
-                 activate_final=True,
-                 name='{0}-attn-weights'.format(self.name))
+                         output_size=1,
+                         bias_final=False,
+                         activation=None,
+                         name='{0}-attn-weights'.format(self.name))
 
         neighborhood_features = []
         neighborhood_attn = []
@@ -383,7 +382,7 @@ class AttentionNeighborhood(Layer):
         weighted_features = tf.contrib.layers.bias_add(weighted_features,
                                                        scope='{0}-b'.format(self.name))
 
-        return self.activation(weighted_features), attn_coefs
+        return self.activation(weighted_features), attn_concat
 
 
 class MinCostFlow(Layer):
