@@ -6,20 +6,16 @@ import networkx as nx
 from constants import *
 
 
-def plot_costs(costs, labels, save_folder):
+def plot_costs(costs_lst, out_path):
     cmap = cm.get_cmap(name='viridis')
-    color_series = np.linspace(start=0.2, stop=0.8, num=len(costs))
+    indices = np.linspace(start=0.0, stop=1.0, endpoint=True, num=len(costs_lst))
 
-    for i, (series, label, color) in enumerate(zip(costs, labels, color_series)):
-        x = list(range(len(series)))
-        plt.plot(x, series, color=cmap(color), label=label)
-
+    for i, costs in enumerate(costs_lst):
+        x = np.arange(start=0, stop=len(costs), step=1)
+        plt.plot(x, costs, color=cmap(indices[i]))
     plt.xlabel('Iteration')
-    plt.ylabel('Cost')
-    plt.title('Cost Estimation per Iteration')
-    plt.legend()
-
-    plt.savefig(COSTS_FILE_FORMAT.format(save_folder))
+    plt.ylabel('Projected Cost')
+    plt.savefig(out_path)
 
 
 # Flows is a |V| x |V| matrix of flow values

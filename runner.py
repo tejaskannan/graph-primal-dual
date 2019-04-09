@@ -8,6 +8,7 @@ from load import write_dataset
 from constants import *
 from sparse_mcf import SparseMCF
 from neighborhood import NeighborhoodMCF
+from dense_baseline import DenseBaseline
 from mcf import MCF
 
 
@@ -19,6 +20,7 @@ def main():
     parser.add_argument('--generate', action='store_true', help='Flag to specify dataset generation.')
     parser.add_argument('--test', action='store_true', help='Flag to specify testing.')
     parser.add_argument('--random-walks', action='store_true')
+    parser.add_argument('--dense', action='store_true', help='Flag to specify using dense baseline.')
     parser.add_argument('--model', type=str, help='Path to trained model.')
     args = parser.parse_args()
 
@@ -39,6 +41,9 @@ def main():
         mcf_solver.test(args.model)
     elif args.random_walks:
         random_walks(params)
+    elif args.dense:
+        baseline = DenseBaseline(params=params)
+        baseline.compute_baseline()
 
 
 def generate(params):
