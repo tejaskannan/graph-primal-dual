@@ -1,16 +1,26 @@
 import numpy as np
 import math
+import networkx as nx
 from load import read_dataset
 from enum import Enum
 from collections.abc import Iterable
 from constants import BIG_NUMBER
 from bisect import bisect_right
+from utils import expand_sparse_matrix, random_walk_neighborhoods
+from utils import create_node_embeddings
 
 
 class Series(Enum):
     TRAIN = 1,
     VALID = 2,
     TEST = 3
+
+
+class DataSeries(Enum):
+    NODE = 1,
+    ADJ = 2,
+    NEIGHBORHOOD = 3,
+    EMBEDDING = 4
 
 
 class Counters:
@@ -21,28 +31,52 @@ class Counters:
         self.sort = sort
 
 
+class Sample:
+
+    def __init__(self, node_features, graph_name):
+        self.node_features = node_features
+        self.graph_name = graph_name
+
+
+class GraphData:
+
+    def __init__(self, adj_matrix, neighborhoods, node_embeddings):
+        self.adj_matrix = adj_matrix
+        self.neighborhoods = neighborhoods
+        self.node_embeddings = node_embeddings
+
+
 class DatasetManager:
 
-    def __init__(self, train_file, valid_file, test_file, params):
-        self.file_paths = {
-            Series.TRAIN: train_file,
-            Series.VALID: valid_file,
-            Series.TEST: test_file
-        }
+    def __init__(self, file_paths, params):
+        self.file_paths = file_paths
         self.params = params
         self.dataset = {}
+        self.graph_data = {}
 
     def load_all(self, num_nodes):
         self.load([Series.TRAIN, Series.VALID, Series.TEST], num_nodes)
 
-    def load(self, series, num_nodes):
+    def load(self, series, graphs, num_nodes, num_neighborhoods):
         assert series is not None
 
         if not isinstance(series, Iterable):
             series = [series]
 
         for s in series:
-            self.dataset[s] = read_dataset(demands_path=self.file_paths[s], num_nodes=num_nodes)
+            for graph_name, path in self.file_paths[s].items():
+                features = read_dataset(demands_path=path, num_nodes=num_nodes)
+                self.dataset[s] = [Sample(node_features=n, graph_name=graph_name) for n in features]
+
+                # Lazily load graph adjacency matrix, neighborhoods, and node embeddings
+                if graph_name not in self.graph_data:
+                    adj_matrix = nx.adjacency_matrix(graphs[graph_name])
+                    adj_matrix = expand_sparse_matrix(csr_mat=adj_matrix, n=num_nodes)
+
+                    neighborhoods = random_walk_neighborhoods(adj_matrix, k=num_neighborhoods)
+                    embeddings = create_node_embeddings(graph=graphs[graph_name])
+
+                    self.graph_data[graph_name] = GraphData(adj_matrix, neighborhoods, embeddings)
 
     def create_shuffled_batches(self, series, batch_size):
         return self.create_batches(series, batch_size, shuffle=True)
@@ -51,15 +85,42 @@ class DatasetManager:
         """
         Returns all batches for a single series using uniform shuffling without replacement.
         """
-        data = self.dataset[series]
+        data = []
+        for dataset in self.dataset[series]:
+            data += dataset
 
         if shuffle:
             np.random.shuffle(data)
 
-        node_features = []
+        node_batches = []
+        adj_batches = []
+        neighborhoods_batches = []
+        embeddings_batches = []
         for i in range(0, len(data), batch_size):
-            node_features.append(data[i:i+batch_size])
-        return np.array(node_features)
+            batch = data[i:i+batch_size]
+
+            node_features = [sample.node_features for sample in batch]
+            adj_matrices = [self.graph_data[sample.graph_name].adj_matrix for sample in batch]
+            neighborhoods = [self.graph_data[sample.graph_name].neighborhoods for sample in batch]
+            embeddings = [self.graph_data[sample.graph_name].embeddings for sample in batch]
+
+            if batch_size == 1:
+                node_features = node_features[0]
+                adj_matrices = adj_matrices[0]
+                neighborhoods = neighborhoods[0]
+                embeddings_batches = embeddings_batches[0]
+
+            node_batches.append(node_features)
+            adj_batches.append(adj_matrices)
+            neighborhoods_batches.append(neighborhoods)
+            embeddings_batches.append(embeddings)
+
+        return {
+            DataSeries.NODE: node_batches,
+            DataSeries.ADJ: adj_batches,
+            DataSeries.NEIGHBORHOOD: neighborhoods_batches,
+            DataSeries.EMBEDDING: embeddings_batches
+        }
 
     def get_train_batch(self, batch_size):
         assert self.is_train_initialized, 'Training not yet initialized.'
@@ -97,7 +158,11 @@ class DatasetManager:
             losses, indices = zip(*samples)
             self.losses, self.indices = np.array(losses), np.array(indices)
 
-        batch = []
+        node_batch = []
+        adj_batch = []
+        neighborhood_batch = []
+        embedding_batch = []
+
         indices = []
         for i in range(batch_size):
             r = min(np.random.random(), self.cumulative_probs[-1])
@@ -108,10 +173,23 @@ class DatasetManager:
                 index = len(self.cumulative_probs) - 1
 
             data_index = self.indices[index]
-            batch.append(self.dataset[Series.TRAIN][data_index])
+
+            sample = self.dataset[Series.TRAIN][data_index]
+
+            node_batch.append(sample.node_features)
+            adj_batch.append(self.graph_data[sample.graph_name].adj_matrix)
+            neighborhood_batch.append(self.graph_data[sample.graph_name].neighborhoods)
+            embedding_batch.append(self.graph_data[sample.graph_name].embeddings)
             indices.append(index)
 
-        return batch, indices
+        batch_dict = {
+            DataSeries.NODE: node_batch,
+            DataSeries.ADJ: adj_batch,
+            DataSeries.NEIGHBORHOOD: neighborhood_batch,
+            DataSeries.EMBEDDING: embedding_batch
+        }
+
+        return batch_dict, indices
 
     def report_losses(self, losses, indices):
         if not isinstance(losses, Iterable):
