@@ -185,3 +185,16 @@ def restore_params(model_path):
     with gzip.GzipFile(params_path, 'rb') as params_file:
         params_dict = pickle.load(params_file)
     return params_dict
+
+
+def expand_sparse_matrix(csr_mat, n):
+    """
+    Expands the given m x m CSR matrix to size n x n. This function
+    will create a new matrix.
+    """
+    pad_amount = (n + 1) - len(csr_mat.indptr)
+    if pad_amount <= 0:
+        return csr_mat
+
+    indptr = np.pad(csr_mat.indptr, (0, pad_amount), mode='edge')
+    return csr_matrix((csr_mat.data, csr_mat.indices, indptr), shape=(n, n))
