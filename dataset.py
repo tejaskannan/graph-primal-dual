@@ -20,7 +20,8 @@ class DataSeries(Enum):
     NODE = 1,
     ADJ = 2,
     NEIGHBORHOOD = 3,
-    EMBEDDING = 4
+    EMBEDDING = 4,
+    GRAPH_NAME = 5
 
 
 class Counters:
@@ -94,30 +95,35 @@ class DatasetManager:
         adj_batches = []
         neighborhoods_batches = []
         embeddings_batches = []
+        graph_name_batches = []
         for i in range(0, len(data), batch_size):
             batch = data[i:i+batch_size]
 
             node_features = [sample.node_features for sample in batch]
-            adj_matrices = [self.graph_data[sample.graph_name].adj_matrix for sample in batch]
-            neighborhoods = [self.graph_data[sample.graph_name].neighborhoods for sample in batch]
-            embeddings = [self.graph_data[sample.graph_name].node_embeddings for sample in batch]
+            graph_names = [sample.graph_name for sample in batch]
+            adj_matrices = [self.graph_data[name].adj_matrix for name in graph_names]
+            neighborhoods = [self.graph_data[name].neighborhoods for name in graph_names]
+            embeddings = [self.graph_data[name].node_embeddings for name in graph_names]
 
             if batch_size == 1:
                 node_features = node_features[0]
                 adj_matrices = adj_matrices[0]
                 neighborhoods = neighborhoods[0]
-                embeddings_batches = embeddings_batches[0]
+                embeddings = embeddings[0]
+                graph_names = graph_names[0]
 
             node_batches.append(node_features)
             adj_batches.append(adj_matrices)
             neighborhoods_batches.append(neighborhoods)
             embeddings_batches.append(embeddings)
+            graph_name_batches.append(graph_names)
 
         return {
             DataSeries.NODE: node_batches,
             DataSeries.ADJ: adj_batches,
             DataSeries.NEIGHBORHOOD: neighborhoods_batches,
-            DataSeries.EMBEDDING: embeddings_batches
+            DataSeries.EMBEDDING: embeddings_batches,
+            DataSeries.GRAPH_NAME: graph_name_batches
         }
 
     def get_train_batch(self, batch_size):

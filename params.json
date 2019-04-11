@@ -30,8 +30,8 @@
 		"plot_flows": true,
 		"train_graph_names": ["tiny", "sioux-falls"],
 		"train_dataset_names": ["tiny-128", "sioux-falls-128"],
-		"test_graph_names": ["tiny"],
-		"test_dataset_names": ["tiny-128"],
+		"test_graph_names": ["tiny", "sioux-falls"],
+		"test_dataset_names": ["tiny-128", "sioux-falls-128"],
 		"sparse": false,
 		"batch_params": {
 			"selection_beg": 1e8,

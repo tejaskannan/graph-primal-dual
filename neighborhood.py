@@ -48,30 +48,6 @@ class NeighborhoodMCF:
         # Load Graphs
         graphs, _, num_nodes = self._load_graphs()
 
-        # Create tensors for global graph properties
-        # adj_mat = nx.adjacency_matrix(graph)
-
-        # if self.params['sparse']:
-        #     adj_tensor = sparse_matrix_to_tensor(adj_mat)
-        # else:
-        #     adj_tensor = adj_mat.todense()
-
-        # # Graph properties
-        # num_nodes = graph.number_of_nodes()
-
-        # # Create neighborhoods
-        # n_neighborhoods = self._num_neighborhoods(graph)
-        # neighborhoods = random_walk_neighborhoods(adj_mat, k=n_neighborhoods)
-
-        # if self.params['sparse']:
-        #     neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
-        # else:
-        #     neighborhood_tensors = [adj_mat_to_node_bias(m) for m in neighborhoods]
-
-        # # Create node embeddings
-        # node_embeddings = create_node_embeddings(graph)
-        # embedding_size = node_embeddings.shape[1]
-
         embedding_size = 4
         n_neighborhoods = self.params['num_neighborhoods']
 
@@ -240,33 +216,11 @@ class NeighborhoodMCF:
                 break
 
     def test(self, model_path):
-        # Load graph
-        graph_path = 'graphs/{0}.tntp'.format(self.params['graph_name'])
-        graph = load_to_networkx(path=graph_path)
+        # Load Graphs
+        _, graphs, num_nodes = self._load_graphs()
 
-        # Create tensors for global graph properties
-        adj_mat = nx.adjacency_matrix(graph)
-
-        if self.params['sparse']:
-            adj_tensor = sparse_matrix_to_tensor(adj_mat)
-        else:
-            adj_tensor = adj_mat.todense()
-
-        # Create neighborhoods
-        n_neighborhoods = self._num_neighborhoods(graph)
-        neighborhoods = random_walk_neighborhoods(adj_mat, k=n_neighborhoods)
-        
-        if self.params['sparse']:
-            neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
-        else:
-            neighborhood_tensors = [adj_mat_to_node_bias(m) for m in neighborhoods]
-
-        # Graph properties
-        num_nodes = graph.number_of_nodes()
-
-        # Create node embeddings
-        node_embeddings = create_node_embeddings(graph)
-        embedding_size = node_embeddings.shape[1]
+        n_neighborhoods = self.params['num_neighborhoods']    
+        embedding_size = 4
 
         # Initialize model
         model = NeighborhoodModel(params=self.params)
@@ -287,51 +241,69 @@ class NeighborhoodMCF:
         model.restore(model_path)
 
         # Load test data
-        self.dataset.load(series=Series.TEST, num_nodes=num_nodes)
+        self.dataset.load(series=Series.TEST, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
         test_batches = self.dataset.create_batches(series=Series.TEST, batch_size=1, shuffle=False)
 
-        for i, node_features in enumerate(test_batches):
+        num_test_batches = len(test_batches[DataSeries.NODE])
 
-            if self.params['sparse']:
-                node_features = node_features[0]
-                demands = features_to_demands(node_features)
-            else:
-                demands = [features_to_demands(n) for n in node_features]
+        for i in range(num_test_batches):
+
+            node_features = test_batches[DataSeries.NODE][i]
+            adj = test_batches[DataSeries.ADJ][i]
+            embeddings = test_batches[DataSeries.EMBEDDING][i]
+            neighborhoods = test_batches[DataSeries.NEIGHBORHOOD][i]
+            demands = features_to_demands(node_features)
+
+            # Ensure correct tensor rank for dense mode
+            if not self.params['sparse']:
+                node_features = [node_features]
+                adj = [adj.todense()]
+                embeddings = [embeddings]
+                demands = [demands]
 
             feed_dict = {
                 node_ph: node_features,
                 demands_ph: demands,
-                adj_ph: adj_tensor,
-                node_embedding_ph: node_embeddings,
+                adj_ph: adj,
+                node_embedding_ph: embeddings,
                 dropout_keep_ph: 1.0
             }
 
-            for j in range(len(neighborhood_tensors)):
-                feed_dict[neighborhoods_ph[j]] = neighborhood_tensors[j]
+            # Provide neighborhood matrices
+            for j, neighborhood in enumerate(neighborhoods):
+
+                # Convert to dense matrices if necessary
+                if not self.params['sparse']:
+                    neighborhood = [neighborhood.todense()]
+
+                feed_dict[neighborhoods_ph[j]] = np.array(neighborhood)
 
             outputs = model.inference(feed_dict=feed_dict)
+
+            graph_name = test_batches[DataSeries.GRAPH_NAME][i]
+            graph = graphs[graph_name]
 
             flow_cost = outputs[1]
             flows = outputs[2]
             flow_proportions = outputs[3]
 
             if self.params['sparse']:
-                flow_graph = add_features_sparse(graph, demands=node_features[0], flows=flows,
+                flow_graph = add_features_sparse(graph, demands=node_features, flows=flows,
                                                  proportions=flow_proportions)
             else:
                 flow_graph = add_features(graph, demands=node_features[0], flows=flows[0],
                                           proportions=flow_proportions[0])
 
             # Write output graph to Graph XML
-            nx.write_gexf(flow_graph, '{0}graph-{1}.gexf'.format(model_path, i))
+            nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, i))
 
             if self.params['plot_flows']:
                 if self.params['sparse']:
-                    plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}.png'.format(model_path, i))
-                    plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}.png'.format(model_path, i))
+                    plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, i))
+                    plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, i))
                 else:
-                    plot_flow_graph(flow_graph, flows[0], '{0}flows-{1}.png'.format(model_path, i))
-                    plot_flow_graph(flow_graph, flow_proportions[0], '{0}flow-prop-{1}.png'.format(model_path, i))
+                    plot_flow_graph(flow_graph, flows[0], '{0}flows-{1}-{2}.png'.format(model_path, graph_name, i))
+                    plot_flow_graph(flow_graph, flow_proportions[0], '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, i))
 
 
     def create_placeholders(self, model, num_nodes, embedding_size, num_neighborhoods):

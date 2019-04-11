@@ -31,7 +31,8 @@ def main():
         # Load parameters used to create the given model
         params = restore_params(args.model)
 
-    mcf_solver = NeighborhoodMCF(params=params['model'])
+    model_params = params['model'] if 'model' in params else params
+    mcf_solver = NeighborhoodMCF(params=model_params)
 
     if args.train:
         mcf_solver.train()
@@ -42,7 +43,7 @@ def main():
     elif args.random_walks:
         random_walks(params)
     elif args.dense:
-        baseline = DenseBaseline(params=params)
+        baseline = DenseBaseline(params=model_params)
         baseline.compute_baseline()
 
 
