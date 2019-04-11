@@ -31,12 +31,12 @@ def main():
         # Load parameters used to create the given model
         params = restore_params(args.model)
 
-    mcf_solver = NeighborhoodMCF(params=params)
+    mcf_solver = NeighborhoodMCF(params=params['model'])
 
     if args.train:
         mcf_solver.train()
     elif args.generate:
-        generate(params)
+        generate(params['generate'])
     elif args.test:
         mcf_solver.test(args.model)
     elif args.random_walks:
@@ -47,32 +47,36 @@ def main():
 
 
 def generate(params):
+    assert len(params['graph_names']) == len(params['dataset_names'])
 
-    # Load graph
-    graph_path = 'graphs/{0}.tntp'.format(params['graph_name'])
-    graph = load_to_networkx(path=graph_path)
+    for graph_name, dataset_name in zip(params['graph_names'], params['dataset_names']):
+        # Load graph
+        graph_path = 'graphs/{0}.tntp'.format(graph_name)
+        graph = load_to_networkx(path=graph_path)
 
-    train_file = 'datasets/{0}_train.txt'.format(params['dataset_name'])
-    valid_file = 'datasets/{0}_valid.txt'.format(params['dataset_name'])
-    test_file = 'datasets/{0}_test.txt'.format(params['dataset_name'])
+        train_file = 'datasets/{0}_train.txt'.format(dataset_name)
+        valid_file = 'datasets/{0}_valid.txt'.format(dataset_name)
+        test_file = 'datasets/{0}_test.txt'.format(dataset_name)
 
-    file_paths = [train_file, valid_file, test_file]
-    samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
-    for file_path, num_samples in zip(file_paths, samples):
-        dataset = []
-        for i in range(num_samples):
-            d = create_demands(graph=graph,
-                               min_max_sources=params['min_max_sources'],
-                               min_max_sinks=params['min_max_sinks'])
-            dataset.append(d)
-            if len(dataset) == WRITE_THRESHOLD:
+        file_paths = [train_file, valid_file, test_file]
+        samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
+        for file_path, num_samples in zip(file_paths, samples):
+            dataset = []
+            for i in range(num_samples):
+                d = create_demands(graph=graph,
+                                   min_max_sources=params['min_max_sources'],
+                                   min_max_sinks=params['min_max_sinks'])
+                dataset.append(d)
+                if len(dataset) == WRITE_THRESHOLD:
+                    write_dataset(dataset, file_path)
+                    print('Wrote {0} samples to {1}'.format(i+1, file_path))
+                    dataset = []
+
+            # Clean up
+            if len(dataset) > 0:
                 write_dataset(dataset, file_path)
-                print('Wrote {0} samples to {1}'.format(i, file_path))
-                dataset = []
 
-        # Clean up
-        if len(dataset) > 0:
-            write_dataset(dataset, file_path)
+            print('Completed {0}.'.format(file_path))
 
 
 def random_walks(params):
@@ -91,6 +95,7 @@ def random_walks(params):
         print('Frac of zero entries for walks of length {0}: {1}'.format(i, frac))
 
         mat = mat.dot(adj)
+
 
 if __name__ == '__main__':
     main()
