@@ -54,9 +54,6 @@ class DatasetManager:
         self.dataset = {}
         self.graph_data = {}
 
-    def load_all(self, num_nodes):
-        self.load([Series.TRAIN, Series.VALID, Series.TEST], num_nodes)
-
     def load(self, series, graphs, num_nodes, num_neighborhoods):
         assert series is not None
 
@@ -64,9 +61,13 @@ class DatasetManager:
             series = [series]
 
         for s in series:
+
+            if s not in self.dataset:
+                self.dataset[s] = []
+
             for graph_name, path in self.file_paths[s].items():
                 features = read_dataset(demands_path=path, num_nodes=num_nodes)
-                self.dataset[s] = [Sample(node_features=n, graph_name=graph_name) for n in features]
+                self.dataset[s] += [Sample(node_features=n, graph_name=graph_name) for n in features]
 
                 # Lazily load graph adjacency matrix, neighborhoods, and node embeddings
                 if graph_name not in self.graph_data:
@@ -74,7 +75,7 @@ class DatasetManager:
                     adj_matrix = expand_sparse_matrix(csr_mat=adj_matrix, n=num_nodes)
 
                     neighborhoods = random_walk_neighborhoods(adj_matrix, k=num_neighborhoods)
-                    embeddings = create_node_embeddings(graph=graphs[graph_name])
+                    embeddings = create_node_embeddings(graph=graphs[graph_name], num_nodes=num_nodes)
 
                     self.graph_data[graph_name] = GraphData(adj_matrix, neighborhoods, embeddings)
 
@@ -85,10 +86,7 @@ class DatasetManager:
         """
         Returns all batches for a single series using uniform shuffling without replacement.
         """
-        data = []
-        for dataset in self.dataset[series]:
-            data += dataset
-
+        data = self.dataset[series]
         if shuffle:
             np.random.shuffle(data)
 
@@ -102,7 +100,7 @@ class DatasetManager:
             node_features = [sample.node_features for sample in batch]
             adj_matrices = [self.graph_data[sample.graph_name].adj_matrix for sample in batch]
             neighborhoods = [self.graph_data[sample.graph_name].neighborhoods for sample in batch]
-            embeddings = [self.graph_data[sample.graph_name].embeddings for sample in batch]
+            embeddings = [self.graph_data[sample.graph_name].node_embeddings for sample in batch]
 
             if batch_size == 1:
                 node_features = node_features[0]
@@ -179,8 +177,14 @@ class DatasetManager:
             node_batch.append(sample.node_features)
             adj_batch.append(self.graph_data[sample.graph_name].adj_matrix)
             neighborhood_batch.append(self.graph_data[sample.graph_name].neighborhoods)
-            embedding_batch.append(self.graph_data[sample.graph_name].embeddings)
+            embedding_batch.append(self.graph_data[sample.graph_name].node_embeddings)
             indices.append(index)
+
+        if batch_size == 1:
+            node_batch = node_batch[0]
+            adj_batch = adj_batch[0]
+            neighborhood_batch = neighborhood_batch[0]
+            embedding_batch = embedding_batch[0]
 
         batch_dict = {
             DataSeries.NODE: node_batch,

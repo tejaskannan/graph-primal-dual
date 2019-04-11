@@ -42,13 +42,13 @@ class NeighborhoodModel(Model):
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
 
                 # Handle dimensions for dense mode
-                if not is_sparse:
-                    adj = tf.expand_dims(adj, axis=0)
+                # if not is_sparse:
+                #     adj = tf.expand_dims(adj, axis=0)
 
-                    neighborhoods = [tf.expand_dims(n, axis=0) for n in neighborhoods]
+                #     neighborhoods = [tf.expand_dims(n, axis=0) for n in neighborhoods]
 
-                    node_embeddings = tf.expand_dims(node_embeddings, axis=0)
-                    node_embeddings = tf.tile(node_embeddings, multiples=(tf.shape(demands)[0], 1, 1))
+                #     node_embeddings = tf.expand_dims(node_embeddings, axis=0)
+                #     node_embeddings = tf.tile(node_embeddings, multiples=(tf.shape(demands)[0], 1, 1))
 
                 # Node encoding
                 encoder = MLP(hidden_sizes=self.params['encoder_hidden'],

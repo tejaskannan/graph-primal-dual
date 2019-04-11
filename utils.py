@@ -84,7 +84,7 @@ def create_demands(graph, min_max_sources, min_max_sinks):
     return demands
 
 
-def create_node_embeddings(graph):
+def create_node_embeddings(graph, num_nodes):
     """
     Creates node "embeddings" based on a set of (approximate) centrality measures
     """
@@ -100,9 +100,12 @@ def create_node_embeddings(graph):
     # Eigenvector Centrality (uses sparse matrix computations)
     eigen = nx.eigenvector_centrality_numpy(graph, max_iter=50, tol=1e-5)
 
-    for n in graph.nodes():
-        embedding = np.array([in_deg[n], out_deg[n], pagerank[n], eigen[n]])
-        embeddings.append(embedding)
+    embeddings = np.zeros(shape=(num_nodes, 4), dtype=float)
+    for i, n in enumerate(graph.nodes()):
+        embeddings[i][0] = in_deg[n]
+        embeddings[i][1] = out_deg[n]
+        embeddings[i][2] = pagerank[n]
+        embeddings[i][3] = eigen[n]
     return np.array(embeddings)
 
 

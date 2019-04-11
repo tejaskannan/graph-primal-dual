@@ -13,7 +13,7 @@ from utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neig
 from utils import add_features, adj_mat_to_node_bias
 from plot import plot_flow_graph_sparse, plot_flow_graph
 from constants import BIG_NUMBER, LINE
-from dataset import DatasetManager, Series
+from dataset import DatasetManager, Series, DataSeries
 
 
 PRINT_THRESHOLD = 100
@@ -24,42 +24,56 @@ class NeighborhoodMCF:
     def __init__(self, params):
         self.params = params
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
-        self.output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], params['graph_name'], self.timestamp)
+        graph_names = '-'.join(params['train_graph_names'])
+        self.output_folder = '{0}/{1}-{2}/'.format(params['output_folder'], graph_names, self.timestamp)
         self.num_node_features = 2
 
-        train_file = 'datasets/{0}_train.txt'.format(self.params['dataset_name'])
-        valid_file = 'datasets/{0}_valid.txt'.format(self.params['dataset_name'])
-        test_file = 'datasets/{0}_test.txt'.format(self.params['dataset_name'])
-        self.dataset = DatasetManager(train_file, valid_file, test_file, params=self.params['batch_params'])
+        file_paths = {
+            Series.TRAIN: {},
+            Series.VALID: {},
+            Series.TEST: {}
+        }
+        dataset_path = 'datasets/{0}_{1}.txt'
+        for dataset_name, graph_name in zip(self.params['train_dataset_names'], self.params['train_graph_names']):
+            file_paths[Series.TRAIN][graph_name] = dataset_path.format(dataset_name, 'train')
+            file_paths[Series.VALID][graph_name] = dataset_path.format(dataset_name, 'valid')
+        
+        for dataset_name, graph_name in zip(self.params['test_dataset_names'], self.params['test_graph_names']):
+            file_paths[Series.TEST][graph_name] = dataset_path.format(dataset_name, 'test')
+
+        self.dataset = DatasetManager(file_paths=file_paths, params=self.params['batch_params'])
 
     def train(self):
-        # Load graph
-        graph_path = 'graphs/{0}.tntp'.format(self.params['graph_name'])
-        graph = load_to_networkx(path=graph_path)
+
+        # Load Graphs
+        graphs, _, num_nodes = self._load_graphs()
 
         # Create tensors for global graph properties
-        adj_mat = nx.adjacency_matrix(graph)
+        # adj_mat = nx.adjacency_matrix(graph)
 
-        if self.params['sparse']:
-            adj_tensor = sparse_matrix_to_tensor(adj_mat)
-        else:
-            adj_tensor = adj_mat.todense()
+        # if self.params['sparse']:
+        #     adj_tensor = sparse_matrix_to_tensor(adj_mat)
+        # else:
+        #     adj_tensor = adj_mat.todense()
 
-        # Graph properties
-        num_nodes = graph.number_of_nodes()
+        # # Graph properties
+        # num_nodes = graph.number_of_nodes()
 
-        # Create neighborhoods
-        n_neighborhoods = self._num_neighborhoods(graph)
-        neighborhoods = random_walk_neighborhoods(adj_mat, k=n_neighborhoods)
+        # # Create neighborhoods
+        # n_neighborhoods = self._num_neighborhoods(graph)
+        # neighborhoods = random_walk_neighborhoods(adj_mat, k=n_neighborhoods)
 
-        if self.params['sparse']:
-            neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
-        else:
-            neighborhood_tensors = [adj_mat_to_node_bias(m) for m in neighborhoods]
+        # if self.params['sparse']:
+        #     neighborhood_tensors = [sparse_matrix_to_tensor(m) for m in neighborhoods]
+        # else:
+        #     neighborhood_tensors = [adj_mat_to_node_bias(m) for m in neighborhoods]
 
-        # Create node embeddings
-        node_embeddings = create_node_embeddings(graph)
-        embedding_size = node_embeddings.shape[1]
+        # # Create node embeddings
+        # node_embeddings = create_node_embeddings(graph)
+        # embedding_size = node_embeddings.shape[1]
+
+        embedding_size = 4
+        n_neighborhoods = self.params['num_neighborhoods']
 
         # Initialize model
         model = NeighborhoodModel(params=self.params)
@@ -87,8 +101,8 @@ class NeighborhoodMCF:
         append_row_to_log(log_headers, log_path)
 
         # Load training and validation datasets
-        self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes)
-        self.dataset.load(series=Series.VALID, num_nodes=num_nodes)
+        self.dataset.load(series=Series.TRAIN, graphs=graphs, num_nodes=num_nodes, num_neighborhoods=n_neighborhoods)
+        self.dataset.load(series=Series.VALID, graphs=graphs, num_nodes=num_nodes, num_neighborhoods=n_neighborhoods)
         self.dataset.init(num_epochs=self.params['epochs'])
 
         # Variables for early stopping
@@ -108,25 +122,34 @@ class NeighborhoodMCF:
             train_losses = []
             for i in range(num_train_batches):
 
-                node_features, indices = self.dataset.get_train_batch(batch_size=batch_size)
+                batch, indices = self.dataset.get_train_batch(batch_size=batch_size)
 
                 if self.params['sparse']:
-                    node_features = node_features[0]
-                    demands = features_to_demands(node_features)
+                    demands = features_to_demands(batch[DataSeries.NODE])
+                    adj = batch[DataSeries.ADJ]
                 else:
-                    demands = [features_to_demands(n) for n in node_features]
+                    demands = [features_to_demands(n) for n in batch[DataSeries.NODE]]
+                    adj = [a.todense() for a in batch[DataSeries.ADJ]]
 
                 feed_dict = {
-                    node_ph: node_features,
+                    node_ph: batch[DataSeries.NODE],
                     demands_ph: demands,
-                    adj_ph: adj_tensor,
-                    node_embedding_ph: node_embeddings,
+                    adj_ph: adj,
+                    node_embedding_ph: batch[DataSeries.EMBEDDING],
                     dropout_keep_ph: self.params['dropout_keep_prob']
                 }
 
                 # Provide neighborhood matrices
-                for j in range(len(neighborhood_tensors)):
-                    feed_dict[neighborhoods_ph[j]] = neighborhood_tensors[j]
+                for j in range(n_neighborhoods+1):
+
+                    # Get the jth neighborhood for each element in the batch
+                    neighborhood = [n[j] for n in batch[DataSeries.NEIGHBORHOOD]]
+
+                    # Convert to dense matrices if necessary
+                    if not self.params['sparse']:
+                        neighborhood = [n.todense() for n in neighborhood]
+
+                    feed_dict[neighborhoods_ph[j]] = np.array(neighborhood)
 
                 outputs = model.run_train_step(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -145,26 +168,40 @@ class NeighborhoodMCF:
 
             # Validation Batches
             valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID, batch_size=batch_size)
-            num_valid_batches = len(valid_batches)
+            num_valid_batches = len(valid_batches[DataSeries.NODE])
             valid_losses = []
-            for i, node_features in enumerate(valid_batches):
+            for i in range(num_valid_batches):
+
+                node_features = valid_batches[DataSeries.NODE][i]
+                adj = valid_batches[DataSeries.ADJ][i]
+                embeddings = valid_batches[DataSeries.EMBEDDING][i]
+                neighborhoods = valid_batches[DataSeries.NEIGHBORHOOD][i]
 
                 if self.params['sparse']:
-                    node_features = node_features[0]
                     demands = features_to_demands(node_features)
                 else:
                     demands = [features_to_demands(n) for n in node_features]
+                    adj = [a.todense() for a in adj]
 
                 feed_dict = {
                     node_ph: node_features,
                     demands_ph: demands,
-                    adj_ph: adj_tensor,
-                    node_embedding_ph: node_embeddings,
+                    adj_ph: adj,
+                    node_embedding_ph: embeddings,
                     dropout_keep_ph: 1.0
                 }
 
-                for j in range(len(neighborhood_tensors)):
-                    feed_dict[neighborhoods_ph[j]] = neighborhood_tensors[j]
+                # Provide neighborhood matrices
+                for j in range(n_neighborhoods+1):
+
+                    # Get the jth neighborhood for each element in the batch
+                    neighborhood = [n[j] for n in neighborhoods]
+
+                    # Convert to dense matrices if necessary
+                    if not self.params['sparse']:
+                        neighborhood = [n.todense() for n in neighborhood]
+
+                    feed_dict[neighborhoods_ph[j]] = np.array(neighborhood)
 
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -300,10 +337,16 @@ class NeighborhoodMCF:
     def create_placeholders(self, model, num_nodes, embedding_size, num_neighborhoods):
         node_shape = [None, num_nodes, self.num_node_features]
         demands_shape = [None, num_nodes, 1]
+        adj_shape = [None, num_nodes, num_nodes]
+        neighborhood_shape = [None, num_nodes, num_nodes]
+        embedding_shape = [None, num_nodes, embedding_size]
 
         if self.params['sparse']:
             node_shape = node_shape[1:]
             demands_shape = demands_shape[1:]
+            adj_shape = adj_shape[1:]
+            neighborhood_shape = neighborhood_shape[1:]
+            embedding_shape = embedding_shape[1:]
 
         node_ph = model.create_placeholder(dtype=tf.float32,
                                            shape=node_shape,
@@ -314,29 +357,47 @@ class NeighborhoodMCF:
                                               name='demands-ph',
                                               is_sparse=False)
         adj_ph = model.create_placeholder(dtype=tf.float32,
-                                          shape=[None, num_nodes],
+                                          shape=adj_shape,
                                           name='adj-ph',
                                           is_sparse=self.params['sparse'])
-
-        neighborhoods = []
-        for i in range(num_neighborhoods+1):
-            ph = model.create_placeholder(dtype=tf.float32,
-                                          shape=[None, num_nodes],
-                                          name='neighborhood-{0}-ph'.format(i),
-                                          is_sparse=self.params['sparse'])
-            neighborhoods.append(ph)
-
         node_embedding_ph = model.create_placeholder(dtype=tf.float32,
-                                                     shape=[num_nodes, embedding_size],
+                                                     shape=embedding_shape,
                                                      name='node-embedding-ph',
                                                      is_sparse=False)
         dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
                                                    shape=(),
                                                    name='dropout-keep-ph',
                                                    is_sparse=False)
+
+        neighborhoods = []
+        for i in range(num_neighborhoods+1):
+            ph = model.create_placeholder(dtype=tf.float32,
+                                          shape=neighborhood_shape,
+                                          name='neighborhood-{0}-ph'.format(i),
+                                          is_sparse=self.params['sparse'])
+            neighborhoods.append(ph)
+
         return node_ph, demands_ph, adj_ph, neighborhoods, node_embedding_ph, dropout_keep_ph
     
     def _num_neighborhoods(self, graph):
         if 'num_neighborhoods' in self.params:
             return self.params['num_neighborhoods']
         return max(2, int(math.log(graph.number_of_nodes())))
+
+    def _load_graphs(self):
+        graph_path = 'graphs/{0}.tntp'
+
+        train_graphs = {}
+        for graph_name in self.params['train_graph_names']:
+            graph = load_to_networkx(path=graph_path.format(graph_name))
+            train_graphs[graph_name] = graph
+
+        test_graphs = {}
+        for graph_name in self.params['test_graph_names']:
+            graph = load_to_networkx(path=graph_path.format(graph_name))
+            test_graphs[graph_name] = graph
+
+        num_train_nodes = np.max([g.number_of_nodes() for g in train_graphs.values()])
+        num_test_nodes = np.max([g.number_of_nodes() for g in test_graphs.values()])
+
+        return train_graphs, test_graphs, max(num_train_nodes, num_test_nodes)
