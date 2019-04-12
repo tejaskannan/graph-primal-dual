@@ -286,6 +286,12 @@ class NeighborhoodMCF:
             flow_cost = outputs[1]
             flows = outputs[2]
             flow_proportions = outputs[3]
+            dual_cost = outputs[4]
+
+            print(flow_cost)
+            print(dual_cost)
+            print(outputs[5])
+            print(LINE)
 
             if self.params['sparse']:
                 flow_graph = add_features_sparse(graph, demands=node_features, flows=flows,

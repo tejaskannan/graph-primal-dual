@@ -79,8 +79,6 @@ class DatasetManager:
                     embeddings = create_node_embeddings(graph=graphs[graph_name], num_nodes=num_nodes,
                                                         neighborhoods=neighborhoods)
 
-                    print(embeddings)
-
                     self.graph_data[graph_name] = GraphData(adj_matrix, neighborhoods, embeddings)
 
     def create_shuffled_batches(self, series, batch_size):

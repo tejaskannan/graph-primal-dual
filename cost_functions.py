@@ -44,32 +44,19 @@ class Cube(CostFunction):
         return self.clip(tf.sqrt(x))
 
 
-class PolyRoot(CostFunction):
-
-    def apply(self, x):
-        return self.clip(self.constant * (tf.pow(x, 1.5) + x))
-
-    def inv_derivative(self, y):
-        x = tf.square(tf.nn.relu((2.0 / (3.0 * self.constant)) * (y - 1)))
-        return self.clip(x)
-
-
-class Sqrt(CostFunction):
-
+class Quad(CostFunction):
+    
     def __init__(self, constant):
-        super(Sqrt, self).__init__(constant)
+        super(Quad, self).__init__(constant)
         assert constant > 0.0
+        assert constant <= EXP_MAX
 
     def apply(self, x):
-        # Shifting mitigates the possibility of zero gradients
-        return self.clip(self.constant * tf.sqrt(x + 1) - self.constant)
+        return self.clip(tf.pow(self.constant * x, 4))
 
     def inv_derivative(self, y):
-        # Pre-clip y because both conditions are executed within the computation graph
-        clipped_y = tf.clip_by_value(y, SMALL_NUMBER, BIG_NUMBER)
-        return tf.where(tf.less_equal(y, SMALL_NUMBER),
-                        x=tf.zeros_like(y, dtype=tf.float32),
-                        y=self.clip(tf.square((2.0 / self.constant) * tf.reciprocal(clipped_y))) - 1)
+        x = tf.clip_by_value((1.0 / (4.0 * self.constant)) * y, SMALL_NUMBER, BIG_NUMBER)
+        return self.clip(tf.pow(x, (1.0 / 3.0)))
 
 
 class Exp(CostFunction):
@@ -83,8 +70,23 @@ class Exp(CostFunction):
         return self.clip(tf.exp(self.constant * x) - 1)
 
     def inv_derivative(self, y):
-        y = tf.clip_by_value(y, self.constant, BIG_NUMBER)
-        return self.clip((1.0 / self.constant) * (tf.log(y) - tf.log(self.constant)))
+        x = (1.0 / self.constant) * tf.clip_by_value(y, SMALL_NUMBER, BIG_NUMBER)
+        return self.clip((1.0 / self.constant) * tf.log(x))
+
+
+class LinearExp(CostFunction):
+
+    def __init__(self, constant):
+        super(LinearExp, self).__init__(constant)
+        assert constant > 0.0
+        assert constant <= EXP_MAX
+
+    def apply(self, x):
+        return self.clip(tf.exp(self.constant * x) - x - 1)
+
+    def inv_derivative(self, y):
+        x = (1.0 / self.constant) * tf.clip_by_value(y + 1, SMALL_NUMBER, BIG_NUMBER)
+        return self.clip((1.0 / self.constant) * tf.log(x))
 
 
 def get_cost_function(name, constant):
@@ -92,10 +94,10 @@ def get_cost_function(name, constant):
         return Square(constant=constant)
     if name == 'exp':
         return Exp(constant=constant)
+    if name == 'linear_exp':
+        return LinearExp(constant=constant)
     if name == 'cube':
         return Cube(constant=constant)
-    if name == 'poly_root':
-        return PolyRoot(constant=constant)
-    if name == 'sqrt':
-        return Sqrt(constant=constant)
+    if name == 'quad':
+        return Quad(constant=constant)
     return None

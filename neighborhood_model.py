@@ -122,5 +122,5 @@ class NeighborhoodModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(flow_cost - dual_cost)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, weights, node_encoding]
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows]
                 self.optimizer_op = self._build_optimizer_op()
