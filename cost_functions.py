@@ -89,6 +89,27 @@ class LinearExp(CostFunction):
         return self.clip((1.0 / self.constant) * tf.log(x))
 
 
+class PolySin(CostFunction):
+
+    def __init__(self, constant):
+        super(PolySin, self).__init__(constant)
+        assert constant > 0.0
+        assert constant < 10.0
+
+    def apply(self, x):
+        return self.clip(x + 0.5 * tf.sin(self.constant * x))
+
+    def inv_derivative(self, y):
+        x = tf.clip_by_value(2.0 / self.constant * (y - 1), -1 + SMALL_NUMBER, 1 - SMALL_NUMBER)
+        inv = self.clip((1.0 / self.constant) * tf.acos(x))
+
+        # Use second derivative to determine if the critical point is a min or a max
+        dx2 = -0.5 * (self.constant**2) * tf.sin(self.constant * inv)
+        return tf.where(tf.less_equal(dx2, 0),
+                        x=tf.zeros_like(inv, dtype=tf.float32),
+                        y=inv)
+
+
 def get_cost_function(name, constant):
     if name == 'square':
         return Square(constant=constant)
@@ -100,4 +121,6 @@ def get_cost_function(name, constant):
         return Cube(constant=constant)
     if name == 'quad':
         return Quad(constant=constant)
+    if name == 'poly_sin':
+        return PolySin(constant=constant)
     return None
