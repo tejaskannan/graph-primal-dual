@@ -48,8 +48,8 @@ class NeighborhoodMCF:
         # Load Graphs
         graphs, _, num_nodes = self._load_graphs()
 
-        embedding_size = 4
         n_neighborhoods = self.params['num_neighborhoods']
+        embedding_size = 2 * n_neighborhoods
 
         # Initialize model
         model = NeighborhoodModel(params=self.params)
@@ -220,7 +220,7 @@ class NeighborhoodMCF:
         _, graphs, num_nodes = self._load_graphs()
 
         n_neighborhoods = self.params['num_neighborhoods']    
-        embedding_size = 4
+        embedding_size = 2 * n_neighborhoods
 
         # Initialize model
         model = NeighborhoodModel(params=self.params)

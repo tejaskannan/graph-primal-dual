@@ -84,28 +84,23 @@ def create_demands(graph, min_max_sources, min_max_sinks):
     return demands
 
 
-def create_node_embeddings(graph, num_nodes):
+def create_node_embeddings(graph, num_nodes, neighborhoods):
     """
-    Creates node "embeddings" based on a set of (approximate) centrality measures
+    Creates node "embeddings" based on the degrees of neighboring vertices
     """
-    embeddings = []
+    embeddings = np.zeros(shape=(num_nodes, 2 * (len(neighborhoods) - 1)), dtype=float)
 
-    # Degree Centralities
-    in_deg = nx.in_degree_centrality(graph)
-    out_deg = nx.out_degree_centrality(graph)
+    out_neighbors = []
+    in_neighbors = []
+    for i in range(1, len(neighborhoods)):
+        out_neighbors.append(neighborhoods[i].sum(axis=1, dtype=float))
+        in_neighbors.append(neighborhoods[i].sum(axis=0, dtype=float))
 
-    # PageRank (Uses power iteration over sparse matrices)
-    pagerank =  nx.pagerank_scipy(graph, alpha=0.85, max_iter=50, tol=1e-5)
+    for i in range(graph.number_of_nodes()):
+        for j in range(len(out_neighbors)):
+            embeddings[i][2*j] = out_neighbors[j][i, 0] / graph.number_of_nodes()
+            embeddings[i][2*j+1] = in_neighbors[j][0, i] / graph.number_of_nodes()
 
-    # Eigenvector Centrality (uses sparse matrix computations)
-    eigen = nx.eigenvector_centrality_numpy(graph, max_iter=50, tol=1e-5)
-
-    embeddings = np.zeros(shape=(num_nodes, 4), dtype=float)
-    for i, n in enumerate(graph.nodes()):
-        embeddings[i][0] = in_deg[n]
-        embeddings[i][1] = out_deg[n]
-        embeddings[i][2] = pagerank[n]
-        embeddings[i][3] = eigen[n]
     return np.array(embeddings)
 
 

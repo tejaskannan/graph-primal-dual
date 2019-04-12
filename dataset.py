@@ -76,7 +76,10 @@ class DatasetManager:
                     adj_matrix = expand_sparse_matrix(csr_mat=adj_matrix, n=num_nodes)
 
                     neighborhoods = random_walk_neighborhoods(adj_matrix, k=num_neighborhoods)
-                    embeddings = create_node_embeddings(graph=graphs[graph_name], num_nodes=num_nodes)
+                    embeddings = create_node_embeddings(graph=graphs[graph_name], num_nodes=num_nodes,
+                                                        neighborhoods=neighborhoods)
+
+                    print(embeddings)
 
                     self.graph_data[graph_name] = GraphData(adj_matrix, neighborhoods, embeddings)
 
