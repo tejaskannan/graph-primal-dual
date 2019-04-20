@@ -9,6 +9,7 @@ from constants import *
 from sparse_mcf import SparseMCF
 from neighborhood import NeighborhoodMCF
 from dense_baseline import DenseBaseline
+from optimization_baseline_runner import OptimizationBaselineRunner
 from mcf import MCF
 
 
@@ -21,6 +22,8 @@ def main():
     parser.add_argument('--test', action='store_true', help='Flag to specify testing.')
     parser.add_argument('--random-walks', action='store_true')
     parser.add_argument('--dense', action='store_true', help='Flag to specify using dense baseline.')
+    parser.add_argument('--slsqp', action='store_true', help='Flag to specify using SLSQP baseline.')
+    parser.add_argument('--trust-constr', action='store_true', help='Flag to specify using Trust Constraint baseline.')
     parser.add_argument('--model', type=str, help='Path to trained model.')
     args = parser.parse_args()
 
@@ -45,6 +48,12 @@ def main():
     elif args.dense:
         baseline = DenseBaseline(params=model_params)
         baseline.compute_baseline()
+    elif args.trust_constr:
+        baseline = OptimizationBaselineRunner(params=model_params, optimizer_name='trust_constr')
+        baseline.optimize()
+    elif args.slsqp:
+        baseline = OptimizationBaselineRunner(params=model_params, optimizer_name='slsqp')
+        baseline.optimize()
 
 
 def generate(params):

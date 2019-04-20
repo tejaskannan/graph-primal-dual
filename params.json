@@ -27,10 +27,10 @@
 		"decoder_hidden": [16, 16],
 		"output_folder": "trained_models",
 		"cost_fn": {
-			"name": "log",
+			"name": "quadratic",
 			"options": {
 				"a": 1.0,
-				"b": 1.0,
+				"b": 0.0,
 				"c": 0.0
 			}
 		},
