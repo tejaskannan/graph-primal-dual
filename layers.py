@@ -451,3 +451,39 @@ class SparseMinCostFlow(Layer):
                                    name='{0}-flow-calculation'.format(self.name))
 
         return flow
+
+
+class DualFlow(Layer):
+
+    def __init__(self, step_size, momentum, iters, name='dual-flow'):
+        super(DualFlow, self).__init__(0, 0, None, name)
+        self.step_size = step_size
+        self.momentum = momentum
+        self.iters = iters
+
+    def __call__(self, inputs, **kwargs):
+        dual_diff = inputs
+        adj = kwargs['adj']
+        cost_fn = kwargs['cost_fn']
+
+        def body(flow, acc, prev_flow):
+            gradient = cost_fn.derivative(flow - self.momentum * acc) - dual_diff
+            next_acc = self.momentum * acc + self.step_size * gradient
+            next_flow = adj * tf.nn.relu(flow - next_acc)
+            return [next_flow, next_acc, flow]
+
+        def cond(flow, momentum, prev_flow):
+            return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
+
+        dual_flows = tf.zeros_like(dual_diff, dtype=tf.float32)
+        acc = tf.zeros_like(dual_diff, dtype=tf.float32)
+        prev_dual_flows = dual_flows + BIG_NUMBER
+        shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
+        dual_flows, _, _ = tf.while_loop(cond, body,
+                                         loop_vars=[dual_flows, acc, prev_dual_flows],
+                                         parallel_iterations=1,
+                                         shape_invariants=shape_invariants,
+                                         maximum_iterations=self.iters)
+
+        return dual_flows
+

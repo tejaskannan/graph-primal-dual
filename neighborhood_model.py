@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from base_model import Model
-from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow
+from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, DualFlow
 from layers import AttentionNeighborhood
 from cost_functions import get_cost_function
 from constants import BIG_NUMBER, FLOW_THRESHOLD
@@ -11,8 +11,7 @@ class NeighborhoodModel(Model):
 
     def __init__(self, params, name='neighborhood-model'):
         super(NeighborhoodModel, self).__init__(params, name)
-        self.cost_fn = get_cost_function(name=params['cost_fn'],
-                                         constant=params['cost_constant'])
+        self.cost_fn = get_cost_function(cost_fn=params['cost_fn'])
 
     def build(self, **kwargs):
 
@@ -114,32 +113,17 @@ class NeighborhoodModel(Model):
                     dual_cost = tf.reduce_sum(dual_flow_cost) - dual_demand
                 else:
                     dual_diff = dual_vars - tf.transpose(dual_vars, perm=[0, 2, 1])
-                    dual_flows_opt = adj * tf.nn.relu(self.cost_fn.inv_derivative(dual_diff))
-
-                    # Optimize dual flows using gradient descent
-                    alpha = self.params['learning_rate']
-                    def body(flow, prev_flow):
-                        next_flow = flow - 0.1 * (self.cost_fn.derivative(flow) - dual_diff)
-                        next_flow = adj * tf.nn.relu(next_flow)
-                        return [next_flow, flow]
-
-                    def cond(flow, prev_flow):
-                        return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
-
-                    dual_flows = tf.zeros_like(dual_diff, dtype=tf.float32)
-                    prev_dual_flows = dual_flows + BIG_NUMBER
-                    shape_invariants = [dual_flows.get_shape(), prev_dual_flows.get_shape()]
-                    dual_flows, _ = tf.while_loop(cond, body,
-                                                  loop_vars=[dual_flows, prev_dual_flows],
-                                                  parallel_iterations=1,
-                                                  shape_invariants=shape_invariants,
-                                                  maximum_iterations=self.params['dual_iters'])
+                    
+                    dual_flow_layer = DualFlow(step_size=self.params['dual_step_size'],
+                                               momentum=self.params['dual_momentum'],
+                                               iters=self.params['dual_iters'])
+                    dual_flows = dual_flow_layer(inputs=dual_diff, adj=adj, cost_fn=self.cost_fn)
 
                     dual_demand = tf.reduce_sum(dual_vars * demands, axis=[1, 2])
                     dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
                     dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
                 self.loss = flow_cost - dual_cost
-                self.loss_op = tf.reduce_mean(flow_cost - dual_cost)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, dual_flows_opt]
+                self.loss_op = tf.reduce_mean(self.loss)
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows]
                 self.optimizer_op = self._build_optimizer_op()

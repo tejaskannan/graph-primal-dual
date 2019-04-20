@@ -10,6 +10,8 @@
 	},
 	"model": {
 		"learning_rate": 0.001,
+		"dual_momentum": 0.9,
+		"dual_step_size": 0.01,
 		"gradient_clip": 1,
 		"batch_size": 128,
 		"epochs": 1,
@@ -24,15 +26,20 @@
 		"encoder_hidden": [16],
 		"decoder_hidden": [16, 16],
 		"output_folder": "trained_models",
-		"cost_fn": "quad",
-		"cost_constant": 5.0,
+		"cost_fn": {
+			"name": "linear",
+			"options": {
+				"a": 1.0,
+				"b": 0.0
+			}
+		},
 		"flow_iters": 1000,
 		"dual_iters": 100,
 		"plot_flows": true,
 		"train_graph_names": ["tiny"],
 		"train_dataset_names": ["tiny-1000"],
 		"test_graph_names": ["tiny"],
-		"test_dataset_names": ["tiny-128"],
+		"test_dataset_names": ["tiny-1000"],
 		"sparse": false,
 		"batch_params": {
 			"selection_beg": 1e8,
