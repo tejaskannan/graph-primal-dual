@@ -42,11 +42,8 @@ class TrustConstr(OptimizeBaseline):
             'factorization_method': 'SVDFactorization'
         }
 
-        initial = np.random.uniform(size=(graph.number_of_edges(),))
-
-        lower_bound = np.zeros(shape=(graph.number_of_edges(),), dtype=float)
-        upper_bound = np.full(shape=(graph.number_of_edges(),), fill_value=np.inf)
-        bounds = optimize.Bounds(lb=lower_bound, ub=upper_bound)
+        initial = np.zeros(shape=(graph.number_of_edges(),), dtype=float)
+        bounds = optimize.Bounds(lb=0, ub=np.inf)
         constraint = self._constraint(graph, demands)
 
         flows_per_iter = []
@@ -58,13 +55,15 @@ class TrustConstr(OptimizeBaseline):
         hess = optimize.BFGS()
         result = optimize.minimize(fun=self.cost_fn,
                                    x0=initial,
+                                   callback=callback,
+                                   bounds=bounds,
                                    method='trust-constr',
                                    constraints=[constraint],
                                    jac='2-point',
                                    hess=hess,
                                    options=options)
 
-        return np.array(flows_per_iter)
+        return np.array(flows_per_iter), result
 
 
 class SLSQP(OptimizeBaseline):
@@ -93,4 +92,4 @@ class SLSQP(OptimizeBaseline):
                                    callback=callback,
                                    options=options)
 
-        return np.array(flows_per_iter)
+        return np.array(flows_per_iter), result

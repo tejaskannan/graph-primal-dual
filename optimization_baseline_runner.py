@@ -3,7 +3,6 @@ from optimization_baselines import TrustConstr, SLSQP
 from datetime import datetime
 from load import load_to_networkx, read_dataset
 from utils import features_to_demands, append_row_to_log
-from np_cost_functions import get_cost_function
 from plot import plot_flow_graph
 from os import mkdir
 from os.path import exists
@@ -29,9 +28,6 @@ class OptimizationBaselineRunner:
         elif optimizer_name == 'slsqp':
             self.optimizer = SLSQP(params=params)
 
-        self.cost_fn = get_cost_function(params['cost_fn'])
-
-
     def optimize(self):
         # Load Graphs
         graph_path = 'graphs/{0}.tntp'
@@ -55,12 +51,11 @@ class OptimizationBaselineRunner:
                 demands = features_to_demands(features)
                 demands = np.reshape(demands, newshape=(demands.shape[0],))
                 
-                flows_per_iter = self.optimizer.optimize(graph=graph, demands=demands)
+                flows_per_iter, result = self.optimizer.optimize(graph=graph, demands=demands)
                 flows = flows_per_iter[-1]
                 flow_mat = self._flow_matrix(graph, flows)
 
-                flow_cost = self.cost_fn(flow_mat)
-                append_row_to_log([index, graph_name, flow_cost], costs_path)
+                append_row_to_log([index, graph_name, result.fun], costs_path)
 
                 # Add demands to graph
                 flow_graph = graph.copy()
