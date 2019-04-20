@@ -1,6 +1,7 @@
 import numpy as np
 from optimization_baselines import TrustConstr, SLSQP
 from datetime import datetime
+from time import time
 from load import load_to_networkx, read_dataset
 from utils import features_to_demands, append_row_to_log
 from plot import plot_flow_graph
@@ -39,7 +40,7 @@ class OptimizationBaselineRunner:
         if not exists(self.output_folder):
             mkdir(self.output_folder)
 
-        cost_headers = ['Index', 'Graph', 'Cost']
+        cost_headers = ['Index', 'Graph', 'Cost', 'Time']
         costs_path = self.output_folder + 'costs.csv'
         append_row_to_log(cost_headers, costs_path)
 
@@ -51,11 +52,14 @@ class OptimizationBaselineRunner:
                 demands = features_to_demands(features)
                 demands = np.reshape(demands, newshape=(demands.shape[0],))
                 
+                start = time()
                 flows_per_iter, result = self.optimizer.optimize(graph=graph, demands=demands)
+                end = time()
+
                 flows = flows_per_iter[-1]
                 flow_mat = self._flow_matrix(graph, flows)
 
-                append_row_to_log([index, graph_name, result.fun], costs_path)
+                append_row_to_log([index, graph_name, result.fun, end - start], costs_path)
 
                 # Add demands to graph
                 flow_graph = graph.copy()

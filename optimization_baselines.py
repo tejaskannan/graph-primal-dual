@@ -26,7 +26,8 @@ class OptimizeBaseline:
                     A[i, j] = -1.0
 
         if not as_dict:
-            return optimize.LinearConstraint(A, lb=-1 * demands, ub=-1 * demands)
+            demands = -1 * demands
+            return optimize.LinearConstraint(A, lb=demands, ub=demands)
         else:
             return {
                 'type': 'eq',

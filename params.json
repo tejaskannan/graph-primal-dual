@@ -27,10 +27,10 @@
 		"decoder_hidden": [16, 16],
 		"output_folder": "trained_models",
 		"cost_fn": {
-			"name": "quadratic",
+			"name": "log",
 			"options": {
 				"a": 1.0,
-				"b": 0.0,
+				"b": 1.0,
 				"c": 0.0
 			}
 		},
@@ -39,8 +39,8 @@
 		"plot_flows": true,
 		"train_graph_names": ["tiny"],
 		"train_dataset_names": ["tiny-1000"],
-		"test_graph_names": ["tiny"],
-		"test_dataset_names": ["tiny-1000"],
+		"test_graph_names": ["sioux-falls"],
+		"test_dataset_names": ["sioux-falls-128"],
 		"sparse": false,
 		"batch_params": {
 			"selection_beg": 1e8,
