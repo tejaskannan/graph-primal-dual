@@ -101,6 +101,24 @@ class Exp(CostFunction):
         return self.clip(self.constant * tf.exp(self.constant * x))
 
 
+class Log(CostFunction):
+
+    def __init__(self, options):
+        super(Log, self).__init__(options)
+        assert 'a' in options
+        assert 'b' in options
+        assert 'c' in options
+
+    def apply(self, x):
+        # Clip values so that gradients are well defined
+        x = tf.clip_by_value(self.options['b'] * x + 1, SMALL_NUMBER, BIG_NUMBER)
+        return self.clip(self.options['a'] * tf.log(x) + self.options['c'])
+
+    def derivative(self, x):
+        x = tf.clip_by_value(self.options['b'] * x + 1, SMALL_NUMBER, BIG_NUMBER)
+        return self.clip(self.options['a'] * self.options['b'] * tf.reciprocal(x))
+
+
 class PolySin(CostFunction):
 
     def __init__(self, options):
@@ -133,4 +151,6 @@ def get_cost_function(cost_fn):
         return Quartic(options=options)
     if name == 'poly_sin':
         return PolySin(options=options)
+    if name == 'log':
+        return Log(options=options)
     return None

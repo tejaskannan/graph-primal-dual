@@ -292,6 +292,8 @@ class NeighborhoodMCF:
             flow_proportions = outputs[3]
             dual_cost = outputs[4]
 
+            print(flow_proportions)
+
             print(flow_cost)
             print(dual_cost)
             print(LINE)

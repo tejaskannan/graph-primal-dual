@@ -4,7 +4,7 @@ from base_model import Model
 from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, DualFlow
 from layers import AttentionNeighborhood
 from cost_functions import get_cost_function
-from constants import BIG_NUMBER, FLOW_THRESHOLD
+from constants import BIG_NUMBER, SMALL_NUMBER
 
 
 class NeighborhoodModel(Model):
