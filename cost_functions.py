@@ -37,7 +37,7 @@ class Cube(CostFunction):
         assert constant > 0
 
     def apply(self, x):
-        return self.clip(tf.pow(x, 3))
+        return self.clip(self.constant * tf.pow(x, 3))
 
     def inv_derivative(self, y):
         x = tf.clip_by_value((1.0 / (3.0 * self.constant)) * y, SMALL_NUMBER, BIG_NUMBER)
@@ -52,11 +52,14 @@ class Quad(CostFunction):
         assert constant <= EXP_MAX
 
     def apply(self, x):
-        return self.clip(tf.pow(self.constant * x, 4))
+        return self.clip(self.constant * tf.pow(x, 4))
 
     def inv_derivative(self, y):
         x = tf.clip_by_value((1.0 / (4.0 * self.constant)) * y, SMALL_NUMBER, BIG_NUMBER)
         return self.clip(tf.pow(x, (1.0 / 3.0)))
+
+    def derivative(self, x):
+        return 4 * self.constant * tf.pow(x, 3)
 
 
 class Exp(CostFunction):
