@@ -5,6 +5,7 @@ import tensorflow as tf
 from neighborhood_model import NeighborhoodModel
 from load import load_to_networkx, read_dataset
 from datetime import datetime
+from time import time
 from os import mkdir
 from os.path import exists
 from utils import create_demands, append_row_to_log, create_node_embeddings
@@ -249,6 +250,12 @@ class NeighborhoodMCF:
 
         num_test_batches = len(test_batches[DataSeries.NODE])
 
+
+        # Iniitalize Testing Log
+        log_headers = ['Test Instance', 'Graph', 'Flow Cost', 'Dual Cost', 'Time (sec)']
+        log_path = model_path + 'test.csv'
+        append_row_to_log(log_headers, log_path)
+
         for i in range(num_test_batches):
 
             node_features = test_batches[DataSeries.NODE][i]
@@ -285,7 +292,9 @@ class NeighborhoodMCF:
 
                 feed_dict[neighborhoods_ph[j]] = neighborhood
 
+            start = time()
             outputs = model.inference(feed_dict=feed_dict)
+            end = time()
 
             graph_name = test_batches[DataSeries.GRAPH_NAME][i]
             graph = graphs[graph_name]
@@ -295,18 +304,17 @@ class NeighborhoodMCF:
             flow_proportions = outputs[3]
             dual_cost = outputs[4]
 
-            print(flow_proportions)
-
-            print(flow_cost)
-            print(dual_cost)
-            print(LINE)
-
             if self.params['sparse']:
                 flow_graph = add_features_sparse(graph, demands=node_features, flows=flows,
                                                  proportions=flow_proportions)
             else:
                 flow_graph = add_features(graph, demands=node_features[0], flows=flows[0],
                                           proportions=flow_proportions[0])
+
+            # Log Outputs
+            flow_cost = flow_cost[0] if not self.params['sparse'] else flow_cost
+            dual_cost = dual_cost[0] if not self.params['sparse'] else dual_cost
+            append_row_to_log([i, graph_name, flow_cost, dual_cost, end - start], log_path)
 
             # Write output graph to Graph XML
             nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, i))

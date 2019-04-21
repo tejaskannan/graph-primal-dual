@@ -41,7 +41,7 @@
 		"train_dataset_names": ["tiny-128"],
 		"test_graph_names": ["tiny"],
 		"test_dataset_names": ["tiny-128"],
-		"sparse": false,
+		"sparse": true,
 		"batch_params": {
 			"selection_beg": 1e8,
 			"selection_end": 1e2,

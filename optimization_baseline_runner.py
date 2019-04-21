@@ -40,7 +40,7 @@ class OptimizationBaselineRunner:
         if not exists(self.output_folder):
             mkdir(self.output_folder)
 
-        cost_headers = ['Index', 'Graph', 'Cost', 'Time']
+        cost_headers = ['Index', 'Graph', 'Cost', 'Time (sec)']
         costs_path = self.output_folder + 'costs.csv'
         append_row_to_log(cost_headers, costs_path)
 
