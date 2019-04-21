@@ -41,7 +41,7 @@
 		"train_dataset_names": ["tiny-1000"],
 		"test_graph_names": ["sioux-falls"],
 		"test_dataset_names": ["sioux-falls-128"],
-		"sparse": false,
+		"sparse": true,
 		"batch_params": {
 			"selection_beg": 1e8,
 			"selection_end": 1e2,

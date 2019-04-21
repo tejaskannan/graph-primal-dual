@@ -1,8 +1,8 @@
 import tensorflow as tf
 import numpy as np
 from base_model import Model
-from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, DualFlow
-from layers import AttentionNeighborhood
+from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow
+from layers import AttentionNeighborhood, SparseDualFlow, DualFlow
 from cost_functions import get_cost_function
 from constants import BIG_NUMBER, SMALL_NUMBER
 
@@ -104,15 +104,20 @@ class NeighborhoodModel(Model):
                 # Compute dual flows based on dual variables
                 if is_sparse:
                     # This operation is expensive (requires O(|V|^2) memory)
-                    dual_diff = dual_vars - tf.transpose(dual_vars, perm=[1, 0])
-                    dual_flows = adj * tf.nn.relu(self.cost_fn.inv_derivative(dual_diff))
+                    dual_diff = adj * (dual_vars - tf.transpose(dual_vars, perm=[1, 0]))
+
+                    dual_flow_layer = SparseDualFlow(step_size=self.params['dual_step_size'],
+                                                     momentum=self.params['dual_momentum'],
+                                                     iters=self.params['dual_iters'])
+                    dual_flows = dual_flow_layer(inputs=dual_diff, adj=adj, cost_fn=self.cost_fn)
 
                     dual_demand = tf.reduce_sum(dual_vars * demands)
-                    diff_values = (dual_flows * dual_diff).values
+
+                    diff_values = dual_flows.values * dual_diff.values
                     dual_flow_cost = self.cost_fn.apply(dual_flows.values) - diff_values
                     dual_cost = tf.reduce_sum(dual_flow_cost) - dual_demand
                 else:
-                    dual_diff = dual_vars - tf.transpose(dual_vars, perm=[0, 2, 1])
+                    dual_diff = adj * (dual_vars - tf.transpose(dual_vars, perm=[0, 2, 1]))
                     
                     dual_flow_layer = DualFlow(step_size=self.params['dual_step_size'],
                                                momentum=self.params['dual_momentum'],

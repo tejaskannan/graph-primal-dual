@@ -5,8 +5,7 @@ from constants import BIG_NUMBER, FLOW_THRESHOLD
 
 class Layer:
 
-    def __init__(self, input_size, output_size, activation, name):
-        self.input_size = input_size
+    def __init__(self, output_size, activation, name):
         self.output_size = output_size
         self.activation = activation
         self.name = name
@@ -23,7 +22,7 @@ class MLP(Layer):
 
     def __init__(self, hidden_sizes, output_size, activation=None,
                  activate_final=False, bias_final=True, name='dense'):
-        super(MLP, self).__init__(0, output_size, activation, name)
+        super(MLP, self).__init__(output_size, activation, name)
         self.hidden_sizes = hidden_sizes
         self.activate_final = activate_final
         self.name = name
@@ -65,7 +64,7 @@ class MLP(Layer):
 class GRU(Layer):
 
     def __init__(self, output_size, activation=tf.nn.tanh, name='GRU'):
-        super(GRU, self).__init__(0, output_size, activation, name)
+        super(GRU, self).__init__(output_size, activation, name)
 
     def __call__(self, inputs, **kwargs):
         dropout_keep_prob = kwargs['dropout_keep_prob'] if 'dropout_keep_prob' in kwargs else 1.0
@@ -110,8 +109,8 @@ class SparseGAT(Layer):
     Sparse Graph Attention Layer from https://arxiv.org/abs/1710.10903
     """
 
-    def __init__(self, input_size, output_size, num_heads, activation=tf.nn.relu, name='GAT'):
-        super(SparseGAT, self).__init__(input_size, output_size, activation, name)
+    def __init__(self, output_size, num_heads, activation=tf.nn.relu, name='GAT'):
+        super(SparseGAT, self).__init__(output_size, activation, name)
         self.num_heads = num_heads
 
     def __call__(self, inputs, **kwargs):
@@ -157,8 +156,8 @@ class GAT(Layer):
     """
     Graph Attention Layer from https://arxiv.org/abs/1710.10903
     """
-    def __init__(self, input_size, output_size, num_heads, dims=3, activation=tf.nn.relu, name='GAT'):
-        super(GAT, self).__init__(input_size, output_size, activation, name)
+    def __init__(self, output_size, num_heads, dims=3, activation=tf.nn.relu, name='GAT'):
+        super(GAT, self).__init__(output_size, activation, name)
         self.num_heads = num_heads
         self.dims = dims
 
@@ -208,7 +207,7 @@ class Gate(Layer):
     Skip-connection Gating layer from https://arxiv.org/pdf/1805.10988.pdf
     """
     def __init__(self, name='gate'):
-        super(Gate, self).__init__(0, 0, None, name)
+        super(Gate, self).__init__(0, None, name)
 
     def __call__(self, inputs, **kwargs):
 
@@ -240,7 +239,7 @@ class Gate(Layer):
 class Neighborhood(Layer):
 
     def __init__(self, output_size, is_sparse, activation=tf.nn.tanh, name='neighborhood'):
-        super(Neighborhood, self).__init__(0, output_size, activation, name)
+        super(Neighborhood, self).__init__(output_size, activation, name)
         self.is_sparse = is_sparse
 
     def __call__(self, inputs, **kwargs):
@@ -311,7 +310,7 @@ class AttentionNeighborhood(Layer):
     """
 
     def __init__(self, output_size, num_heads, is_sparse, activation=tf.nn.tanh, name='neighborhood'):
-        super(AttentionNeighborhood, self).__init__(0, output_size, activation, name)
+        super(AttentionNeighborhood, self).__init__(output_size, activation, name)
         self.is_sparse = is_sparse
         self.num_heads = num_heads
 
@@ -323,14 +322,12 @@ class AttentionNeighborhood(Layer):
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
         if self.is_sparse:
-            agg_layer = SparseGAT(input_size=0,
-                                  output_size=self.output_size,
+            agg_layer = SparseGAT(output_size=self.output_size,
                                   num_heads=self.num_heads,
                                   activation=self.activation,
                                   name='{0}-sparse-GAT'.format(self.name))
         else:
-            agg_layer = GAT(input_size=0,
-                            output_size=self.output_size,
+            agg_layer = GAT(output_size=self.output_size,
                             num_heads=self.num_heads,
                             activation=self.activation,
                             name='{0}-GAT'.format(self.name))
@@ -388,7 +385,7 @@ class AttentionNeighborhood(Layer):
 class MinCostFlow(Layer):
 
     def __init__(self, flow_iters, dims=3, name='min-cost-flow'):
-        super(MinCostFlow, self).__init__(0, 0, None, name)
+        super(MinCostFlow, self).__init__(0, None, name)
         self.flow_iters = flow_iters
         self.dims = dims
 
@@ -422,7 +419,7 @@ class MinCostFlow(Layer):
 class SparseMinCostFlow(Layer):
 
     def __init__(self, flow_iters, name='sparse-min-cost-flow'):
-        super(SparseMinCostFlow, self).__init__(0, 0, None, name)
+        super(SparseMinCostFlow, self).__init__(0, None, name)
         self.flow_iters = flow_iters
 
     def __call__(self, inputs, **kwargs):
@@ -456,7 +453,7 @@ class SparseMinCostFlow(Layer):
 class DualFlow(Layer):
 
     def __init__(self, step_size, momentum, iters, name='dual-flow'):
-        super(DualFlow, self).__init__(0, 0, None, name)
+        super(DualFlow, self).__init__(0, None, name)
         self.step_size = step_size
         self.momentum = momentum
         self.iters = iters
@@ -487,3 +484,53 @@ class DualFlow(Layer):
 
         return dual_flows
 
+
+class SparseDualFlow(Layer):
+
+    def __init__(self, step_size, momentum, iters, name='sparse-dual-flow'):
+        super(SparseDualFlow, self).__init__(0, None, name)
+        self.step_size = step_size
+        self.momentum = momentum
+        self.iters = iters
+
+    def __call__(self, inputs, **kwargs):
+        dual_diff = inputs  # |V| x |V| sparse tensor
+        adj = kwargs['adj']  # |V| x |V| sparse tensor
+        cost_fn = kwargs['cost_fn']  # Callable cost function
+
+        def body(flow, acc, prev_flow):
+            acc_momentum = tf.scalar_mul(self.momentum, acc)
+
+            flow_diff = tf.sparse.add(flow, tf.scalar_mul(-1, acc_momentum))
+            gradient = cost_fn.derivative(flow_diff.values) - dual_diff.values
+
+            next_acc = tf.SparseTensor(indices=acc.indices,
+                                       values=acc_momentum.values + self.step_size * gradient,
+                                       dense_shape=acc.dense_shape)
+            next_flow = tf.SparseTensor(indices=flow.indices,
+                                        values=tf.nn.relu(flow.values - next_acc.values),
+                                        dense_shape=flow.dense_shape)
+            return [next_flow, next_acc, flow]
+
+        def cond(flow, momentum, prev_flow):
+            diff = tf.sparse.add(flow, tf.scalar_mul(-1, prev_flow))
+            return tf.sparse.reduce_max(tf.abs(diff)) > FLOW_THRESHOLD
+
+        # Initialize values for optimization loop
+        dual_flows = tf.SparseTensor(indices=np.empty((0, 2), dtype=np.int64),
+                                     values=[],
+                                     dense_shape=dual_diff.dense_shape)
+        acc = tf.SparseTensor(indices=np.empty((0, 2), dtype=np.int64),
+                              values=[],
+                              dense_shape=dual_diff.dense_shape)
+        prev_dual_flows = dual_diff
+        #shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
+        
+        shape_invariants = [tf.TensorShape([None]), tf.TensorShape([None]), tf.TensorShape([None])]
+        dual_flows, _, _ = tf.while_loop(cond, body,
+                                         loop_vars=[dual_flows, acc, prev_dual_flows],
+                                         parallel_iterations=1,
+                                         shape_invariants=shape_invariants,
+                                         maximum_iterations=self.iters)
+
+        return dual_flows
