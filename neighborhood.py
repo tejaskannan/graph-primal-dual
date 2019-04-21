@@ -102,7 +102,7 @@ class NeighborhoodMCF:
 
                 if self.params['sparse']:
                     demands = features_to_demands(batch[DataSeries.NODE])
-                    adj = batch[DataSeries.ADJ]
+                    adj = sparse_matrix_to_tensor(batch[DataSeries.ADJ])
                 else:
                     demands = [features_to_demands(n) for n in batch[DataSeries.NODE]]
                     adj = [a.todense() for a in batch[DataSeries.ADJ]]
@@ -119,13 +119,12 @@ class NeighborhoodMCF:
                 for j in range(n_neighborhoods+1):
 
                     # Get the jth neighborhood for each element in the batch
-                    neighborhood = [n[j] for n in batch[DataSeries.NEIGHBORHOOD]]
+                    if self.params['sparse']:
+                        neighborhood = sparse_matrix_to_tensor(batch[DataSeries.NEIGHBORHOOD][j])
+                    else:
+                        neighborhood = [n[j].todense() for n in batch[DataSeries.NEIGHBORHOOD]]
 
-                    # Convert to dense matrices if necessary
-                    if not self.params['sparse']:
-                        neighborhood = [n.todense() for n in neighborhood]
-
-                    feed_dict[neighborhoods_ph[j]] = np.array(neighborhood)
+                    feed_dict[neighborhoods_ph[j]] = neighborhood
 
                 outputs = model.run_train_step(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -155,6 +154,7 @@ class NeighborhoodMCF:
 
                 if self.params['sparse']:
                     demands = features_to_demands(node_features)
+                    adj = sparse_matrix_to_tensor(adj)
                 else:
                     demands = [features_to_demands(n) for n in node_features]
                     adj = [a.todense() for a in adj]
@@ -171,13 +171,12 @@ class NeighborhoodMCF:
                 for j in range(n_neighborhoods+1):
 
                     # Get the jth neighborhood for each element in the batch
-                    neighborhood = [n[j] for n in neighborhoods]
+                    if self.params['sparse']:
+                        neighborhood = sparse_matrix_to_tensor(neighborhoods[j])
+                    else:
+                        neighborhood = [n[j].todense() for n in neighborhoods]
 
-                    # Convert to dense matrices if necessary
-                    if not self.params['sparse']:
-                        neighborhood = [n.todense() for n in neighborhood]
-
-                    feed_dict[neighborhoods_ph[j]] = np.array(neighborhood)
+                    feed_dict[neighborhoods_ph[j]] = neighborhood
 
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -264,6 +263,8 @@ class NeighborhoodMCF:
                 adj = [adj.todense()]
                 embeddings = [embeddings]
                 demands = [demands]
+            else:
+                adj = sparse_matrix_to_tensor(adj)
 
             feed_dict = {
                 node_ph: node_features,
@@ -274,13 +275,15 @@ class NeighborhoodMCF:
             }
 
             # Provide neighborhood matrices
-            for j, neighborhood in enumerate(neighborhoods):
+            for j, _ in enumerate(neighborhoods):
 
-                # Convert to dense matrices if necessary
-                if not self.params['sparse']:
-                    neighborhood = [neighborhood.todense()]
+                # Get the jth neighborhood for each element in the batch
+                if self.params['sparse']:
+                    neighborhood = sparse_matrix_to_tensor(neighborhoods[j])
+                else:
+                    neighborhood = [neighborhoods[j].todense()]
 
-                feed_dict[neighborhoods_ph[j]] = np.array(neighborhood)
+                feed_dict[neighborhoods_ph[j]] = neighborhood
 
             outputs = model.inference(feed_dict=feed_dict)
 
@@ -320,8 +323,8 @@ class NeighborhoodMCF:
     def create_placeholders(self, model, num_nodes, embedding_size, num_neighborhoods):
         node_shape = [None, num_nodes, self.num_node_features]
         demands_shape = [None, num_nodes, 1]
-        adj_shape = [None, num_nodes, num_nodes]
-        neighborhood_shape = [None, num_nodes, num_nodes]
+        adj_shape = [None, None, num_nodes]
+        neighborhood_shape = [None, None, num_nodes]
         embedding_shape = [None, num_nodes, embedding_size]
 
         if self.params['sparse']:

@@ -480,7 +480,8 @@ class DualFlow(Layer):
                                          loop_vars=[dual_flows, acc, prev_dual_flows],
                                          parallel_iterations=1,
                                          shape_invariants=shape_invariants,
-                                         maximum_iterations=self.iters)
+                                         maximum_iterations=self.iters,
+                                         name=self.name + '-while-loop')
 
         return dual_flows
 
@@ -495,42 +496,31 @@ class SparseDualFlow(Layer):
 
     def __call__(self, inputs, **kwargs):
         dual_diff = inputs  # |V| x |V| sparse tensor
-        adj = kwargs['adj']  # |V| x |V| sparse tensor
         cost_fn = kwargs['cost_fn']  # Callable cost function
 
         def body(flow, acc, prev_flow):
-            acc_momentum = tf.scalar_mul(self.momentum, acc)
+            acc_momentum = self.momentum * acc
+            gradient = cost_fn.derivative(flow - acc_momentum) - dual_diff.values
 
-            flow_diff = tf.sparse.add(flow, tf.scalar_mul(-1, acc_momentum))
-            gradient = cost_fn.derivative(flow_diff.values) - dual_diff.values
-
-            next_acc = tf.SparseTensor(indices=acc.indices,
-                                       values=acc_momentum.values + self.step_size * gradient,
-                                       dense_shape=acc.dense_shape)
-            next_flow = tf.SparseTensor(indices=flow.indices,
-                                        values=tf.nn.relu(flow.values - next_acc.values),
-                                        dense_shape=flow.dense_shape)
+            next_acc = acc_momentum + self.step_size * gradient
+            next_flow = tf.nn.relu(flow - next_acc)
             return [next_flow, next_acc, flow]
 
         def cond(flow, momentum, prev_flow):
-            diff = tf.sparse.add(flow, tf.scalar_mul(-1, prev_flow))
-            return tf.sparse.reduce_max(tf.abs(diff)) > FLOW_THRESHOLD
+            return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
 
         # Initialize values for optimization loop
-        dual_flows = tf.SparseTensor(indices=np.empty((0, 2), dtype=np.int64),
-                                     values=[],
-                                     dense_shape=dual_diff.dense_shape)
-        acc = tf.SparseTensor(indices=np.empty((0, 2), dtype=np.int64),
-                              values=[],
-                              dense_shape=dual_diff.dense_shape)
-        prev_dual_flows = dual_diff
-        #shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
-        
-        shape_invariants = [tf.TensorShape([None]), tf.TensorShape([None]), tf.TensorShape([None])]
+        dual_flows = tf.zeros_like(dual_diff.values, dtype=tf.float32)
+        acc = tf.zeros_like(dual_diff.values, dtype=tf.float32)
+        prev_dual_flows = dual_flows + BIG_NUMBER
+        shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]        
         dual_flows, _, _ = tf.while_loop(cond, body,
                                          loop_vars=[dual_flows, acc, prev_dual_flows],
                                          parallel_iterations=1,
                                          shape_invariants=shape_invariants,
-                                         maximum_iterations=self.iters)
+                                         maximum_iterations=self.iters,
+                                         name=self.name + '-while-loop')
 
-        return dual_flows
+        return tf.SparseTensor(indices=dual_diff.indices,
+                               values=dual_flows,
+                               dense_shape=dual_diff.dense_shape)
