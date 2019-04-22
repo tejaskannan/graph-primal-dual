@@ -86,9 +86,13 @@ def create_demands(graph, min_max_sources, min_max_sinks):
 
 def create_node_embeddings(graph, num_nodes, neighborhoods):
     """
-    Creates node "embeddings" based on the degrees of neighboring vertices
+    Creates node "embeddings" based on the degrees of neighboring vertices and approximate
+    centrality measures
     """
-    embeddings = np.zeros(shape=(num_nodes, 2 * (len(neighborhoods) - 1)), dtype=float)
+    embeddings = np.zeros(shape=(num_nodes, 2 * (len(neighborhoods) - 1) + 2), dtype=float)
+
+    eigen = nx.eigenvector_centrality_numpy(graph)
+    pagerank = nx.pagerank_scipy(graph, alpha=0.85)
 
     out_neighbors = []
     in_neighbors = []
@@ -96,10 +100,13 @@ def create_node_embeddings(graph, num_nodes, neighborhoods):
         out_neighbors.append(neighborhoods[i].sum(axis=1, dtype=float))
         in_neighbors.append(neighborhoods[i].sum(axis=0, dtype=float))
 
-    for i in range(graph.number_of_nodes()):
+    for i, node in enumerate(graph.nodes()):
         for j in range(len(out_neighbors)):
             embeddings[i][2*j] = out_neighbors[j][i, 0] / graph.number_of_nodes()
             embeddings[i][2*j+1] = in_neighbors[j][0, i] / graph.number_of_nodes()
+
+        embeddings[i][-2] = eigen[node]
+        embeddings[i][-1] = pagerank[node]
 
     return np.array(embeddings)
 

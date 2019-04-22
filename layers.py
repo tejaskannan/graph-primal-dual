@@ -379,7 +379,7 @@ class AttentionNeighborhood(Layer):
         weighted_features = tf.contrib.layers.bias_add(weighted_features,
                                                        scope='{0}-b'.format(self.name))
 
-        return self.activation(weighted_features), attn_concat
+        return self.activation(weighted_features), attn_coefs
 
 
 class MinCostFlow(Layer):
@@ -477,14 +477,14 @@ class DualFlow(Layer):
         acc = tf.zeros_like(dual_diff, dtype=tf.float32)
         prev_dual_flows = dual_flows + BIG_NUMBER
         shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
-        dual_flows, _, p = tf.while_loop(cond, body,
+        dual_flows, _, _ = tf.while_loop(cond, body,
                                          loop_vars=[dual_flows, acc, prev_dual_flows],
                                          parallel_iterations=1,
                                          shape_invariants=shape_invariants,
                                          maximum_iterations=self.iters,
                                          name=self.name + '-while-loop')
 
-        return dual_flows, p
+        return dual_flows
 
 
 class SparseDualFlow(Layer):

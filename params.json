@@ -27,22 +27,21 @@
 		"decoder_hidden": [16, 16],
 		"output_folder": "trained_models",
 		"cost_fn": {
-			"name": "quartic",
+			"name": "quadratic",
 			"options": {
 				"a": 1.0,
 				"b": 0.0,
-				"c": 0.0,
-				"d": 0.0,
-				"e": 0.0
+				"c": 0.0
 			}
 		},
 		"flow_iters": 1000,
 		"dual_iters": 100,
 		"plot_flows": true,
+		"plot_weight_samples": 5,
 		"train_graph_names": ["sioux-falls"],
-		"train_dataset_names": ["sioux-falls-1000"],
+		"train_dataset_names": ["sioux-falls-100000"],
 		"test_graph_names": ["sioux-falls"],
-		"test_dataset_names": ["sioux-falls-1000"],
+		"test_dataset_names": ["sioux-falls-100000"],
 		"sparse": false,
 		"batch_params": {
 			"selection_beg": 1e8,

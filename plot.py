@@ -65,3 +65,36 @@ def plot_flow_graph_sparse(graph, flows, file_path):
         if abs(val) > SMALL_NUMBER:
             e.attr['label'] = str(round(val, 2))
     agraph.draw(file_path, prog='dot')
+
+
+def plot_weights(weight_matrix, file_path, num_samples=-1):
+    if weight_matrix.ndim == 3:
+        weight_matrix = weight_matrix[0]
+
+    # Default to using all elements
+    num_samples = weight_matrix.shape[0] if num_samples == -1 else num_samples
+
+    step = int(weight_matrix.shape[0] / num_samples) + 1
+    indices = list(range(0, weight_matrix.shape[0], step))
+    samples = weight_matrix[indices]
+
+    fig, ax = plt.subplots()
+
+    im = ax.imshow(samples, aspect='auto')
+
+    # Labels
+    ax.set_yticks(np.arange(len(samples)))
+    ax.set_yticklabels(indices)
+
+    ax.set_xticks(np.arange(weight_matrix.shape[1]))
+    ax.set_xticklabels(np.arange(weight_matrix.shape[1]))
+
+    # Create colorbar
+    cbar = ax.figure.colorbar(im, ax=ax)
+
+    # Axes Labels
+    ax.set_xlabel('Neighborhood Layer')
+    ax.set_ylabel('Node Index')
+    ax.set_title('Node-Specific Attention Weights for each Neighborhood Layer')
+
+    plt.savefig(file_path)

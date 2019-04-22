@@ -12,7 +12,7 @@ from utils import create_demands, append_row_to_log, create_node_embeddings
 from utils import add_features_sparse, create_node_bias, restore_params
 from utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
 from utils import add_features, adj_mat_to_node_bias
-from plot import plot_flow_graph_sparse, plot_flow_graph
+from plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
 from constants import BIG_NUMBER, LINE
 from dataset import DatasetManager, Series, DataSeries
 
@@ -50,7 +50,7 @@ class NeighborhoodMCF:
         graphs, _, num_nodes = self._load_graphs()
 
         n_neighborhoods = self.params['num_neighborhoods']
-        embedding_size = 2 * n_neighborhoods
+        embedding_size = 2 * n_neighborhoods + 2
 
         # Initialize model
         model = NeighborhoodModel(params=self.params)
@@ -220,7 +220,7 @@ class NeighborhoodMCF:
         _, graphs, num_nodes = self._load_graphs()
 
         n_neighborhoods = self.params['num_neighborhoods']    
-        embedding_size = 2 * n_neighborhoods
+        embedding_size = 2 * n_neighborhoods + 2
 
         # Initialize model
         model = NeighborhoodModel(params=self.params)
@@ -299,6 +299,7 @@ class NeighborhoodMCF:
             flows = outputs[2]
             flow_proportions = outputs[3]
             dual_cost = outputs[4]
+            weights = outputs[6]
 
             if self.params['sparse']:
                 flow_graph = add_features_sparse(graph, demands=node_features, flows=flows,
@@ -323,6 +324,7 @@ class NeighborhoodMCF:
                     plot_flow_graph(flow_graph, flows[0], '{0}flows-{1}-{2}.png'.format(model_path, graph_name, i))
                     plot_flow_graph(flow_graph, flow_proportions[0], '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, i))
 
+            plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, i), num_samples=5)
 
     def create_placeholders(self, model, num_nodes, embedding_size, num_neighborhoods):
         node_shape = [None, num_nodes, self.num_node_features]
