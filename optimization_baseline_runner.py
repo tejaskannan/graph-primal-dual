@@ -1,4 +1,7 @@
 import numpy as np
+import pickle
+import gzip
+import networkx as nx
 from optimization_baselines import TrustConstr, SLSQP
 from datetime import datetime
 from time import time
@@ -7,6 +10,7 @@ from utils import features_to_demands, append_row_to_log
 from plot import plot_flow_graph
 from os import mkdir
 from os.path import exists
+from constants import PARAMS_FILE
 
 
 class OptimizationBaselineRunner:
@@ -44,6 +48,11 @@ class OptimizationBaselineRunner:
         costs_path = self.output_folder + 'costs.csv'
         append_row_to_log(cost_headers, costs_path)
 
+        # Save parameters
+        params_path = PARAMS_FILE.format(self.output_folder)
+        with gzip.GzipFile(params_path, 'wb') as out_file:
+            pickle.dump(self.params, out_file)
+
         index = 0
         for graph_name, graph in test_graphs.items():
 
@@ -64,11 +73,14 @@ class OptimizationBaselineRunner:
                 # Add demands to graph
                 flow_graph = graph.copy()
                 for i, node in enumerate(graph.nodes()):
-                    flow_graph.add_node(node, demand=demands[i])
+                    flow_graph.add_node(node, demand=float(demands[i]))
 
                 plot_flow_graph(flow_graph, flow_mat, '{0}flows-{1}-{2}.png'.format(self.output_folder, graph_name, index))
 
+                nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, graph_name, index))
+
                 index += 1
+
 
     def _flow_matrix(self, graph, flows):
         num_nodes = graph.number_of_nodes()
