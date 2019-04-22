@@ -60,7 +60,7 @@ class OptimizationBaselineRunner:
             for features in test_features:
                 demands = features_to_demands(features)
                 demands = np.reshape(demands, newshape=(demands.shape[0],))
-                
+
                 start = time()
                 flows_per_iter, result = self.optimizer.optimize(graph=graph, demands=demands)
                 end = time()
@@ -80,7 +80,6 @@ class OptimizationBaselineRunner:
                 nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, graph_name, index))
 
                 index += 1
-
 
     def _flow_matrix(self, graph, flows):
         num_nodes = graph.number_of_nodes()

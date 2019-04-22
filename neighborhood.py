@@ -38,7 +38,7 @@ class NeighborhoodMCF:
         for dataset_name, graph_name in zip(self.params['train_dataset_names'], self.params['train_graph_names']):
             file_paths[Series.TRAIN][graph_name] = dataset_path.format(dataset_name, 'train')
             file_paths[Series.VALID][graph_name] = dataset_path.format(dataset_name, 'valid')
-        
+
         for dataset_name, graph_name in zip(self.params['test_dataset_names'], self.params['test_graph_names']):
             file_paths[Series.TEST][graph_name] = dataset_path.format(dataset_name, 'test')
 
@@ -219,7 +219,7 @@ class NeighborhoodMCF:
         # Load Graphs
         _, graphs, num_nodes = self._load_graphs()
 
-        n_neighborhoods = self.params['num_neighborhoods']    
+        n_neighborhoods = self.params['num_neighborhoods']
         embedding_size = 2 * n_neighborhoods + 2
 
         # Initialize model
@@ -245,7 +245,6 @@ class NeighborhoodMCF:
         test_batches = self.dataset.create_batches(series=Series.TEST, batch_size=1, shuffle=False)
 
         num_test_batches = len(test_batches[DataSeries.NODE])
-
 
         # Iniitalize Testing Log
         log_headers = ['Test Instance', 'Graph', 'Flow Cost', 'Dual Cost', 'Time (sec)']
@@ -370,7 +369,7 @@ class NeighborhoodMCF:
             neighborhoods.append(ph)
 
         return node_ph, demands_ph, adj_ph, neighborhoods, node_embedding_ph, dropout_keep_ph
-    
+
     def _num_neighborhoods(self, graph):
         if 'num_neighborhoods' in self.params:
             return self.params['num_neighborhoods']

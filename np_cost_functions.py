@@ -48,7 +48,7 @@ class Cubic(CostFunction):
 
 
 class Quartic(CostFunction):
-    
+
     def __init__(self, options):
         super(Quartic, self).__init__(options)
         self.a = options['a']
@@ -58,7 +58,7 @@ class Quartic(CostFunction):
         self.e = options['e']
 
     def __call__(self, x):
-        return np.sum(self.a * np.power(x, 4) + self.b * np.power(x, 3) +\
+        return np.sum(self.a * np.power(x, 4) + self.b * np.power(x, 3) +
                       self.c * np.square(x) + self.d * x + self.e)
 
 

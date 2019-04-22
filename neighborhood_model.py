@@ -85,7 +85,7 @@ class NeighborhoodModel(Model):
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
                     flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='normalized-weights')
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
-                
+
                 flow = mcf_solver(inputs=flow_weight_pred, demands=demands)
 
                 # This operation assumes that the c(0) = 0
@@ -118,7 +118,7 @@ class NeighborhoodModel(Model):
                     dual_cost = tf.reduce_sum(dual_flow_cost) - dual_demand
                 else:
                     dual_diff = adj * (dual_vars - tf.transpose(dual_vars, perm=[0, 2, 1]))
-                    
+
                     dual_flow_layer = DualFlow(step_size=self.params['dual_step_size'],
                                                momentum=self.params['dual_momentum'],
                                                iters=self.params['dual_iters'])

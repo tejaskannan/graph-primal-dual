@@ -86,12 +86,12 @@ class Quartic(CostFunction):
         self.e = options['e']
 
     def apply(self, x):
-        return self.clip(self.a * tf.pow(x, 4) + self.b * tf.pow(x, 3) +\
+        return self.clip(self.a * tf.pow(x, 4) + self.b * tf.pow(x, 3) +
                          self.c * tf.square(x) + self.d * x + self.e)
 
     def derivative(self, x):
-        return self.clip(4.0 * self.a * tf.pow(x, 3) +\
-                         3.0 * self.b * tf.square(x) +\
+        return self.clip(4.0 * self.a * tf.pow(x, 3) +
+                         3.0 * self.b * tf.square(x) +
                          2.0 * self.c * x + self.d)
 
 
