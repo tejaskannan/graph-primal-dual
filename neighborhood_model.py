@@ -122,13 +122,13 @@ class NeighborhoodModel(Model):
                     dual_flow_layer = DualFlow(step_size=self.params['dual_step_size'],
                                                momentum=self.params['dual_momentum'],
                                                iters=self.params['dual_iters'])
-                    dual_flows = dual_flow_layer(inputs=dual_diff, adj=adj, cost_fn=self.cost_fn)
+                    dual_flows, p = dual_flow_layer(inputs=dual_diff, adj=adj, cost_fn=self.cost_fn)
 
                     dual_demand = tf.reduce_sum(dual_vars * demands, axis=[1, 2])
                     dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
                     dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
-                self.loss = flow_cost - dual_cost
+                self.loss = tf.square(flow_cost - dual_cost)
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows]
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, p]
                 self.optimizer_op = self._build_optimizer_op()

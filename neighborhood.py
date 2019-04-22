@@ -183,10 +183,6 @@ class NeighborhoodMCF:
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
 
-                # print(outputs[1])
-                # print(LINE)
-                # print(outputs[4])
-
                 if not self.params['sparse'] or (i+1) % PRINT_THRESHOLD == 0:
                     if self.params['sparse']:
                         start = (i+1) - PRINT_THRESHOLD

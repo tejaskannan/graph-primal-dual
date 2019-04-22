@@ -14,7 +14,7 @@
 		"dual_step_size": 0.01,
 		"gradient_clip": 1,
 		"batch_size": 128,
-		"epochs": 1,
+		"epochs": 5,
 		"patience": 5,
 		"early_stop_threshold": 1e-5,
 		"graph_layers": 3,
@@ -27,21 +27,23 @@
 		"decoder_hidden": [16, 16],
 		"output_folder": "trained_models",
 		"cost_fn": {
-			"name": "log",
+			"name": "quartic",
 			"options": {
 				"a": 1.0,
-				"b": 1.0,
-				"c": 0.0
+				"b": 0.0,
+				"c": 0.0,
+				"d": 0.0,
+				"e": 0.0
 			}
 		},
 		"flow_iters": 1000,
 		"dual_iters": 100,
 		"plot_flows": true,
-		"train_graph_names": ["tiny"],
-		"train_dataset_names": ["tiny-128"],
-		"test_graph_names": ["tiny"],
-		"test_dataset_names": ["tiny-128"],
-		"sparse": true,
+		"train_graph_names": ["sioux-falls"],
+		"train_dataset_names": ["sioux-falls-1000"],
+		"test_graph_names": ["sioux-falls"],
+		"test_dataset_names": ["sioux-falls-1000"],
+		"sparse": false,
 		"batch_params": {
 			"selection_beg": 1e8,
 			"selection_end": 1e2,
