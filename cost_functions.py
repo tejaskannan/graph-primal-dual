@@ -19,119 +19,157 @@ class CostFunction:
 
 
 class Linear(CostFunction):
+    """
+    f(x) = ax + b
+    """
 
     def __init__(self, options):
         super(Linear, self).__init__(options)
-        assert 'a' in options
-        assert 'b' in options
+        self.a = options['a']
+        self.b = options['b']
 
     def apply(self, x):
-        return self.clip(self.options['a'] * x + self.options['b'])
+        return self.clip(self.a * x + self.b)
 
     def derivative(self, x):
-        return self.options['a']
+        return self.a
 
 
 class Quadratic(CostFunction):
+    """
+    f(x) = ax^2 + bx + c
+    """
 
     def __init__(self, options):
         super(Quadratic, self).__init__(options)
-        assert 'a' in options
-        assert 'b' in options
-        assert 'c' in options
+        self.a = options['a']
+        self.b = options['b']
+        self.c = options['c']
 
     def apply(self, x):
-        return self.clip(self.options['a'] * tf.square(x) + self.options['b'] * x + self.options['c'])
+        return self.clip(self.a * tf.square(x) + self.b * x + self.c)
 
     def derivative(self, x):
-        return self.clip(2.0 * self.options['a'] * x + self.options['b'])
+        return self.clip(2.0 * self.a * x + self.b)
 
 
 class Cubic(CostFunction):
+    """
+    f(x) = a*x^3 + b*x^2 + c*x + d
+    """
 
     def __init__(self, options):
         super(Cubic, self).__init__(options)
-        assert 'a' in options
-        assert 'b' in options
-        assert 'c' in options
-        assert 'd' in options
+        self.a = options['a']
+        self.b = options['b']
+        self.c = options['c']
+        self.d = options['d']
 
     def apply(self, x):
-        return self.clip(self.options['a'] * tf.pow(x, 3) + self.options['b'] * tf.square(x) +\
-                         self.options['c'] * x + self.options['d'])
+        return self.clip(self.a * tf.pow(x, 3) + self.b * tf.square(x) + self.c * x + self.d)
 
     def derivative(self, x):
-        return self.clip(3.0 * self.options['a'] * tf.square(x) + 2.0 * self.options['b'] * x +\
-                         self.options['c'])
+        return self.clip(3.0 * self.a * tf.square(x) + 2.0 * self.b * x + self.c)
 
 
 class Quartic(CostFunction):
-    
+    """
+    f(x) = a*x^4 + b*x^3 + c*x^2 + d*x + e
+    """
+
     def __init__(self, options):
         super(Quartic, self).__init__(options)
-        assert 'a' in options
-        assert 'b' in options
-        assert 'c' in options
-        assert 'd' in options
-        assert 'e' in options
+        self.a = options['a']
+        self.b = options['b']
+        self.c = options['c']
+        self.d = options['d']
+        self.e = options['e']
 
     def apply(self, x):
-        return self.clip(self.options['a'] * tf.pow(x, 4) + self.options['b'] * tf.pow(x, 3) +\
-                         self.options['c'] * tf.square(x) + self.options['d'] * x + self.options['e'])
+        return self.clip(self.a * tf.pow(x, 4) + self.b * tf.pow(x, 3) +\
+                         self.c * tf.square(x) + self.d * x + self.e)
 
     def derivative(self, x):
-        return self.clip(4.0 * self.options['a'] * tf.pow(x, 3) +\
-                         3.0 * self.options['b'] * tf.square(x) +\
-                         2.0 * self.options['c'] * x + self.options['d'])
+        return self.clip(4.0 * self.a * tf.pow(x, 3) +\
+                         3.0 * self.b * tf.square(x) +\
+                         2.0 * self.c * x + self.d)
 
 
 class Exp(CostFunction):
+    """
+    f(x) = e^(a*x) - 1
+    """
 
     def __init__(self, options):
         super(Exp, self).__init__(options)
 
-        self.constant = options['constant']
-        assert self.constant > 0.0
-        assert self.constant <= EXP_MAX
+        self.a = options['a']
+        assert self.a > 0.0
+        assert self.a <= EXP_MAX
 
     def apply(self, x):
-        return self.clip(tf.exp(self.constant * x) - 1)
+        return self.clip(tf.exp(self.a * x) - 1)
 
     def derivative(self, x):
-        return self.clip(self.constant * tf.exp(self.constant * x))
+        return self.clip(self.a * tf.exp(self.a * x))
 
 
 class Log(CostFunction):
+    """
+    f(x) = a*ln(b*x + 1) + c
+    """
 
     def __init__(self, options):
         super(Log, self).__init__(options)
-        assert 'a' in options
-        assert 'b' in options
-        assert 'c' in options
+        self.a = options['a']
+        self.b = options['b']
+        self.c = options['c']
 
     def apply(self, x):
         # Clip values so that gradients are well defined
-        x = tf.clip_by_value(self.options['b'] * x + 1, SMALL_NUMBER, BIG_NUMBER)
-        return self.clip(self.options['a'] * tf.log(x) + self.options['c'])
+        shifted_x = tf.clip_by_value(self.b * x + 1, SMALL_NUMBER, BIG_NUMBER)
+        return self.clip(self.a * tf.log(shifted_x) + self.c)
 
     def derivative(self, x):
-        x = tf.clip_by_value(self.options['b'] * x + 1, SMALL_NUMBER, BIG_NUMBER)
-        return self.clip(self.options['a'] * self.options['b'] * tf.reciprocal(x))
+        shifted_x = tf.clip_by_value(self.b * x + 1, SMALL_NUMBER, BIG_NUMBER)
+        return self.clip(self.a * self.b * tf.reciprocal(shifted_x))
 
 
-class PolySin(CostFunction):
+class LinearSin(CostFunction):
+    """
+    f(x) = a*x + b*sin(c*x)
+    """
 
     def __init__(self, options):
-        super(PolySin, self).__init__(options)
-        assert 'a' in options
-        assert 'b' in options
-        assert 'c' in options
+        super(LinearSin, self).__init__(options)
+        self.a = options['a']
+        self.b = options['b']
+        self.c = options['c']
 
     def apply(self, x):
-        return self.clip(self.options['a'] * x + self.options['b'] * tf.sin(self.options['c'] * x))
+        return self.clip(self.a * x + self.b * tf.sin(self.c * x))
 
     def derivative(self, x):
-        return self.options['a'] + self.options['b'] * self.options['c'] * tf.cos(self.options['c'] * x)
+        return self.a + self.b * self.c * tf.cos(self.c * x)
+
+
+class Tanh(CostFunction):
+    """
+    f(x) = a*tanh(b*x) + c
+    """
+
+    def __init__(self, options):
+        super(Tanh, self).__init__(options)
+        self.a = options['a']
+        self.b = options['b']
+        self.c = options['c']
+
+    def apply(self, x):
+        return self.clip(self.a * (tf.nn.tanh(self.b * x)) + self.c)
+
+    def derivative(self, x):
+        tanh_squared = tf.square(tf.nn.tanh(self.b * x))
+        return self.clip(self.a * self.b * (1 - tanh_squared))
 
 
 def get_cost_function(cost_fn):
@@ -149,8 +187,8 @@ def get_cost_function(cost_fn):
         return Cubic(options=options)
     if name == 'quartic':
         return Quartic(options=options)
-    if name == 'poly_sin':
-        return PolySin(options=options)
+    if name == 'linear_sin':
+        return LinearSin(options=options)
     if name == 'log':
         return Log(options=options)
     return None
