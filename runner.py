@@ -1,6 +1,7 @@
 import argparse
 import networkx as nx
 import numpy as np
+import json
 from utils import load_params, restore_params, create_node_embeddings
 from utils import append_row_to_log, create_demands, random_walk_neighborhoods
 from load import load_to_networkx, load_embeddings
@@ -24,6 +25,7 @@ def main():
     parser.add_argument('--dense', action='store_true', help='Flag to specify using dense baseline.')
     parser.add_argument('--slsqp', action='store_true', help='Flag to specify using SLSQP baseline.')
     parser.add_argument('--trust-constr', action='store_true', help='Flag to specify using Trust Constraint baseline.')
+    parser.add_argument('--view-params', action='store_true', help='Flag to specify viewing model parameters.')
     parser.add_argument('--degree', action='store_true')
     parser.add_argument('--model', type=str, help='Path to trained model.')
     args = parser.parse_args()
@@ -57,6 +59,8 @@ def main():
     elif args.slsqp:
         baseline = OptimizationBaselineRunner(params=model_params, optimizer_name='slsqp')
         baseline.optimize()
+    elif args.view_params:
+        print(json.dumps(params, indent=2, sort_keys=True))
 
 
 def generate(params):
