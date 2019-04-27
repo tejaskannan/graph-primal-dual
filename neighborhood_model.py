@@ -103,8 +103,12 @@ class NeighborhoodModel(Model):
 
                 # Compute dual flows based on dual variables
                 if is_sparse:
-                    # This operation is expensive (requires O(|V|^2) memory)
-                    dual_diff = adj * (dual_vars - tf.transpose(dual_vars, perm=[1, 0]))
+                    # Creates a |V| x |V| sparse tensor of dual variables which is
+                    # masked by the adjacency matrix. Performing operations in this manner
+                    # prevents keeping a |V| x |V| dense tensor.
+                    dual_masked = adj * dual_vars
+                    dual_transpose = adj * tf.transpose(-1 * dual_vars, perm=[1, 0])
+                    dual_diff = tf.sparse.add(dual_masked, dual_transpose)
 
                     dual_flow_layer = SparseDualFlow(step_size=self.params['dual_step_size'],
                                                      momentum=self.params['dual_momentum'],
