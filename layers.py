@@ -139,11 +139,8 @@ class SparseGAT(Layer):
                 masked_2 = adj_matrix * tf.transpose(attn_weights, perm=[1, 0])
 
                 sparse_sim_mat = tf.sparse.add(masked_1, masked_2)
-                sparse_leaky_relu = tf.SparseTensor(indices=sparse_sim_mat.indices,
-                                                    values=tf.nn.leaky_relu(sparse_sim_mat.values),
-                                                    dense_shape=sparse_sim_mat.dense_shape)
 
-                attn_coefs = tf.sparse.softmax(sparse_leaky_relu)
+                attn_coefs = tf.sparse.softmax(sparse_sim_mat)
                 weighted_tensors = tf.sparse.matmul(attn_coefs, tensors)
                 attn_head = tf.contrib.layers.bias_add(weighted_tensors, scope='b-{0}'.format(i))
                 heads.append(attn_head)
@@ -190,8 +187,15 @@ class GAT(Layer):
                 else:
                     attn_weights = attn_weights + tf.transpose(attn_weights, [1, 0])
 
+                # Sharpen attention weights
+                sharpen_init = tf.random_uniform(shape=(1,), dtype=tf.float32)
+                sharpen_var = tf.Variable(initial_value=sharpen_init,
+                                          trainable=True,
+                                          name='{0}-{1}-sharpen-var'.format(self.name, i))
+                sharpen_weight = 1.0 + tf.nn.relu(sharpen_var)
+
                 # Compute normalized attention weights, B x V x V
-                attention_coefs = tf.nn.softmax(tf.nn.leaky_relu(attn_weights) + bias, axis=-1)
+                attention_coefs = tf.nn.softmax(sharpen_weight * attn_weights + bias, axis=-1)
 
                 # Apply attention weights, B x V x F'
                 attn_head = tf.matmul(attention_coefs, transformed_inputs)
@@ -367,8 +371,15 @@ class AttentionNeighborhood(Layer):
         # V x K
         attn_concat = tf.concat(neighborhood_attn, axis=-1)
 
+        # Sharpen attention weights
+        sharpen_init = tf.random_uniform(shape=(1,), dtype=tf.float32)
+        sharpen_var = tf.Variable(initial_value=sharpen_init,
+                                  trainable=True,
+                                  name=self.name + '-sharpen-var')
+        sharpen_weight = 1.0 + tf.nn.relu(sharpen_var)
+
         # V x K tensor of normalized attention coefficients
-        attn_coefs = tf.nn.softmax(attn_concat, axis=-1)
+        attn_coefs = tf.nn.softmax(sharpen_weight * attn_concat, axis=-1)
 
         # V x K x 1 tensor of normalized attention coefficients
         attn_coefs_expanded = tf.expand_dims(attn_coefs, axis=-1)
