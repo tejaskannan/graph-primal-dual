@@ -16,6 +16,7 @@ def plot_costs(costs_lst, out_path):
     plt.xlabel('Iteration')
     plt.ylabel('Projected Cost')
     plt.savefig(out_path)
+    plt.close()
 
 
 # Flows is a |V| x |V| matrix of flow values
@@ -98,3 +99,4 @@ def plot_weights(weight_matrix, file_path, num_samples=-1):
     ax.set_title('Node-Specific Attention Weights for each Neighborhood Layer')
 
     plt.savefig(file_path)
+    plt.close(fig)

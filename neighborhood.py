@@ -81,6 +81,7 @@ class NeighborhoodMCF:
         self.dataset.load(series=Series.TRAIN, graphs=graphs, num_nodes=num_nodes, num_neighborhoods=n_neighborhoods)
         self.dataset.load(series=Series.VALID, graphs=graphs, num_nodes=num_nodes, num_neighborhoods=n_neighborhoods)
         self.dataset.init(num_epochs=self.params['epochs'])
+        # self.dataset.normalize_embeddings()
 
         # Variables for early stopping
         convergence_count = 0
@@ -240,8 +241,11 @@ class NeighborhoodMCF:
         model.init()
         model.restore(model_path)
 
-        # Load test data
+        # Load test data and normalize embeddings
+        self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
         self.dataset.load(series=Series.TEST, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
+        # self.dataset.normalize_embeddings()
+
         test_batches = self.dataset.create_batches(series=Series.TEST, batch_size=1, shuffle=False)
 
         num_test_batches = len(test_batches[DataSeries.NODE])

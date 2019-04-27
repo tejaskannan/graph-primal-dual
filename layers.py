@@ -146,7 +146,8 @@ class SparseGAT(Layer):
                 heads.append(attn_head)
 
             # Average over all attention heads
-            return self.activation((1.0 / self.num_heads) * tf.add_n(heads))
+            attn_heads = (1.0 / self.num_heads) * tf.add_n(heads)
+            return self.activation(attn_heads)
 
 
 class GAT(Layer):
@@ -187,15 +188,8 @@ class GAT(Layer):
                 else:
                     attn_weights = attn_weights + tf.transpose(attn_weights, [1, 0])
 
-                # Sharpen attention weights
-                sharpen_init = tf.random_uniform(shape=(1,), dtype=tf.float32)
-                sharpen_var = tf.Variable(initial_value=sharpen_init,
-                                          trainable=True,
-                                          name='{0}-{1}-sharpen-var'.format(self.name, i))
-                sharpen_weight = 1.0 + tf.nn.relu(sharpen_var)
-
                 # Compute normalized attention weights, B x V x V
-                attention_coefs = tf.nn.softmax(sharpen_weight * attn_weights + bias, axis=-1)
+                attention_coefs = tf.nn.softmax(attn_weights + bias, axis=-1)
 
                 # Apply attention weights, B x V x F'
                 attn_head = tf.matmul(attention_coefs, transformed_inputs)
@@ -203,7 +197,8 @@ class GAT(Layer):
                 heads.append(attn_head)
 
             # Average over all attention heads
-            return self.activation((1.0 / self.num_heads) * tf.add_n(heads))
+            attn_heads = (1.0 / self.num_heads) * tf.add_n(heads)
+            return self.activation(attn_heads)
 
 
 class Gate(Layer):
@@ -265,7 +260,7 @@ class Neighborhood(Layer):
         attn_layer = MLP(hidden_sizes=[],
                  output_size=1,
                  bias_final=False,
-                 activation=tf.nn.leaky_relu,
+                 activation=None,
                  activate_final=True,
                  name='{0}-attn-weights'.format(self.name))
 
@@ -371,15 +366,8 @@ class AttentionNeighborhood(Layer):
         # V x K
         attn_concat = tf.concat(neighborhood_attn, axis=-1)
 
-        # Sharpen attention weights
-        sharpen_init = tf.random_uniform(shape=(1,), dtype=tf.float32)
-        sharpen_var = tf.Variable(initial_value=sharpen_init,
-                                  trainable=True,
-                                  name=self.name + '-sharpen-var')
-        sharpen_weight = 1.0 + tf.nn.relu(sharpen_var)
-
         # V x K tensor of normalized attention coefficients
-        attn_coefs = tf.nn.softmax(sharpen_weight * attn_concat, axis=-1)
+        attn_coefs = tf.nn.softmax(attn_concat, axis=-1)
 
         # V x K x 1 tensor of normalized attention coefficients
         attn_coefs_expanded = tf.expand_dims(attn_coefs, axis=-1)
@@ -388,9 +376,10 @@ class AttentionNeighborhood(Layer):
         weighted_features = tf.matmul(neighborhood_concat, attn_coefs_expanded)
         weighted_features = tf.squeeze(weighted_features, axis=-1)
         weighted_features = tf.contrib.layers.bias_add(weighted_features,
-                                                       scope='{0}-b'.format(self.name))
+                                                       activation_fn=self.activation,
+                                                       scope='{0}-bias'.format(self.name))
 
-        return self.activation(weighted_features), attn_coefs
+        return weighted_features, attn_coefs
 
 
 class MinCostFlow(Layer):

@@ -8,6 +8,7 @@ from constants import BIG_NUMBER
 from bisect import bisect_right
 from utils import expand_sparse_matrix, random_walk_neighborhoods
 from utils import create_node_embeddings
+from sklearn.preprocessing import StandardScaler
 
 
 class Series(Enum):
@@ -54,6 +55,7 @@ class DatasetManager:
         self.params = params
         self.dataset = {}
         self.graph_data = {}
+        self.scaler = StandardScaler()
 
     def load(self, series, graphs, num_nodes, num_neighborhoods):
         assert series is not None
@@ -236,3 +238,17 @@ class DatasetManager:
             self.cumulative_probs[i] = self.cumulative_probs[i-1] + self.probs[i]
 
         self.is_train_initialized = True
+
+    def normalize_embeddings(self):
+        embeddings_lst = []
+        for graph_name in self.file_paths[Series.TRAIN].keys():
+            graph_embeddings = self.graph_data[graph_name].node_embeddings
+            embeddings_lst.append(graph_embeddings)
+        embeddings = np.concatenate(embeddings_lst, axis=0)
+
+        self.scaler.fit(embeddings)
+
+        for graph_name in self.graph_data.keys():
+            node_embeddings = self.graph_data[graph_name].node_embeddings
+            transformed_embeddings = self.scaler.transform(node_embeddings)
+            self.graph_data[graph_name].node_embeddings = transformed_embeddings
