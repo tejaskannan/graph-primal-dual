@@ -36,7 +36,7 @@
 		},
 		"flow_iters": 1000,
 		"dual_iters": 100,
-		"plot_flows": false,
+		"plot_flows": true,
 		"plot_weight_samples": 25,
 		"train_graph_names": ["tiny"],
 		"train_dataset_names": ["tiny-128"],
