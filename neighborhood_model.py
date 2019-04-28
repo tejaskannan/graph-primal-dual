@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from base_model import Model
 from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow
-from layers import AttentionNeighborhood, SparseDualFlow, DualFlow
+from layers import AttentionNeighborhood, SparseDualFlow, DualFlow, SparseMax
 from cost_functions import get_cost_function
 from constants import BIG_NUMBER, SMALL_NUMBER
 
@@ -29,6 +29,9 @@ class NeighborhoodModel(Model):
 
         # V x V sparse tensor containing the adjacency matrix
         adj = kwargs['adj']
+
+        # (B * V) x 2 tensor containing index permutations for sparsemax
+        obs_indices = kwargs['obs_indices']
 
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
@@ -89,7 +92,11 @@ class NeighborhoodModel(Model):
                 else:
                     pred_weights = adj * tf.transpose(pred_weights, perm=[0, 2, 1])
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
-                    flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='normalized-weights')
+
+                    sparsemax = SparseMax(epsilon=1e-3, name='sparsemax')
+                    flow_weight_pred = sparsemax(inputs=weights, obs_indices=obs_indices, mask=adj)
+
+                    #flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='normalized-weights')
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
 
                 flow = mcf_solver(inputs=flow_weight_pred, demands=demands)

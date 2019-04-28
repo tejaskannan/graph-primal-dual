@@ -252,6 +252,9 @@ class SparseMax(Layer):
         # B x V tensor containing coordinates
         obs_indices = kwargs['obs_indices']
 
+        # V x V tensor
+        mask = kwargs['mask']
+
         # Size of the final dimension
         dims = tf.shape(inputs)[-1]
 
@@ -259,14 +262,14 @@ class SparseMax(Layer):
         z = inputs
 
         # Sort z vectors
-        z_sorted, _ = tf.nn.top_k(z, k=dims, name='{0}-z-sort'.format(name))
+        z_sorted, _ = tf.nn.top_k(z, k=dims, name='{0}-z-sort'.format(self.name))
 
         # Partial sums based on sorted vectors
-        partial_sums = tf.cumsum(z_sorted, axis=-1, name='{0}-cumsum'.format(name))
+        partial_sums = tf.cumsum(z_sorted, axis=-1, name='{0}-cumsum'.format(self.name))
 
         # Tensor with k values
         k = tf.range(start=1, limit=tf.cast(dims, dtype=z.dtype) + 1,
-                     dtype=z.dtype, name='{0}-k'.format(name))
+                     dtype=z.dtype, name='{0}-k'.format(self.name))
 
         # Tensor of ones and zeros representing which indices are greater
         # than their respective partial sums
@@ -290,8 +293,8 @@ class SparseMax(Layer):
         weights = tf.nn.relu(z - tau_z)
 
         # Renormalize values to enforce a minimum probability if needed
-        if epsilon > 0.0:
-            weights = tf.clip_by_value(weights, epsilon, 1.0)
+        if self.epsilon > 0.0:
+            weights = mask * tf.clip_by_value(weights, self.epsilon, 1.0)
             weights = weights / tf.norm(weights, ord=1, axis=-1, keepdims=True)
 
         return weights
