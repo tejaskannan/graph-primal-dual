@@ -86,8 +86,12 @@ class NeighborhoodModel(Model):
                     # V x V sparse tensor
                     pred_weights_sp = adj * (sharpen_weight * pred_weights)
 
-                    # Compute pairwise products (without explicitly keeping a V x V matrix)
-                    pred_weights = pred_weights_sp * tf.transpose(pred_weights, perm=[1, 0])
+                    # V x V sparse tensor
+                    pred_weights_sp_tr = adj * (sharpen_weight * tf.transpose(pred_weights, perm=[1, 0]))
+
+                    # Compute pairwise weights (without explicitly keeping a V x V matrix)
+                    # pred_weights = pred_weights_sp * tf.transpose(pred_weights, perm=[1, 0])
+                    pred_weights = tf.sparse.add(pred_weights_sp, pred_weights_sp_tr)
 
                     flow_weight_pred = tf.sparse.softmax(pred_weights, name='normalized-weights')
                     mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])

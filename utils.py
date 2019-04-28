@@ -122,6 +122,16 @@ def adj_mat_to_node_bias(adj_mat):
     bias_mat = adj_mat.todense()
     return -BIG_NUMBER * (1.0 - bias_mat)
 
+def create_obs_indices(dim1, dim2):
+    x1 = np.arange(0, dim1)
+    x2 = np.arange(0, dim2)
+
+    a, b = np.meshgrid(x1, x2)
+
+    a = np.reshape(a, [-1, 1], order='F')
+    b = np.reshape(b, [-1, 1], order='F')
+    return np.concatenate([a, b], axis=-1).astype(np.int32)
+
 
 def create_edge_bias(graph):
     bias_mat = np.eye(graph.number_of_edges(), dtype=float)

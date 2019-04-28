@@ -235,6 +235,60 @@ class Gate(Layer):
             return self.z * curr_state + (1 - self.z) * prev_state
 
 
+class SparseMax(Layer):
+
+    def __init__(self, name='sparsemax'):
+        super(SparseMax, self).__init__(0, None, name)
+
+    def __call__(self, inputs, **kwargs):
+        """
+        Implementation of sparsemax for tensors of rank 3. The sparsemax
+        algorithm is presented in https://arxiv.org/abs/1602.02068. The implementation
+        is based on the code for tf.contrib.layers.sparsemax.sparsemax
+        https://github.com/tensorflow/tensorflow/blob/r1.13/tensorflow/contrib/sparsemax/python/ops/sparsemax.py
+        """
+
+        # B x V tensor containing coordinates
+        obs_indices = kwargs['obs_indices']
+
+        # Size of the final dimension
+        dims = tf.shape(inputs)[-1]
+
+        # The paper calls the inputs 'z', so we use the same conventions here
+        z = inputs
+
+        # Sort z vectors
+        z_sorted, _ = tf.nn.top_k(z, k=dims, name='{0}-z-sort'.format(name))
+
+        # Partial sums based on sorted vectors
+        partial_sums = tf.cumsum(z_sorted, axis=-1, name='{0}-cumsum'.format(name))
+
+        # Tensor with k values
+        k = tf.range(start=1, limit=tf.cast(dims, dtype=z.dtype) + 1,
+                     dtype=z.dtype, name='{0}-k'.format(name))
+
+        # Tensor of ones and zeros representing which indices are greater 
+        # than their respective partial sums
+        z_threshold = 1.0 + k * z_sorted > partial_sums
+
+        # k(z) value
+        k_z = tf.reduce_sum(tf.cast(z_threshold, dtype=tf.int32), axis=-1)
+
+        # k(z) indices within the 3D tensor
+        indices = tf.concat([obs_indices, tf.reshape(k_z - 1, [-1, 1])], axis=1)
+
+        # Partial sums less than (z)
+        tau_sum = tf.gather_nd(partial_sums, indices)
+        tau_sum_reshape = tf.reshape(tau_sum, tf.shape(k_z))
+
+        # Threshold value tau(z)
+        tau_z = (tau_sum_reshape - 1) / tf.cast(k_z, dtype=z.dtype)
+        tau_z = tf.expand_dims(tau_z, axis=-1)
+
+        # Take max of reduced z values with zero
+        return tf.nn.relu(z - tau_z)
+
+
 class Neighborhood(Layer):
 
     def __init__(self, output_size, is_sparse, activation=tf.nn.tanh, name='neighborhood'):
