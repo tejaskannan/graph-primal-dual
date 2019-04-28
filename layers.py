@@ -237,8 +237,9 @@ class Gate(Layer):
 
 class SparseMax(Layer):
 
-    def __init__(self, name='sparsemax'):
+    def __init__(self, epsilon=0.0, name='sparsemax'):
         super(SparseMax, self).__init__(0, None, name)
+        self.epsilon = epsilon
 
     def __call__(self, inputs, **kwargs):
         """
@@ -286,7 +287,14 @@ class SparseMax(Layer):
         tau_z = tf.expand_dims(tau_z, axis=-1)
 
         # Take max of reduced z values with zero
-        return tf.nn.relu(z - tau_z)
+        weights = tf.nn.relu(z - tau_z)
+
+        # Renormalize values to enforce a minimum probability if needed
+        if epsilon > 0.0:
+            weights = tf.clip_by_value(weights, epsilon, 1.0)
+            weights = weights / tf.norm(weights, ord=1, axis=-1, keepdims=True)
+        
+        return weights
 
 
 class Neighborhood(Layer):
