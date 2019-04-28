@@ -81,14 +81,13 @@ class NeighborhoodModel(Model):
                                           name='sharpen-var')
                 sharpen_weight = 1.0 + tf.nn.relu(sharpen_var)
 
-                # V x V tensor of node scores
-                pred_weights = adj * pred_weights
-
                 # Compute minimum cost flow from flow weights
                 if is_sparse:
+                    pred_weights = adj * tf.transpose(pred_weights, perm=[1, 0])
                     flow_weight_pred = tf.sparse.softmax(pred_weights, name='normalized-weights')
                     mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
                 else:
+                    pred_weights = adj * tf.transpose(pred_weights, perm=[0, 2, 1])
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
                     flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='normalized-weights')
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
@@ -141,5 +140,5 @@ class NeighborhoodModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs]
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, pred_weights]
                 self.optimizer_op = self._build_optimizer_op()
