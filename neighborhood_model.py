@@ -30,9 +30,6 @@ class NeighborhoodModel(Model):
         # V x V sparse tensor containing the adjacency matrix
         adj = kwargs['adj']
 
-        # (B * V) x 2 tensor containing index permutations for sparsemax
-        obs_indices = kwargs['obs_indices']
-
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
         num_output_features = kwargs['num_output_features']
@@ -94,7 +91,7 @@ class NeighborhoodModel(Model):
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
 
                     sparsemax = SparseMax(epsilon=1e-3, name='sparsemax')
-                    flow_weight_pred = sparsemax(inputs=weights, obs_indices=obs_indices, mask=adj)
+                    flow_weight_pred = sparsemax(inputs=weights, mask=adj)
 
                     #flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='normalized-weights')
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])

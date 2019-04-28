@@ -249,9 +249,6 @@ class SparseMax(Layer):
         https://github.com/tensorflow/tensorflow/blob/r1.13/tensorflow/contrib/sparsemax/python/ops/sparsemax.py
         """
 
-        # B x V tensor containing coordinates
-        obs_indices = kwargs['obs_indices']
-
         # V x V tensor
         mask = kwargs['mask']
 
@@ -277,6 +274,16 @@ class SparseMax(Layer):
 
         # k(z) value
         k_z = tf.reduce_sum(tf.cast(z_threshold, dtype=tf.int32), axis=-1)
+
+        # 2D matrix of indices
+        dim0_indices = tf.range(0, tf.shape(z)[0])
+        dim1_indices = tf.range(0, tf.shape(z)[1])
+
+        indices_x, indices_y = tf.meshgrid(dim0_indices, dim1_indices)
+        indices_x = tf.reshape(tf.transpose(indices_x), [-1, 1])
+        indices_y = tf.reshape(tf.transpose(indices_y), [-1, 1])
+
+        obs_indices = tf.concat([indices_x, indices_y], axis=-1)
 
         # k(z) indices within the final dimension of the 3D tensor
         indices = tf.concat([obs_indices, tf.reshape(k_z - 1, [-1, 1])], axis=1)
