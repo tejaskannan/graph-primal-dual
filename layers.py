@@ -268,14 +268,14 @@ class SparseMax(Layer):
         k = tf.range(start=1, limit=tf.cast(dims, dtype=z.dtype) + 1,
                      dtype=z.dtype, name='{0}-k'.format(name))
 
-        # Tensor of ones and zeros representing which indices are greater 
+        # Tensor of ones and zeros representing which indices are greater
         # than their respective partial sums
         z_threshold = 1.0 + k * z_sorted > partial_sums
 
         # k(z) value
         k_z = tf.reduce_sum(tf.cast(z_threshold, dtype=tf.int32), axis=-1)
 
-        # k(z) indices within the 3D tensor
+        # k(z) indices within the final dimension of the 3D tensor
         indices = tf.concat([obs_indices, tf.reshape(k_z - 1, [-1, 1])], axis=1)
 
         # Partial sums less than (z)
@@ -293,7 +293,7 @@ class SparseMax(Layer):
         if epsilon > 0.0:
             weights = tf.clip_by_value(weights, epsilon, 1.0)
             weights = weights / tf.norm(weights, ord=1, axis=-1, keepdims=True)
-        
+
         return weights
 
 
@@ -320,11 +320,11 @@ class Neighborhood(Layer):
 
         # Layer to compute attention weights for each neighborhood
         attn_layer = MLP(hidden_sizes=[],
-                 output_size=1,
-                 bias_final=False,
-                 activation=None,
-                 activate_final=True,
-                 name='{0}-attn-weights'.format(self.name))
+                         output_size=1,
+                         bias_final=False,
+                         activation=None,
+                         activate_final=True,
+                         name='{0}-attn-weights'.format(self.name))
 
         neighborhood_features = []
         neighborhood_attn = []
@@ -576,7 +576,7 @@ class SparseDualFlow(Layer):
         dual_flows = tf.zeros_like(dual_diff.values, dtype=tf.float32)
         acc = tf.zeros_like(dual_diff.values, dtype=tf.float32)
         prev_dual_flows = dual_flows + BIG_NUMBER
-        shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]        
+        shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
         dual_flows, _, _ = tf.while_loop(cond, body,
                                          loop_vars=[dual_flows, acc, prev_dual_flows],
                                          parallel_iterations=1,
