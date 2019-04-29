@@ -92,10 +92,8 @@ class NeighborhoodModel(Model):
                     one_hop_neighborhood = self_loops + normalized_neighbors
 
                     node_weights_agg = tf.matmul(normalized_neighbors, node_weights)
-                    node_weights_gate = Gate()
-                    node_weights_comb = node_weights_gate(inputs=node_weights, prev_state=node_weights_agg)
 
-                    pred_weights = adj * tf.transpose(node_weights_comb, perm=[0, 2, 1])
+                    pred_weights = adj * tf.transpose(node_weights_agg, perm=[0, 2, 1])
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
 
                     sparsemax = SparseMax(epsilon=1e-3, name='sparsemax')
@@ -151,5 +149,5 @@ class NeighborhoodModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights]
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights_agg]
                 self.optimizer_op = self._build_optimizer_op()
