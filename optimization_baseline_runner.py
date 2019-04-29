@@ -75,7 +75,8 @@ class OptimizationBaselineRunner:
                 for i, node in enumerate(graph.nodes()):
                     flow_graph.add_node(node, demand=float(demands[i]))
 
-                plot_flow_graph(flow_graph, flow_mat, '{0}flows-{1}-{2}.png'.format(self.output_folder, graph_name, index))
+                plot_flow_graph(flow_graph, flow_mat, '{0}flows-{1}-{2}.png'.format(self.output_folder, graph_name, index),
+                                use_node_weights=False)
 
                 nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, graph_name, index))
 

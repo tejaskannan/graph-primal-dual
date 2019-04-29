@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from base_model import Model
-from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow
+from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, Gate
 from layers import AttentionNeighborhood, SparseDualFlow, DualFlow, SparseMax
 from cost_functions import get_cost_function
 from constants import BIG_NUMBER, SMALL_NUMBER
@@ -87,13 +87,20 @@ class NeighborhoodModel(Model):
                     flow_weight_pred = tf.sparse.softmax(pred_weights, name='normalized-weights')
                     mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
                 else:
-                    pred_weights = adj * tf.transpose(node_weights, perm=[0, 2, 1])
+                    self_loops = tf.expand_dims(tf.eye(tf.shape(adj)[1]), axis=0)
+                    normalized_neighbors = adj / (tf.norm(adj, axis=-1, ord=1, keepdims=True) + SMALL_NUMBER)
+                    one_hop_neighborhood = self_loops + normalized_neighbors
+
+                    node_weights_agg = tf.matmul(normalized_neighbors, node_weights)
+                    node_weights_gate = Gate()
+                    node_weights_comb = node_weights_gate(inputs=node_weights, prev_state=node_weights_agg)
+
+                    pred_weights = adj * tf.transpose(node_weights_comb, perm=[0, 2, 1])
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
 
                     sparsemax = SparseMax(epsilon=1e-3, name='sparsemax')
                     flow_weight_pred = sparsemax(inputs=weights, mask=adj)
 
-                    #flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='normalized-weights')
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
 
                 flow = mcf_solver(inputs=flow_weight_pred, demands=demands)

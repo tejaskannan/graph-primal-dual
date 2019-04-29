@@ -321,6 +321,19 @@ class NeighborhoodMCF:
             # Write output graph to Graph XML
             nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, i))
 
+            # print('Node Weights')
+            # print(outputs[7])
+            # print(LINE)
+            # print('Node Aggregation')
+            # print(outputs[8])
+            # print(LINE)
+            # print('Flow Proportions')
+            # print(flow_proportions)
+            # print(LINE)
+            # print('Pred Weights')
+            # print(outputs[9])
+            # print(LINE)
+
             if self.params['plot_flows']:
                 if self.params['sparse']:
                     plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, i))
