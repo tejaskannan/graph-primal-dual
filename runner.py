@@ -12,6 +12,9 @@ from neighborhood import NeighborhoodMCF
 from dense_baseline import DenseBaseline
 from optimization_baseline_runner import OptimizationBaselineRunner
 from mcf import MCF
+from os import remove
+from os.path import exists
+from plot import plot_graph
 
 
 def main():
@@ -26,7 +29,7 @@ def main():
     parser.add_argument('--slsqp', action='store_true', help='Flag to specify using SLSQP baseline.')
     parser.add_argument('--trust-constr', action='store_true', help='Flag to specify using Trust Constraint baseline.')
     parser.add_argument('--view-params', action='store_true', help='Flag to specify viewing model parameters.')
-    parser.add_argument('--degree', action='store_true')
+    parser.add_argument('--graph-stats', action='store_true')
     parser.add_argument('--model', type=str, help='Path to trained model.')
     args = parser.parse_args()
 
@@ -48,8 +51,8 @@ def main():
         mcf_solver.test(args.model)
     elif args.random_walks:
         random_walks(params['generate']['graph_names'][0])
-    elif args.degree:
-        degree(params['generate']['graph_names'][0])
+    elif args.graph_stats:
+        graph_stats(params['generate']['graph_names'][0])
     elif args.dense:
         baseline = DenseBaseline(params=model_params)
         baseline.compute_baseline()
@@ -118,7 +121,7 @@ def random_walks(graph_name):
         mat = mat.dot(adj)
 
 
-def degree(graph_name):
+def graph_stats(graph_name):
     # Load graph
     graph_path = 'graphs/{0}.tntp'.format(graph_name)
     graph = load_to_networkx(path=graph_path)
@@ -129,9 +132,34 @@ def degree(graph_name):
     avg_out_deg = total_out_deg / float(graph.number_of_nodes())
     avg_in_deg = total_in_deg / float(graph.number_of_nodes())
 
-    print('Graph Name: {0}'.format(graph_name))
-    print('Avg Out Degree: {0}'.format(avg_out_deg))
-    print('Avg In Degree: {0}'.format(avg_in_deg))
+    # Compute average shortest path length
+    avg_path_length = nx.average_shortest_path_length(graph)
+
+    # Strongly connected components
+    strong_conn_comp = nx.number_strongly_connected_components(graph)
+
+    # Graph diameter
+    diameter = nx.diameter(graph)
+
+    # Write stats to output file
+    stats_path = 'graphs/{0}_stats.csv'.format(graph_name)
+    if exists(stats_path):
+        remove(stats_path)
+
+    append_row_to_log(['Graph Name', graph_name], stats_path)
+    append_row_to_log(['Num Nodes', graph.number_of_nodes()], stats_path)
+    append_row_to_log(['Num (directed) edges', graph.number_of_edges()], stats_path)
+    append_row_to_log(['Avg Out Degree', avg_out_deg], stats_path)
+    append_row_to_log(['Avg In Degree', avg_in_deg], stats_path)
+    append_row_to_log(['Avg Path Length', avg_path_length], stats_path)
+    append_row_to_log(['Diameter', diameter], stats_path)
+    append_row_to_log(['Strongly Connected Components', strong_conn_comp], stats_path)
+
+    # Save graph visualization using GraphGiz
+    plot_graph(graph, file_path='graphs/{0}.png'.format(graph_name))
+
+    # Save graph XML
+    nx.write_gexf(graph, path='graphs/{0}.gexf'.format(graph_name))
 
 
 if __name__ == '__main__':

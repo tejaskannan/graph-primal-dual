@@ -26,7 +26,7 @@ def add_features(graph, demands, flows, proportions, node_weights):
 
     for node in graph.nodes():
         graph.add_node(node, demand=float(demands[node][0] - demands[node][1]),
-                       node_weight=node_weights[node][0])
+                       node_weight=float(node_weights[node][0]))
 
     for src, dest in graph.edges():
         flow = float(flows[src, dest])

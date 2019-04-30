@@ -49,6 +49,8 @@ def plot_flow_graph(graph, flows, file_path, use_node_weights=True):
             rgb = node_cmap(normalized_weight)[:3]
             n.attr['fillcolor'] = colors.rgb2hex(rgb)
             n.attr['fontcolor'] = font_color(rgb)
+        else:
+            n.attr['fillcolor'] = '#BAD7E6'
 
     max_flow_val = np.max(flows)
     min_flow_val = min(0.0, np.min(flows))
@@ -61,6 +63,18 @@ def plot_flow_graph(graph, flows, file_path, use_node_weights=True):
             e.attr['labeldistance'] = '3'
     agraph.draw(file_path, prog='neato')
 
+
+def plot_graph(graph, file_path):
+    agraph = nx.drawing.nx_agraph.to_agraph(graph)
+
+    agraph.node_attr['style'] = 'filled'
+    agraph.node_attr['fillcolor'] = '#BAD7E6'
+
+    agraph.graph_attr['pad'] = 2.0
+    agraph.graph_attr['overlap'] = 'scalexy'
+    agraph.graph_attr['sep'] = 1.3
+
+    agraph.draw(file_path, prog='neato')
 
 # Flows is a |V| x |V| sparse tensor value
 def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
@@ -92,6 +106,8 @@ def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
             rgb = node_cmap(normalized_weight)[:3]
             n.attr['fillcolor'] = colors.rgb2hex(rgb)
             n.attr['fontcolor'] = font_color(rgb)
+        else:
+            n.attr['fillcolor'] = '#BAD7E6'
 
     max_flow_val = np.max(flows.values)
     min_flow_val = min(0.0, np.min(flows.values))
