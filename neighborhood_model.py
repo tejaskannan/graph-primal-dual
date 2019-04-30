@@ -87,13 +87,7 @@ class NeighborhoodModel(Model):
                     flow_weight_pred = tf.sparse.softmax(pred_weights, name='normalized-weights')
                     mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
                 else:
-                    self_loops = tf.expand_dims(tf.eye(tf.shape(adj)[1]), axis=0)
-                    normalized_neighbors = adj / (tf.norm(adj, axis=-1, ord=1, keepdims=True) + SMALL_NUMBER)
-                    one_hop_neighborhood = self_loops + normalized_neighbors
-
-                    node_weights_agg = tf.matmul(normalized_neighbors, node_weights)
-
-                    pred_weights = adj * tf.transpose(node_weights_agg, perm=[0, 2, 1])
+                    pred_weights = adj * tf.transpose(node_weights, perm=[0, 2, 1])
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
 
                     sparsemax = SparseMax(epsilon=1e-3, name='sparsemax')
@@ -149,5 +143,5 @@ class NeighborhoodModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights_agg]
+                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights]
                 self.optimizer_op = self._build_optimizer_op()
