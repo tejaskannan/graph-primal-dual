@@ -1,0 +1,8 @@
+Graph Name,sioux-falls
+Num Nodes,24
+Num (directed) edges,76
+Avg Out Degree,3.1666666666666665
+Avg In Degree,3.1666666666666665
+Avg Path Length,3.010869565217391
+Diameter,6
+Strongly Connected Components,1

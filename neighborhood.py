@@ -66,7 +66,8 @@ class NeighborhoodMCF:
                     neighborhoods=neighborhoods_ph,
                     adj=adj_ph,
                     num_output_features=num_nodes,
-                    dropout_keep_prob=dropout_keep_ph)
+                    dropout_keep_prob=dropout_keep_ph,
+                    num_nodes=num_nodes)
         model.init()
 
         # Create output folder and initialize logging
@@ -237,7 +238,8 @@ class NeighborhoodMCF:
                     neighborhoods=neighborhoods_ph,
                     adj=adj_ph,
                     num_output_features=num_nodes,
-                    dropout_keep_prob=dropout_keep_ph)
+                    dropout_keep_prob=dropout_keep_ph,
+                    num_nodes=num_nodes)
         model.init()
         model.restore(model_path)
 
@@ -307,7 +309,8 @@ class NeighborhoodMCF:
 
             if self.params['sparse']:
                 flow_graph = add_features_sparse(graph, demands=node_features, flows=flows,
-                                                 proportions=flow_proportions)
+                                                 proportions=flow_proportions,
+                                                 node_weights=node_weights)
             else:
                 flow_graph = add_features(graph, demands=node_features[0], flows=flows[0],
                                           proportions=flow_proportions[0],

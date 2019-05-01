@@ -36,11 +36,12 @@ def add_features(graph, demands, flows, proportions, node_weights):
     return graph
 
 
-def add_features_sparse(graph, demands, flows, proportions):
+def add_features_sparse(graph, demands, flows, proportions, node_weights):
     graph = graph.copy()
 
     for node in graph.nodes():
-        graph.add_node(node, demand=float(demands[node][0] - demands[node][1]))
+        graph.add_node(node, demand=float(demands[node][0] - demands[node][1]),
+                       node_weight=float(node_weights[node][0]))
 
     for edge, flow in zip(flows.indices, flows.values):
         graph.add_edge(edge[0], edge[1], flow=float(flow))

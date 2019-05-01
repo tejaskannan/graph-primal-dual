@@ -70,27 +70,21 @@ class NeighborhoodModel(Model):
                 # Compute flow proportions
                 decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
                               output_size=1,
-                              activation=None,
+                              activation=tf.nn.tanh,
+                              activate_final=False,
                               name='node-decoder')
                 node_weights = decoder(inputs=node_encoding)
 
-                # Sharpen Weight
-                sharpen_init = tf.random.uniform(shape=(1,), dtype=tf.float32)
-                sharpen_var = tf.Variable(initial_value=sharpen_init,
-                                          trainable=True,
-                                          name='sharpen-var')
-                sharpen_weight = 1.0 + tf.nn.relu(sharpen_var)
-
                 # Compute minimum cost flow from flow weights
+                sparsemax = SparseMax(epsilon=1e-5, is_sparse=is_sparse, name='sparsemax')
                 if is_sparse:
                     pred_weights = adj * tf.transpose(node_weights, perm=[1, 0])
-                    flow_weight_pred = tf.sparse.softmax(pred_weights, name='normalized-weights')
+                    flow_weight_pred = sparsemax(inputs=pred_weights, num_rows=kwargs['num_nodes'])
+                    #flow_weight_pred = tf.sparse.softmax(pred_weights, name='normalized-weights')
                     mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
                 else:
                     pred_weights = adj * tf.transpose(node_weights, perm=[0, 2, 1])
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
-
-                    sparsemax = SparseMax(epsilon=1e-3, name='sparsemax')
                     flow_weight_pred = sparsemax(inputs=weights, mask=adj)
 
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
@@ -106,7 +100,8 @@ class NeighborhoodModel(Model):
                 # Compute Dual Problem and associated cost
                 dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
                                    output_size=1,
-                                   activation=None,
+                                   activation=tf.nn.tanh,
+                                   activate_final=False,
                                    name='dual-decoder')
                 dual_vars = dual_decoder(inputs=node_encoding)
 

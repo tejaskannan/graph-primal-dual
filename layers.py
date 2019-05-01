@@ -237,20 +237,23 @@ class Gate(Layer):
 
 class SparseMax(Layer):
 
-    def __init__(self, epsilon=0.0, name='sparsemax'):
+    def __init__(self, epsilon=0.0, is_sparse=False, name='sparsemax'):
         super(SparseMax, self).__init__(0, None, name)
         self.epsilon = epsilon
+        self.is_sparse = is_sparse
 
     def __call__(self, inputs, **kwargs):
+        if self.is_sparse:
+            return self.sparse_op(inputs, kwargs['num_rows'])
+        return self.dense_op(inputs, kwargs['mask'])
+
+    def dense_op(self, inputs, mask):
         """
         Implementation of sparsemax for tensors of rank 3. The sparsemax
         algorithm is presented in https://arxiv.org/abs/1602.02068. The implementation
         is based on the code for tf.contrib.layers.sparsemax.sparsemax
         https://github.com/tensorflow/tensorflow/blob/r1.13/tensorflow/contrib/sparsemax/python/ops/sparsemax.py
         """
-
-        # V x V tensor
-        mask = kwargs['mask']
 
         # Size of the final dimension
         dims = tf.shape(inputs)[-1]
@@ -305,6 +308,42 @@ class SparseMax(Layer):
             weights = weights / tf.norm(weights, ord=1, axis=-1, keepdims=True)
 
         return weights
+
+    def sparse_op(self, inputs, num_rows, name='sparse-sparsemax'):
+        # Fetch individual rows from the sparse tensor
+        partitions = tf.cast(inputs.indices[:, 0], dtype=tf.int32)
+        rows = tf.dynamic_partition(inputs.values, partitions, num_rows, name='{0}-dyn-part'.format(name))
+
+        def clipped_sparsemax(tensor, epsilon):
+            # We need reshape the tensor because the provided sparsemax function requires
+            # 2D tensors
+            expanded_tensor = tf.expand_dims(tensor, axis=0)
+            normalized_tensor = tf.contrib.sparsemax.sparsemax(logits=expanded_tensor,
+                                                               name='{0}-sparsemax-op'.format(name))
+            # Clip values if necessary
+            if epsilon > 0.0:
+                clipped = tf.clip_by_value(normalized_tensor, epsilon, 1.0)
+                normalized_tensor = clipped / tf.norm(clipped, ord=1, axis=-1, keepdims=True)
+            return normalized_tensor
+
+        # Normalize rows using clipped sparsemax and set the value of all empty tensors
+        # to -1 for later removal. This trick allows the function to handle zero rows.
+        # It may be helpful to translate this operation into tf.while(...) but we leave
+        # it as a list comprehension for simplicity.
+        normalized = [tf.cond(tf.equal(tf.size(tensor), 0),
+                              lambda: tf.constant(-1.0, shape=[1, 1], dtype=tf.float32),
+                              lambda: clipped_sparsemax(tensor, self.epsilon)) for tensor in rows]
+        concat = tf.squeeze(tf.concat(normalized, axis=1), axis=0)
+
+        # Mask out empty entries (set to -1 from beforehand)
+        mask = tf.logical_not(tf.equal(concat, -1.0))
+        filtered = tf.boolean_mask(concat, mask)
+
+        return tf.SparseTensor(
+            indices=inputs.indices,
+            values=filtered,
+            dense_shape=inputs.dense_shape
+        )
 
 
 class Neighborhood(Layer):

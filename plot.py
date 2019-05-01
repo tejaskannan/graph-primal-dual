@@ -116,8 +116,8 @@ def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
         e.attr['color'] = colors.rgb2hex(cmap(val / max_flow_val)[:3])
         if abs(val) > SMALL_NUMBER:
             e.attr['label'] = str(round(val, 2))
-            e.attr['labeldistance'] = '5'
-    agraph.draw(file_path, prog='dot')
+            e.attr['labeldistance'] = '3'
+    agraph.draw(file_path, prog='neato')
 
 
 def plot_weights(weight_matrix, file_path, num_samples=-1):
