@@ -57,7 +57,7 @@ class DatasetManager:
         self.graph_data = {}
         self.scaler = StandardScaler()
 
-    def load(self, series, graphs, num_nodes, num_neighborhoods):
+    def load(self, series, graphs, num_nodes, num_neighborhoods, unique_neighborhoods=True):
         assert series is not None
 
         if not isinstance(series, Iterable):
@@ -77,7 +77,8 @@ class DatasetManager:
                     adj_matrix = nx.adjacency_matrix(graphs[graph_name])
                     adj_matrix = expand_sparse_matrix(csr_mat=adj_matrix, n=num_nodes)
 
-                    neighborhoods = random_walk_neighborhoods(adj_matrix, k=num_neighborhoods)
+                    neighborhoods = random_walk_neighborhoods(adj_matrix, k=num_neighborhoods,
+                                                              unique_neighborhoods=unique_neighborhoods)
                     embeddings = create_node_embeddings(graph=graphs[graph_name], num_nodes=num_nodes,
                                                         neighborhoods=neighborhoods)
 

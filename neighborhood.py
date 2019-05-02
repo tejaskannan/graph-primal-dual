@@ -56,7 +56,7 @@ class NeighborhoodMCF:
         model = NeighborhoodModel(params=self.params)
 
         # Model placeholders
-        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, correct_flow_ph, \
+        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
             dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size, n_neighborhoods)
 
         # Create model
@@ -68,7 +68,7 @@ class NeighborhoodMCF:
                     num_output_features=num_nodes,
                     dropout_keep_prob=dropout_keep_ph,
                     num_nodes=num_nodes,
-                    correct_flows=correct_flow_ph)
+                    should_correct_flows=False)
         model.init()
 
         # Create output folder and initialize logging
@@ -80,8 +80,10 @@ class NeighborhoodMCF:
         append_row_to_log(log_headers, log_path)
 
         # Load training and validation datasets
-        self.dataset.load(series=Series.TRAIN, graphs=graphs, num_nodes=num_nodes, num_neighborhoods=n_neighborhoods)
-        self.dataset.load(series=Series.VALID, graphs=graphs, num_nodes=num_nodes, num_neighborhoods=n_neighborhoods)
+        self.dataset.load(series=Series.TRAIN, graphs=graphs, num_nodes=num_nodes,
+                          num_neighborhoods=n_neighborhoods, unique_neighborhoods=self.params['unique_neighborhoods'])
+        self.dataset.load(series=Series.VALID, graphs=graphs, num_nodes=num_nodes,
+                          num_neighborhoods=n_neighborhoods, unique_neighborhoods=self.params['unique_neighborhoods'])
         self.dataset.init(num_epochs=self.params['epochs'])
         # self.dataset.normalize_embeddings()
 
@@ -116,8 +118,7 @@ class NeighborhoodMCF:
                     demands_ph: demands,
                     adj_ph: adj,
                     node_embedding_ph: batch[DataSeries.EMBEDDING],
-                    dropout_keep_ph: self.params['dropout_keep_prob'],
-                    correct_flow_ph: False,
+                    dropout_keep_ph: self.params['dropout_keep_prob']
                 }
 
                 # Provide neighborhood matrices
@@ -169,8 +170,7 @@ class NeighborhoodMCF:
                     demands_ph: demands,
                     adj_ph: adj,
                     node_embedding_ph: embeddings,
-                    dropout_keep_ph: 1.0,
-                    correct_flow_ph: False
+                    dropout_keep_ph: 1.0
                 }
 
                 # Provide neighborhood matrices
@@ -231,7 +231,7 @@ class NeighborhoodMCF:
         model = NeighborhoodModel(params=self.params)
 
         # Model placeholders
-        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, correct_flow_ph, \
+        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
             dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size, n_neighborhoods)
 
         # Create model
@@ -243,13 +243,14 @@ class NeighborhoodMCF:
                     num_output_features=num_nodes,
                     dropout_keep_prob=dropout_keep_ph,
                     num_nodes=num_nodes,
-                    correct_flows=correct_flow_ph)
+                    should_correct_flows=True)
         model.init()
         model.restore(model_path)
 
         # Load test data and normalize embeddings
-        self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
-        self.dataset.load(series=Series.TEST, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
+        # self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
+        self.dataset.load(series=Series.TEST, num_nodes=num_nodes, graphs=graphs,
+                          num_neighborhoods=n_neighborhoods, unique_neighborhoods=self.params['unique_neighborhoods'])
         # self.dataset.normalize_embeddings()
 
         test_batches = self.dataset.create_batches(series=Series.TEST, batch_size=1, shuffle=False)
@@ -283,8 +284,7 @@ class NeighborhoodMCF:
                 demands_ph: demands,
                 adj_ph: adj,
                 node_embedding_ph: embeddings,
-                dropout_keep_ph: 1.0,
-                correct_flow_ph: True
+                dropout_keep_ph: 1.0
             }
 
             # Provide neighborhood matrices
@@ -373,10 +373,6 @@ class NeighborhoodMCF:
                                                    shape=(),
                                                    name='dropout-keep-ph',
                                                    is_sparse=False)
-        correct_flow_ph = model.create_placeholder(dtype=tf.bool,
-                                                   shape=(),
-                                                   name='correct-flow-ph',
-                                                   is_sparse=False)
 
         neighborhoods = []
         for i in range(num_neighborhoods+1):
@@ -386,7 +382,7 @@ class NeighborhoodMCF:
                                           is_sparse=self.params['sparse'])
             neighborhoods.append(ph)
 
-        return node_ph, demands_ph, adj_ph, neighborhoods, node_embedding_ph, correct_flow_ph, dropout_keep_ph
+        return node_ph, demands_ph, adj_ph, neighborhoods, node_embedding_ph, dropout_keep_ph
 
     def _num_neighborhoods(self, graph):
         if 'num_neighborhoods' in self.params:

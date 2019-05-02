@@ -1,3 +1,4 @@
+import os
 import argparse
 import networkx as nx
 import numpy as np
@@ -12,8 +13,6 @@ from neighborhood import NeighborhoodMCF
 from dense_baseline import DenseBaseline
 from optimization_baseline_runner import OptimizationBaselineRunner
 from mcf import MCF
-from os import remove
-from os.path import exists
 from plot import plot_graph
 
 
@@ -50,7 +49,7 @@ def main():
     elif args.test:
         mcf_solver.test(args.model)
     elif args.random_walks:
-        random_walks(params['generate']['graph_names'][0])
+        random_walks(params['generate']['graph_names'][0], params['model']['unique_neighborhoods'])
     elif args.graph_stats:
         graph_stats(params['generate']['graph_names'][0])
     elif args.dense:
@@ -99,15 +98,17 @@ def generate(params):
             print('Completed {0}.'.format(file_path))
 
 
-def random_walks(graph_name):
+def random_walks(graph_name, unique_neighborhoods):
     # Load graph
     graph_path = 'graphs/{0}.tntp'.format(graph_name)
     graph = load_to_networkx(path=graph_path)
 
     adj = nx.adjacency_matrix(graph)
-    neighborhoods = random_walk_neighborhoods(adj, k=20)
+    neighborhoods = random_walk_neighborhoods(adj, k=20, unique_neighborhoods=unique_neighborhoods)
 
     total = graph.number_of_nodes()**2
+
+    limit = int(unique_neighborhoods)
 
     print('Graph: {0}'.format(graph_name))
     print('Number of Entries: {0}'.format(total))
@@ -116,7 +117,7 @@ def random_walks(graph_name):
         frac = (total - nonzero) / total
         print('Frac of zero entries for walks of length {0}: {1}'.format(i, frac))
 
-        if frac == 1.0:
+        if frac == limit:
             break
 
 
@@ -142,8 +143,8 @@ def graph_stats(graph_name):
 
     # Write stats to output file
     stats_path = 'graphs/{0}_stats.csv'.format(graph_name)
-    if exists(stats_path):
-        remove(stats_path)
+    if os.path.exists(stats_path):
+        os.remove(stats_path)
 
     append_row_to_log(['Graph Name', graph_name], stats_path)
     append_row_to_log(['Num Nodes', graph.number_of_nodes()], stats_path)

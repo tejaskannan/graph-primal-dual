@@ -43,7 +43,7 @@ class MLP(Layer):
                                          activation=self.activation,
                                          name='{0}-layer-{1}'.format(self.name, i))
                 tensors = tf.nn.dropout(x=tensors,
-                                        keep_prob=dropout_keep_prob,
+                                        rate=(1.0 - dropout_keep_prob),
                                         name='{0}-layer-{1}-dropout'.format(self.name, i))
 
             # Output layer
@@ -55,7 +55,7 @@ class MLP(Layer):
                                      use_bias=self.bias_final,
                                      name='{0}-output'.format(self.name))
             output = tf.nn.dropout(x=output,
-                                   keep_prob=dropout_keep_prob,
+                                   rate=(1.0 - dropout_keep_prob),
                                    name='{0}-output-dropout'.format(self.name))
 
             return output

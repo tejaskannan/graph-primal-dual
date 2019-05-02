@@ -35,7 +35,7 @@ class NeighborhoodModel(Model):
 
         num_output_features = kwargs['num_output_features']
 
-        correct_flows = kwargs['correct_flows']
+        should_correct_flows = kwargs['should_correct_flows']
 
         is_sparse = self.params['sparse']
         rank = 2 if is_sparse else 3
@@ -82,13 +82,22 @@ class NeighborhoodModel(Model):
                 sparsemax = SparseMax(epsilon=1e-5, is_sparse=is_sparse, name='sparsemax')
                 if is_sparse:
                     pred_weights = adj * tf.transpose(node_weights, perm=[1, 0])
-                    flow_weight_pred = sparsemax(inputs=pred_weights, num_rows=kwargs['num_nodes'])
-                    #flow_weight_pred = tf.sparse.softmax(pred_weights, name='normalized-weights')
+
+                    if self.params['use_sparsemax']:
+                        flow_weight_pred = sparsemax(inputs=pred_weights,
+                                                     num_rows=kwargs['num_nodes'])
+                    else:
+                        flow_weight_pred = tf.sparse.softmax(pred_weights,
+                                                             name='weight-softmax')
                     mcf_solver = SparseMinCostFlow(flow_iters=self.params['flow_iters'])
                 else:
                     pred_weights = adj * tf.transpose(node_weights, perm=[0, 2, 1])
                     weights = (-BIG_NUMBER * (1.0 - adj)) + pred_weights
-                    flow_weight_pred = sparsemax(inputs=weights, mask=adj)
+
+                    if self.params['use_sparsemax']:
+                        flow_weight_pred = sparsemax(inputs=weights, mask=adj)
+                    else:
+                        flow_weight_pred = tf.nn.softmax(weights, axis=-1, name='weight-softmax')
 
                     mcf_solver = MinCostFlow(flow_iters=self.params['flow_iters'])
 
@@ -97,24 +106,23 @@ class NeighborhoodModel(Model):
                 # This operation assumes that the c(0) = 0
                 if is_sparse:
 
-                    flow_transpose = tf.sparse.transpose(flow, perm=[1, 0])
-                    
-                    # There seems to be a bug when computing gradients for sparse.minimum, so
-                    # we instead use the alternative formula for minimum below
-                    # min(a, b) = 0.5 * (a + b - |a - b|)
-                    flow_add = tf.sparse.add(flow, flow_transpose)
-                    flow_sub_abs = tf.abs(sparse_subtract(flow, flow_transpose))
-                    min_flow = sparse_subtract(flow_add, flow_sub_abs)
-                    flow = tf.sparse.add(flow, sparse_scalar_mul(min_flow, -0.5), threshold=SMALL_NUMBER)
+                    if should_correct_flows:
+                        flow_transpose = tf.sparse.transpose(flow, perm=[1, 0])
+                        
+                        # There seems to be a bug when computing gradients for sparse.minimum, so
+                        # we instead use the alternative formula for minimum below
+                        # min(a, b) = 0.5 * (a + b - |a - b|)
+                        flow_add = tf.sparse.add(flow, flow_transpose)
+                        flow_sub_abs = tf.abs(sparse_subtract(flow, flow_transpose))
+                        min_flow = sparse_subtract(flow_add, flow_sub_abs)
+                        flow = tf.sparse.add(flow, sparse_scalar_mul(min_flow, -0.5),
+                                             threshold=SMALL_NUMBER)
 
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
                 else:
                     # Remove excess flow about simple cycles
-                    correct_flow_fn = lambda: flow - adj * tf.math.minimum(flow, tf.transpose(flow, perm=[0, 2, 1]))
-
-                    flow = tf.cond(correct_flows,
-                                   true_fn=correct_flow_fn,
-                                   false_fn=lambda: flow)
+                    if should_correct_flows:
+                        flow = flow - adj * tf.math.minimum(flow, tf.transpose(flow, perm=[0, 2, 1]))
 
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
