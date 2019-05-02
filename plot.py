@@ -112,6 +112,9 @@ def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
     max_flow_val = np.max(flows.values)
     min_flow_val = min(0.0, np.min(flows.values))
     for edge, val in zip(flows.indices, flows.values):
+        if not graph.has_edge(*edge):
+            continue
+
         e = agraph.get_edge(edge[0], edge[1])
         e.attr['color'] = colors.rgb2hex(cmap(val / max_flow_val)[:3])
         if abs(val) > SMALL_NUMBER:

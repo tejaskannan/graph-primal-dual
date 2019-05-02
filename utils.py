@@ -44,10 +44,12 @@ def add_features_sparse(graph, demands, flows, proportions, node_weights):
                        node_weight=float(node_weights[node][0]))
 
     for edge, flow in zip(flows.indices, flows.values):
-        graph.add_edge(edge[0], edge[1], flow=float(flow))
+        if graph.has_edge(*edge):
+            graph.add_edge(edge[0], edge[1], flow=float(flow))
 
     for edge, prop in zip(proportions.indices, proportions.values):
-        graph.add_edge(edge[0], edge[1], proportion=float(prop))
+        if graph.has_edge(*edge):
+            graph.add_edge(edge[0], edge[1], proportion=float(prop))
 
     return graph
 
@@ -159,6 +161,18 @@ def sparse_matrix_to_tensor(sparse_mat):
     mat = sparse_mat.tocoo()
     indices = np.mat([mat.row, mat.col]).transpose()
     return tf.SparseTensorValue(indices, mat.data, mat.shape)
+
+
+def sparse_subtract(sp_a, sp_b):
+    return tf.sparse.add(sp_a, sparse_scalar_mul(sp_b, -1))
+
+
+def sparse_scalar_mul(sparse_tensor, scalar):
+    return tf.SparseTensor(
+        indices=sparse_tensor.indices,
+        values=scalar * sparse_tensor.values,
+        dense_shape=sparse_tensor.dense_shape
+    )
 
 
 def sparse_matrix_to_tensor_multiple(sparse_mat, k):
