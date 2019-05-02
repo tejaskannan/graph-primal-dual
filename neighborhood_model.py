@@ -3,6 +3,7 @@ import numpy as np
 from base_model import Model
 from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, Gate
 from layers import AttentionNeighborhood, SparseDualFlow, DualFlow, SparseMax
+from utils import sparse_scalar_mul, sparse_subtract
 from cost_functions import get_cost_function
 from constants import BIG_NUMBER, SMALL_NUMBER
 
@@ -97,8 +98,14 @@ class NeighborhoodModel(Model):
                 if is_sparse:
 
                     flow_transpose = tf.sparse.transpose(flow, perm=[1, 0])
-                    min_flow = tf.sparse.minimum(flow, flow_transpose)
-                    flow = tf.sparse.add(flow, min_flow * -1, thresh=SMALL_NUMBER)
+                    
+                    # There seems to be a bug when computing gradients for sparse.minimum, so
+                    # we instead use the alternative formula for minimum below
+                    # min(a, b) = 0.5 * (a + b - |a - b|)
+                    flow_add = tf.sparse.add(flow, flow_transpose)
+                    flow_sub_abs = tf.abs(sparse_subtract(flow, flow_transpose))
+                    min_flow = sparse_subtract(flow_add, flow_sub_abs)
+                    flow = tf.sparse.add(flow, sparse_scalar_mul(min_flow, -0.5), threshold=SMALL_NUMBER)
 
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
                 else:
