@@ -34,6 +34,8 @@ class NeighborhoodModel(Model):
 
         num_output_features = kwargs['num_output_features']
 
+        correct_flows = kwargs['correct_flows']
+
         is_sparse = self.params['sparse']
         rank = 2 if is_sparse else 3
 
@@ -93,10 +95,20 @@ class NeighborhoodModel(Model):
 
                 # This operation assumes that the c(0) = 0
                 if is_sparse:
+
+                    flow_transpose = tf.sparse.transpose(flow, perm=[1, 0])
+                    min_flow = tf.sparse.minimum(flow, flow_transpose)
+                    flow = tf.sparse.add(flow, min_flow * -1, thresh=SMALL_NUMBER)
+
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
                 else:
                     # Remove excess flow about simple cycles
-                    flow = flow - adj * tf.math.minimum(flow, tf.transpose(flow, perm=[0, 2, 1]))
+                    correct_flow_fn = lambda: flow - adj * tf.math.minimum(flow, tf.transpose(flow, perm=[0, 2, 1]))
+
+                    flow = tf.cond(correct_flows,
+                                   true_fn=correct_flow_fn,
+                                   false_fn=lambda: flow)
+
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
                 # Compute Dual Problem and associated cost

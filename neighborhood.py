@@ -56,7 +56,7 @@ class NeighborhoodMCF:
         model = NeighborhoodModel(params=self.params)
 
         # Model placeholders
-        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
+        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, correct_flow_ph, \
             dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size, n_neighborhoods)
 
         # Create model
@@ -67,7 +67,8 @@ class NeighborhoodMCF:
                     adj=adj_ph,
                     num_output_features=num_nodes,
                     dropout_keep_prob=dropout_keep_ph,
-                    num_nodes=num_nodes)
+                    num_nodes=num_nodes,
+                    correct_flows=correct_flow_ph)
         model.init()
 
         # Create output folder and initialize logging
@@ -115,7 +116,8 @@ class NeighborhoodMCF:
                     demands_ph: demands,
                     adj_ph: adj,
                     node_embedding_ph: batch[DataSeries.EMBEDDING],
-                    dropout_keep_ph: self.params['dropout_keep_prob']
+                    dropout_keep_ph: self.params['dropout_keep_prob'],
+                    correct_flow_ph: False,
                 }
 
                 # Provide neighborhood matrices
@@ -167,7 +169,8 @@ class NeighborhoodMCF:
                     demands_ph: demands,
                     adj_ph: adj,
                     node_embedding_ph: embeddings,
-                    dropout_keep_ph: 1.0
+                    dropout_keep_ph: 1.0,
+                    correct_flow_ph: False
                 }
 
                 # Provide neighborhood matrices
@@ -228,7 +231,7 @@ class NeighborhoodMCF:
         model = NeighborhoodModel(params=self.params)
 
         # Model placeholders
-        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, \
+        node_ph, demands_ph, adj_ph, neighborhoods_ph, node_embedding_ph, correct_flow_ph, \
             dropout_keep_ph = self.create_placeholders(model, num_nodes, embedding_size, n_neighborhoods)
 
         # Create model
@@ -239,7 +242,8 @@ class NeighborhoodMCF:
                     adj=adj_ph,
                     num_output_features=num_nodes,
                     dropout_keep_prob=dropout_keep_ph,
-                    num_nodes=num_nodes)
+                    num_nodes=num_nodes,
+                    correct_flows=correct_flow_ph)
         model.init()
         model.restore(model_path)
 
@@ -279,7 +283,8 @@ class NeighborhoodMCF:
                 demands_ph: demands,
                 adj_ph: adj,
                 node_embedding_ph: embeddings,
-                dropout_keep_ph: 1.0
+                dropout_keep_ph: 1.0,
+                correct_flow_ph: True
             }
 
             # Provide neighborhood matrices
@@ -368,6 +373,10 @@ class NeighborhoodMCF:
                                                    shape=(),
                                                    name='dropout-keep-ph',
                                                    is_sparse=False)
+        correct_flow_ph = model.create_placeholder(dtype=tf.bool,
+                                                   shape=(),
+                                                   name='correct-flow-ph',
+                                                   is_sparse=False)
 
         neighborhoods = []
         for i in range(num_neighborhoods+1):
@@ -377,7 +386,7 @@ class NeighborhoodMCF:
                                           is_sparse=self.params['sparse'])
             neighborhoods.append(ph)
 
-        return node_ph, demands_ph, adj_ph, neighborhoods, node_embedding_ph, dropout_keep_ph
+        return node_ph, demands_ph, adj_ph, neighborhoods, node_embedding_ph, correct_flow_ph, dropout_keep_ph
 
     def _num_neighborhoods(self, graph):
         if 'num_neighborhoods' in self.params:

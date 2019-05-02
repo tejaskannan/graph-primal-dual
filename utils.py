@@ -183,11 +183,23 @@ def sparse_matrix_to_tensor_multiple(sparse_mat, k):
 def random_walk_neighborhoods(adj_matrix, k):
     mat = eye(adj_matrix.shape[0])
     neighborhoods = [mat]
+    agg_mat = mat
 
     for _ in range(k):
         mat = mat.dot(adj_matrix)
         mat.data[:] = 1
+
+        # Remove already reached nodes
+        mat = mat - agg_mat
+        mat.data = np.maximum(mat.data, 0)
+        mat.eliminate_zeros()
+        mat.data[:] = 1
+
         neighborhoods.append(mat)
+
+        agg_mat += mat
+        agg_mat.data[:] = 1
+
     return neighborhoods
 
 
