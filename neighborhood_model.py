@@ -95,6 +95,8 @@ class NeighborhoodModel(Model):
                 if is_sparse:
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
                 else:
+                    # Remove excess flow about simple cycles
+                    flow = flow - adj * tf.math.minimum(flow, tf.transpose(flow, perm=[0, 2, 1]))
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
                 # Compute Dual Problem and associated cost

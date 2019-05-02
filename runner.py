@@ -104,21 +104,20 @@ def random_walks(graph_name):
     graph_path = 'graphs/{0}.tntp'.format(graph_name)
     graph = load_to_networkx(path=graph_path)
 
-    adj = nx.adjacency_matrix(graph).todense()
-    mat = np.eye(graph.number_of_nodes())
+    adj = nx.adjacency_matrix(graph)
+    neighborhoods = random_walk_neighborhoods(adj, k=20)
+
     total = graph.number_of_nodes()**2
 
     print('Graph: {0}'.format(graph_name))
     print('Number of Entries: {0}'.format(total))
-    for i in range(20):
-        nonzero = np.count_nonzero(mat)
+    for i, mat in enumerate(neighborhoods):
+        nonzero = mat.count_nonzero()
         frac = (total - nonzero) / total
         print('Frac of zero entries for walks of length {0}: {1}'.format(i, frac))
 
-        if frac == 0.0:
+        if frac == 1.0:
             break
-
-        mat = mat.dot(adj)
 
 
 def graph_stats(graph_name):
