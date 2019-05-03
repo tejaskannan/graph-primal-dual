@@ -283,7 +283,7 @@ class ModelRunner:
 
             plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, i), num_samples=5)
 
-    def create_placeholders(self, model, num_nodes, embedding_size, num_neighborhoods):
+    def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
         raise NotImplementedError()
 
     def create_feed_dict(self, placeholders, batch, index, batch_size, data_series):

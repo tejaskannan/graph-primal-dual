@@ -13,6 +13,7 @@ from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
 from model_runners.neighborhood_runner import NeighborhoodRunner
 from model_runners.gat_runner import GATRunner
+from model_runners.gcn_runner import GCNRunner
 from model_runners.uniform_baseline import UniformBaseline
 
 
@@ -107,6 +108,8 @@ def get_model_runner(params):
         return NeighborhoodRunner(params=params)
     elif params['name'] == 'gat':
         return GATRunner(params=params)
+    elif params['name'] == 'gcn':
+        return GCNRunner(params=params)
     raise ValueError('Model with name {0} does not exist.'.format(params['name']))
 
 

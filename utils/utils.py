@@ -43,13 +43,13 @@ def add_features_sparse(graph, demands, flows, proportions, node_weights):
         graph.add_node(node, demand=float(demands[node][0] - demands[node][1]),
                        node_weight=float(node_weights[node][0]))
 
-    # for edge, flow in zip(flows.indices, flows.values):
-    #     if graph.has_edge(*edge):
-    #         graph.add_edge(edge[0], edge[1], flow=float(flow))
+    for edge, flow in zip(flows.indices, flows.values):
+        if graph.has_edge(*edge):
+            graph.add_edge(edge[0], edge[1], flow=float(flow))
 
-    # for edge, prop in zip(proportions.indices, proportions.values):
-    #     if graph.has_edge(*edge):
-    #         graph.add_edge(edge[0], edge[1], proportion=float(prop))
+    for edge, prop in zip(proportions.indices, proportions.values):
+        if graph.has_edge(*edge):
+            graph.add_edge(edge[0], edge[1], proportion=float(prop))
 
     return graph
 
@@ -125,6 +125,19 @@ def create_node_bias(graph):
 def adj_mat_to_node_bias(adj_mat):
     bias_mat = adj_mat.todense()
     return -BIG_NUMBER * (1.0 - bias_mat)
+
+
+def gcn_aggregator(adj):
+    num_nodes = adj.shape[0]
+    adj_hat = adj + np.eye(num_nodes)
+
+    sqrt_degrees = 1.0 / np.sqrt(np.sum(adj_hat, axis=-1))
+
+    degree_mat = np.zeros_like(adj_hat)
+    np.fill_diagonal(degree_mat, sqrt_degrees)
+
+    return degree_mat.dot(adj_hat.dot(degree_mat))
+
 
 def create_obs_indices(dim1, dim2):
     x1 = np.arange(0, dim1)

@@ -9,7 +9,9 @@ from models.neighborhood_model import NeighborhoodModel
 
 class NeighborhoodRunner(ModelRunner):
 
-    def create_placeholders(self, model, num_nodes, embedding_size, num_neighborhoods):
+    def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
+        num_neighborhoods = kwargs['num_neighborhoods']
+
         node_shape = [None, num_nodes, self.num_node_features]
         demands_shape = [None, num_nodes, 1]
         adj_shape = [None, None, num_nodes]
