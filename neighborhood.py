@@ -68,7 +68,7 @@ class NeighborhoodMCF:
                     num_output_features=num_nodes,
                     dropout_keep_prob=dropout_keep_ph,
                     num_nodes=num_nodes,
-                    should_correct_flows=False)
+                    should_correct_flows=True)
         model.init()
 
         # Create output folder and initialize logging
@@ -85,7 +85,7 @@ class NeighborhoodMCF:
         self.dataset.load(series=Series.VALID, graphs=graphs, num_nodes=num_nodes,
                           num_neighborhoods=n_neighborhoods, unique_neighborhoods=self.params['unique_neighborhoods'])
         self.dataset.init(num_epochs=self.params['epochs'])
-        # self.dataset.normalize_embeddings()
+        self.dataset.normalize_embeddings()
 
         # Variables for early stopping
         convergence_count = 0
@@ -243,15 +243,15 @@ class NeighborhoodMCF:
                     num_output_features=num_nodes,
                     dropout_keep_prob=dropout_keep_ph,
                     num_nodes=num_nodes,
-                    should_correct_flows=False)
+                    should_correct_flows=True)
         model.init()
         model.restore(model_path)
 
         # Load test data and normalize embeddings
-        # self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
+        self.dataset.load(series=Series.TRAIN, num_nodes=num_nodes, graphs=graphs, num_neighborhoods=n_neighborhoods)
         self.dataset.load(series=Series.TEST, num_nodes=num_nodes, graphs=graphs,
                           num_neighborhoods=n_neighborhoods, unique_neighborhoods=self.params['unique_neighborhoods'])
-        # self.dataset.normalize_embeddings()
+        self.dataset.normalize_embeddings()
 
         test_batches = self.dataset.create_batches(series=Series.TEST, batch_size=1, shuffle=False)
 
