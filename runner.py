@@ -15,6 +15,7 @@ from optimization_baseline_runner import OptimizationBaselineRunner
 from uniform_baseline import UniformBaseline
 from mcf import MCF
 from plot import plot_graph
+from neighborhood_runner import NeighborhoodRunner
 
 
 def main():
@@ -42,7 +43,7 @@ def main():
         params = restore_params(args.model)
 
     model_params = params['model'] if 'model' in params else params
-    mcf_solver = NeighborhoodMCF(params=model_params)
+    mcf_solver = NeighborhoodRunner(params=model_params)
 
     if args.train:
         mcf_solver.train()
