@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from constants import BIG_NUMBER, FLOW_THRESHOLD
+from constants import BIG_NUMBER, SMALL_NUMBER, FLOW_THRESHOLD
 
 
 class Layer:
@@ -42,8 +42,12 @@ class MLP(Layer):
                                          kernel_initializer=self.initializer,
                                          activation=self.activation,
                                          name='{0}-layer-{1}'.format(self.name, i))
+                
+                # The 'keep_prob' parameter is deprecated in Tensorflow 1.13 in favor of 'rate'
+                # Azure Deep Learning VMs, however, are still using Tensorflow 1.12 and don't
+                # support the 'rate' paramter.
                 tensors = tf.nn.dropout(x=tensors,
-                                        rate=(1.0 - dropout_keep_prob),
+                                        keep_prob=dropout_keep_prob,
                                         name='{0}-layer-{1}-dropout'.format(self.name, i))
 
             # Output layer
@@ -55,7 +59,7 @@ class MLP(Layer):
                                      use_bias=self.bias_final,
                                      name='{0}-output'.format(self.name))
             output = tf.nn.dropout(x=output,
-                                   rate=(1.0 - dropout_keep_prob),
+                                   keep_prob=dropout_keep_prob,
                                    name='{0}-output-dropout'.format(self.name))
 
             return output
@@ -305,7 +309,8 @@ class SparseMax(Layer):
         # Renormalize values to enforce a minimum probability if needed
         if self.epsilon > 0.0:
             weights = mask * tf.clip_by_value(weights, self.epsilon, 1.0)
-            weights = weights / tf.norm(weights, ord=1, axis=-1, keepdims=True)
+            clipped_norm = tf.clip_by_value(tf.norm(weights, ord=1, axis=-1, keepdims=True), SMALL_NUMBER, BIG_NUMBER)
+            weights = weights / clipped_norm
 
         return weights
 

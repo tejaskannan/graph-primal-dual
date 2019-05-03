@@ -43,13 +43,13 @@ def add_features_sparse(graph, demands, flows, proportions, node_weights):
         graph.add_node(node, demand=float(demands[node][0] - demands[node][1]),
                        node_weight=float(node_weights[node][0]))
 
-    for edge, flow in zip(flows.indices, flows.values):
-        if graph.has_edge(*edge):
-            graph.add_edge(edge[0], edge[1], flow=float(flow))
+    # for edge, flow in zip(flows.indices, flows.values):
+    #     if graph.has_edge(*edge):
+    #         graph.add_edge(edge[0], edge[1], flow=float(flow))
 
-    for edge, prop in zip(proportions.indices, proportions.values):
-        if graph.has_edge(*edge):
-            graph.add_edge(edge[0], edge[1], proportion=float(prop))
+    # for edge, prop in zip(proportions.indices, proportions.values):
+    #     if graph.has_edge(*edge):
+    #         graph.add_edge(edge[0], edge[1], proportion=float(prop))
 
     return graph
 

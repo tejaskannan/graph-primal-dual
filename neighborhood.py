@@ -243,7 +243,7 @@ class NeighborhoodMCF:
                     num_output_features=num_nodes,
                     dropout_keep_prob=dropout_keep_ph,
                     num_nodes=num_nodes,
-                    should_correct_flows=True)
+                    should_correct_flows=False)
         model.init()
         model.restore(model_path)
 

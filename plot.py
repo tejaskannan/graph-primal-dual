@@ -109,6 +109,10 @@ def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
         else:
             n.attr['fillcolor'] = '#BAD7E6'
 
+    for src, dest in graph.edges():
+        e = agraph.get_edge(src, dest)
+        e.attr['color'] = colors.rgb2hex(cmap(0.0)[:3])
+
     max_flow_val = np.max(flows.values)
     min_flow_val = min(0.0, np.min(flows.values))
     for edge, val in zip(flows.indices, flows.values):
