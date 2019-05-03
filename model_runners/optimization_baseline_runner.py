@@ -2,14 +2,14 @@ import numpy as np
 import pickle
 import gzip
 import networkx as nx
-from optimization_baselines import TrustConstr, SLSQP
 from time import time
-from load import load_to_networkx, read_dataset
-from utils import features_to_demands, append_row_to_log
-from plot import plot_flow_graph
+from models.optimization_baselines import TrustConstr, SLSQP
+from utils.utils import features_to_demands, append_row_to_log
+from utils.constants import PARAMS_FILE
+from core.plot import plot_flow_graph
+from core.load import load_to_networkx, read_dataset
 from os import mkdir
 from os.path import exists
-from constants import PARAMS_FILE
 
 
 class OptimizationBaselineRunner:

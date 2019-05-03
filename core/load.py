@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 from os.path import exists
-from constants import SMALL_NUMBER
+from utils.constants import SMALL_NUMBER
 from annoy import AnnoyIndex
 
 

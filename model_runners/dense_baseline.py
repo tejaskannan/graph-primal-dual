@@ -1,13 +1,13 @@
 import tensorflow as tf
 import numpy as np
 import networkx as nx
-from load import load_to_networkx
-from dense_model import DenseModel
-from utils import create_node_embeddings, features_to_demands
-from utils import add_features, append_row_to_log
-from constants import BIG_NUMBER, FLOW_THRESHOLD, LINE
-from plot import plot_flow_graph, plot_costs
-from dataset import DatasetManager, Series
+from models.dense_model import DenseModel
+from utils.utils import create_node_embeddings, features_to_demands
+from utils.utils import add_features, append_row_to_log
+from utils.constants import BIG_NUMBER, FLOW_THRESHOLD, LINE
+from core.plot import plot_flow_graph, plot_costs
+from core.dataset import DatasetManager, Series
+from core.load import load_to_networkx
 from os import mkdir
 from os.path import exists
 from datetime import datetime

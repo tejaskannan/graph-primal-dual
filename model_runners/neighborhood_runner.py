@@ -1,10 +1,10 @@
 import numpy as np
 import tensorflow as tf
-from neighborhood_model import NeighborhoodModel
-from utils import sparse_matrix_to_tensor, features_to_demands
-from constants import BIG_NUMBER, LINE
-from dataset import DatasetManager, Series, DataSeries
-from model_runner import ModelRunner
+from utils.utils import sparse_matrix_to_tensor, features_to_demands
+from utils.constants import BIG_NUMBER, LINE
+from core.dataset import DatasetManager, Series, DataSeries
+from model_runners.model_runner import ModelRunner
+from models.neighborhood_model import NeighborhoodModel
 
 
 class NeighborhoodRunner(ModelRunner):

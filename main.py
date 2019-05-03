@@ -3,19 +3,16 @@ import argparse
 import networkx as nx
 import numpy as np
 import json
-from utils import load_params, restore_params, create_node_embeddings
-from utils import append_row_to_log, create_demands, random_walk_neighborhoods
-from load import load_to_networkx, load_embeddings
-from load import write_dataset
-from constants import *
-from sparse_mcf import SparseMCF
-from neighborhood import NeighborhoodMCF
-from dense_baseline import DenseBaseline
-from optimization_baseline_runner import OptimizationBaselineRunner
-from uniform_baseline import UniformBaseline
-from mcf import MCF
-from plot import plot_graph
-from neighborhood_runner import NeighborhoodRunner
+from utils.utils import load_params, restore_params, create_node_embeddings
+from utils.utils import append_row_to_log, create_demands, random_walk_neighborhoods
+from utils.constants import *
+from core.load import load_to_networkx, load_embeddings
+from core.load import write_dataset
+from core.plot import plot_graph
+from model_runners.dense_baseline import DenseBaseline
+from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
+from model_runners.neighborhood_runner import NeighborhoodRunner
+from model_runners.uniform_baseline import UniformBaseline
 
 
 def main():

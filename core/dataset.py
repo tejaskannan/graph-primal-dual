@@ -1,13 +1,13 @@
 import numpy as np
 import math
 import networkx as nx
-from load import read_dataset
 from enum import Enum
-from collections.abc import Iterable
-from constants import BIG_NUMBER
 from bisect import bisect_right
-from utils import expand_sparse_matrix, random_walk_neighborhoods
-from utils import create_node_embeddings
+from collections.abc import Iterable
+from core.load import read_dataset
+from utils.constants import BIG_NUMBER
+from utils.utils import expand_sparse_matrix, random_walk_neighborhoods
+from utils.utils import create_node_embeddings
 from sklearn.preprocessing import StandardScaler
 
 

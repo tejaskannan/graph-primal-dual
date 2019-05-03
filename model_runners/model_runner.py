@@ -3,17 +3,16 @@ import math
 import networkx as nx
 import tensorflow as tf
 import os
-from neighborhood_model import NeighborhoodModel
-from load import load_to_networkx, read_dataset
 from datetime import datetime
 from time import time
-from utils import create_demands, append_row_to_log, create_node_embeddings
-from utils import add_features_sparse, create_node_bias, restore_params
-from utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
-from utils import add_features, adj_mat_to_node_bias
-from plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
-from constants import BIG_NUMBER, LINE
-from dataset import DatasetManager, Series, DataSeries
+from utils.utils import create_demands, append_row_to_log, create_node_embeddings
+from utils.utils import add_features_sparse, create_node_bias, restore_params
+from utils.utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
+from utils.utils import add_features, adj_mat_to_node_bias
+from utils.constants import BIG_NUMBER, LINE
+from core.plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
+from core.load import load_to_networkx, read_dataset
+from core.dataset import DatasetManager, Series, DataSeries
 
 
 PRINT_THRESHOLD = 100

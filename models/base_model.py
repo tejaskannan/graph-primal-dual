@@ -4,7 +4,7 @@ import gzip
 import pickle
 from os.path import exists
 from os import mkdir
-from constants import *
+from utils.constants import *
 
 
 class Model:

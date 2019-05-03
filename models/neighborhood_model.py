@@ -1,11 +1,11 @@
 import tensorflow as tf
 import numpy as np
-from base_model import Model
-from layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, Gate
-from layers import AttentionNeighborhood, SparseDualFlow, DualFlow, SparseMax
-from utils import sparse_scalar_mul, sparse_subtract
-from cost_functions import get_cost_function
-from constants import BIG_NUMBER, SMALL_NUMBER
+from models.base_model import Model
+from core.layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, Gate
+from core.layers import AttentionNeighborhood, SparseDualFlow, DualFlow, SparseMax
+from utils.utils import sparse_scalar_mul, sparse_subtract
+from utils.constants import BIG_NUMBER, SMALL_NUMBER
+from cost_functions.cost_functions import get_cost_function
 
 
 class NeighborhoodModel(Model):

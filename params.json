@@ -1,12 +1,12 @@
 {
 	"generate": {
-		"train_samples": 128,
-		"valid_samples": 128,
+		"train_samples": 100000,
+		"valid_samples": 10000,
 		"test_samples": 16,
-		"graph_names": ["ema", "sioux-falls"],
-		"dataset_names": ["ema-128", "sioux-falls-128"],
-		"min_max_sources": [1, 2],
-		"min_max_sinks": [1, 2]
+		"graph_names": ["sioux-falls"],
+		"dataset_names": ["sioux-falls-100000"],
+		"min_max_sources": [1, 1],
+		"min_max_sinks": [1, 1]
 	},
 	"model": {
 		"learning_rate": 0.001,
@@ -14,35 +14,35 @@
 		"dual_step_size": 0.01,
 		"gradient_clip": 1,
 		"batch_size": 128,
-		"epochs": 1,
+		"epochs": 5,
 		"patience": 5,
 		"early_stop_threshold": 1e-5,
-		"graph_layers": 2,
+		"graph_layers": 3,
 		"num_heads": 1,
-		"node_encoding": 8,
-		"num_neighborhoods": 3,
+		"node_encoding": 16,
+		"num_neighborhoods": 2,
 		"node_embedding_size": 4,
 		"dropout_keep_prob": 1.0,
 		"encoder_hidden": [16],
 		"decoder_hidden": [16, 16],
 		"output_folder": "trained_models",
 		"cost_fn": {
-			"name": "quadratic",
+			"name": "exp",
 			"options": {
-				"a": 1.0,
-				"b": 0.0,
-				"c": 0.0
+				"a": 1.0
 			}
 		},
 		"flow_iters": 1000,
 		"dual_iters": 100,
 		"plot_flows": true,
 		"plot_weight_samples": 25,
-		"train_graph_names": ["sioux-falls"],
-		"train_dataset_names": ["sioux-falls-100000"],
-		"test_graph_names": ["sioux-falls"],
-		"test_dataset_names": ["sioux-falls-100000"],
+		"train_graph_names": ["tiny"],
+		"train_dataset_names": ["tiny-128"],
+		"test_graph_names": ["tiny"],
+		"test_dataset_names": ["tiny-128"],
 		"sparse": false,
+		"use_sparsemax": true,
+		"unique_neighborhoods": false,
 		"batch_params": {
 			"selection_beg": 1e8,
 			"selection_end": 1e2,

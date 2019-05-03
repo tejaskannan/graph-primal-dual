@@ -3,7 +3,7 @@ from matplotlib import cm
 from matplotlib import colors
 import numpy as np
 import networkx as nx
-from constants import *
+from utils.constants import *
 
 
 def plot_costs(costs_lst, out_path):

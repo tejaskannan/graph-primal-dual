@@ -7,7 +7,7 @@ import gzip
 import pickle
 import csv
 from os.path import exists
-from constants import *
+from utils.constants import *
 from scipy.sparse import csr_matrix, eye
 
 

@@ -4,15 +4,15 @@ import networkx as nx
 import scipy.sparse as sp
 import os
 from time import time
-from load import load_to_networkx
-from dataset import DatasetManager, Series, DataSeries
-from layers import SparseMinCostFlow
-from utils import features_to_demands, sparse_subtract
-from utils import sparse_scalar_mul, sparse_matrix_to_tensor
-from utils import append_row_to_log
-from cost_functions import get_cost_function
-from constants import SMALL_NUMBER
-from plot import plot_flow_graph_sparse
+from core.load import load_to_networkx
+from core.dataset import DatasetManager, Series, DataSeries
+from core.layers import SparseMinCostFlow
+from core.plot import plot_flow_graph_sparse
+from utils.utils import features_to_demands, sparse_subtract
+from utils.utils import sparse_scalar_mul, sparse_matrix_to_tensor
+from utils.utils import append_row_to_log
+from utils.constants import SMALL_NUMBER
+from cost_functions.cost_functions import get_cost_function
 
 
 class UniformBaseline:

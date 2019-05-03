@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import optimize
-from np_cost_functions import get_cost_function
+from cost_functions.np_cost_functions import get_cost_function
 
 
 class OptimizeBaseline:

@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from constants import BIG_NUMBER, SMALL_NUMBER, FLOW_THRESHOLD
+from utils.constants import BIG_NUMBER, SMALL_NUMBER, FLOW_THRESHOLD
 
 
 class Layer:

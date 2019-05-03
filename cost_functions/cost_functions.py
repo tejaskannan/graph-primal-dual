@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from constants import COST_MAX, EXP_MAX, BIG_NUMBER, SMALL_NUMBER
+from utils.constants import COST_MAX, EXP_MAX, BIG_NUMBER, SMALL_NUMBER
 
 
 class CostFunction:

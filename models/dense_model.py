@@ -1,8 +1,8 @@
 import tensorflow as tf
-from base_model import Model
-from layers import MLP, MinCostFlow
-from cost_functions import get_cost_function
-from constants import BIG_NUMBER
+from models.base_model import Model
+from core.layers import MLP, MinCostFlow
+from cost_functions.cost_functions import get_cost_function
+from utils.constants import BIG_NUMBER
 
 
 class DenseModel(Model):
