@@ -3,6 +3,7 @@ import numpy as np
 import networkx as nx
 import scipy.sparse as sp
 import os
+from time import time
 from load import load_to_networkx
 from dataset import DatasetManager, Series, DataSeries
 from layers import SparseMinCostFlow
@@ -22,7 +23,8 @@ class UniformBaseline:
         assert len(params['test_graph_names']) == 1, 'Uniform Baseline only supports a single graph.'
 
         self.graph_name = params['test_graph_names'][0]
-        self.output_folder = '{0}/uniform-{1}/'.format(params['output_folder'], self.graph_name)
+        cost_fn_name = params['cost_fn']['name']
+        self.output_folder = '{0}/uniform-{1}-{2}/'.format(params['output_folder'], self.graph_name, cost_fn_name)
 
         file_paths = {
             Series.TRAIN: {},
@@ -66,7 +68,7 @@ class UniformBaseline:
         if os.path.exists(log_path):
             os.remove(log_path)
 
-        append_row_to_log(['Instance', 'Graph Name', 'Cost'], log_path)
+        append_row_to_log(['Instance', 'Graph Name', 'Cost', 'Time (sec)'], log_path)
 
         with tf.Session() as sess:
 
@@ -87,14 +89,16 @@ class UniformBaseline:
                     demands_ph: demands
                 }
 
-                outputs = sess.run(flow_ops, feed_dict=feed_dict)
-                flow_cost = outputs[0]
-                flows = outputs[1]
+                start = time()
+                flow_cost, flows = sess.run(flow_ops, feed_dict=feed_dict)
+                elapsed = time() - start
 
-                append_row_to_log([i, self.graph_name, flow_cost], log_path)
+                append_row_to_log([i, self.graph_name, flow_cost, elapsed], log_path)
+
+                flow_graph = self.add_flow_values(graph, flows, demands)
+                nx.write_gexf(flow_graph, '{0}{1}-{2}.gexf'.format(self.output_folder, self.graph_name, i))
 
                 if self.params['plot_flows']:
-                    flow_graph = self.add_flow_values(graph, flows, demands)
                     file_path = '{0}{1}-{2}.png'.format(self.output_folder, self.graph_name, i)
                     plot_flow_graph_sparse(flow_graph, flows, file_path, use_node_weights=False)
 

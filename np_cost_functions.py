@@ -67,7 +67,7 @@ class Exp(CostFunction):
     def __init__(self, options):
         super(Exp, self).__init__(options)
 
-        self.a = options['constant']
+        self.a = options['a']
         assert self.a > 0.0
         assert self.a <= EXP_MAX
 

@@ -3,7 +3,6 @@ import pickle
 import gzip
 import networkx as nx
 from optimization_baselines import TrustConstr, SLSQP
-from datetime import datetime
 from time import time
 from load import load_to_networkx, read_dataset
 from utils import features_to_demands, append_row_to_log
@@ -17,10 +16,10 @@ class OptimizationBaselineRunner:
 
     def __init__(self, params, optimizer_name):
         self.params = params
-        self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
         graph_names = '-'.join(params['test_graph_names'])
 
-        self.output_folder = '{0}/{1}-{2}-{3}/'.format(params['output_folder'], optimizer_name, graph_names, self.timestamp)
+        cost_fn_name = parmas['cost_fn']['name']
+        self.output_folder = '{0}/{1}-{2}-{3}/'.format(params['output_folder'], optimizer_name, graph_names, cost_fn_name)
 
         self.file_paths = {}
         dataset_path = 'datasets/{0}_{1}.txt'
