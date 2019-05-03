@@ -25,7 +25,11 @@ class ModelRunner:
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
         graph_names = '-'.join(params['train_graph_names'])
         cost_fn_name = params['cost_fn']['name']
-        self.output_folder = '{0}/{1}-{2}-{3}/'.format(params['output_folder'], graph_names, cost_fn_name, self.timestamp)
+        self.output_folder = '{0}/{1}-{2}-{3}-{4}/'.format(params['output_folder'],
+                                                           params['name'],
+                                                           graph_names,
+                                                           cost_fn_name,
+                                                           self.timestamp)
         
         self.num_node_features = 2
         self.embedding_size = 2 * self.params['num_neighborhoods'] + 2

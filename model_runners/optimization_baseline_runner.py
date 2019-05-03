@@ -3,7 +3,7 @@ import pickle
 import gzip
 import networkx as nx
 from time import time
-from models.optimization_baselines import TrustConstr, SLSQP
+from models.optimization_models import TrustConstr, SLSQP
 from utils.utils import features_to_demands, append_row_to_log
 from utils.constants import PARAMS_FILE
 from core.plot import plot_flow_graph

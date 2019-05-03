@@ -12,6 +12,7 @@ from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
 from model_runners.neighborhood_runner import NeighborhoodRunner
+from model_runners.gat_runner import GATRunner
 from model_runners.uniform_baseline import UniformBaseline
 
 
@@ -40,13 +41,14 @@ def main():
         params = restore_params(args.model)
 
     model_params = params['model'] if 'model' in params else params
-    mcf_solver = NeighborhoodRunner(params=model_params)
 
     if args.train:
+        mcf_solver = get_model_runner(params=model_params)
         mcf_solver.train()
     elif args.generate:
         generate(params['generate'])
     elif args.test:
+        mcf_solver = get_model_runner(params=model_params)
         mcf_solver.test(args.model)
     elif args.random_walks:
         random_walks(params['generate']['graph_names'][0], params['model']['unique_neighborhoods'])
@@ -99,6 +101,13 @@ def generate(params):
                 write_dataset(dataset, file_path)
 
             print('Completed {0}.'.format(file_path))
+
+def get_model_runner(params):
+    if params['name'] == 'neighborhood':
+        return NeighborhoodRunner(params=params)
+    elif params['name'] == 'gat':
+        return GATRunner(params=params)
+    raise ValueError('Model with name {0} does not exist.'.format(params['name']))
 
 
 def random_walks(graph_name, unique_neighborhoods):
