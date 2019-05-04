@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from utils.constants import COST_MAX, EXP_MAX, BIG_NUMBER, SMALL_NUMBER
+from utils.utils import sparse_subtract
 
 
 class CostFunction:
@@ -47,7 +48,7 @@ class Quadratic(CostFunction):
         self.c = options['c']
 
     def apply(self, x):
-        return self.clip(self.a * tf.square(x) + self.b * x + self.c)
+        return self.clip(tf.square(x) * self.a + x * self.b + self.c)
 
     def derivative(self, x):
         return self.clip(2.0 * self.a * x + self.b)
@@ -170,6 +171,25 @@ class Tanh(CostFunction):
     def derivative(self, x):
         tanh_squared = tf.square(tf.nn.tanh(self.b * x))
         return self.clip(self.a * self.b * (1 - tanh_squared))
+
+
+def apply_with_capacities(cost_fn, x, capacities):
+    # If the value violated the capacity, an exponential penalty is applied 
+    
+    # Some constant to produce near-asymptotic behavior
+    beta = 20
+
+    # Value at which capacity is seen to be saturated
+    t = 0.99 * tf.clip_by_value(capacities, SMALL_NUMBER, BIG_NUMBER)
+
+    # Provided cost function
+    below_capacity = cost_fn.apply(x)
+
+    # Cost if capacity is violated
+    above_capacity = (cost_fn.derivative(t) / beta) * (tf.exp((x - t) * beta)) + cost_fn.apply(t)
+    above_capacity = tf.clip_by_value(above_capacity, 0, BIG_NUMBER)
+
+    return tf.where(x <= t, x=below_capacity, y=above_capacity, name='capacity-cost-wrapper')
 
 
 def get_cost_function(cost_fn):

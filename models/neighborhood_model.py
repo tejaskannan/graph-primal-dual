@@ -5,7 +5,7 @@ from core.layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, 
 from core.layers import AttentionNeighborhood, SparseDualFlow, DualFlow, SparseMax
 from utils.utils import sparse_scalar_mul, sparse_subtract
 from utils.constants import BIG_NUMBER, SMALL_NUMBER
-from cost_functions.cost_functions import get_cost_function
+from cost_functions.cost_functions import get_cost_function, apply_with_capacities
 
 
 class NeighborhoodModel(Model):
@@ -28,8 +28,11 @@ class NeighborhoodModel(Model):
         # List of V x V sparse tensors representing node neighborhoods
         neighborhoods = kwargs['neighborhoods']
 
-        # V x V sparse tensor containing the adjacency matrix
+        # V x V tensor containing the adjacency matrix
         adj = kwargs['adj']
+
+        # V x V tensor containing capacities on each edge
+        capacities = kwargs['capacities']
 
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
@@ -110,7 +113,7 @@ class NeighborhoodModel(Model):
                         flow_transpose = tf.sparse.transpose(flow, perm=[1, 0])
                         
                         # There seems to be a bug when computing gradients for sparse.minimum, so
-                        # we instead use the alternative formula for minimum below
+                        # we instead use an alternative formula for minimum
                         # min(a, b) = 0.5 * (a + b - |a - b|)
                         flow_add = tf.sparse.add(flow, flow_transpose)
                         flow_sub_abs = tf.abs(sparse_subtract(flow, flow_transpose))
@@ -118,13 +121,31 @@ class NeighborhoodModel(Model):
                         flow = tf.sparse.add(flow, sparse_scalar_mul(min_flow, -0.5),
                                              threshold=SMALL_NUMBER)
 
+                        index_difference = tf.sets.difference(capacities.indices, flow.indices)
+                        # capacity_slices = tf.IndexedSlices(indices=capacities.indices,
+                        #                                    values=capacities.values,
+                        #                                    dense_shape=capacities.dense_shape)
+
+                        #print(index_difference)
+
+                        capacities_masked = tf.sparse.mask(capacities, index_difference.values)
+
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
+                    cost_with_capacity = apply_with_capacities(cost_fn=self.cost_fn,
+                                                               x=flow.values,
+                                                               capacities=capacities_masked.values)
+                    flow_cost_capacity = tf.reduce_sum(cost_with_capacity)
                 else:
                     # Remove excess flow about simple cycles
                     if should_correct_flows:
                         flow = flow - adj * tf.math.minimum(flow, tf.transpose(flow, perm=[0, 2, 1]))
 
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
+
+                    cost_with_capacity = apply_with_capacities(cost_fn=self.cost_fn,
+                                                               x=flow,
+                                                               capacities=capacities)
+                    flow_cost_capacity = tf.reduce_sum(cost_with_capacity, axis=[1, 2])
 
                 # Compute Dual Problem and associated cost
                 dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
@@ -165,7 +186,7 @@ class NeighborhoodModel(Model):
                     dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
                     dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
-                self.loss = flow_cost - dual_cost
+                self.loss = flow_cost_capacity - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow_cost, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights]
+                self.output_ops += [flow_cost_capacity, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights]
                 self.optimizer_op = self._build_optimizer_op()

@@ -17,6 +17,7 @@ class NeighborhoodRunner(ModelRunner):
         adj_shape = [None, None, num_nodes]
         neighborhood_shape = [None, None, num_nodes]
         embedding_shape = [None, num_nodes, embedding_size]
+        capacity_shape = [None, None, num_nodes]
 
         if self.params['sparse']:
             node_shape = node_shape[1:]
@@ -24,6 +25,7 @@ class NeighborhoodRunner(ModelRunner):
             adj_shape = adj_shape[1:]
             neighborhood_shape = neighborhood_shape[1:]
             embedding_shape = embedding_shape[1:]
+            capacity_shape = capacity_shape[1:]
 
         node_ph = model.create_placeholder(dtype=tf.float32,
                                            shape=node_shape,
@@ -45,6 +47,10 @@ class NeighborhoodRunner(ModelRunner):
                                                    shape=(),
                                                    name='dropout-keep-ph',
                                                    is_sparse=False)
+        capacity_ph = model.create_placeholder(dtype=tf.float32,
+                                               shape=capacity_shape,
+                                               name='capacity-ph',
+                                               is_sparse=self.params['sparse'])
 
         neighborhoods = []
         for i in range(num_neighborhoods+1):
@@ -60,6 +66,7 @@ class NeighborhoodRunner(ModelRunner):
             'node_embeddings': node_embedding_ph,
             'neighborhoods': neighborhoods,
             'adj': adj_ph,
+            'capacities': capacity_ph,
             'num_output_features': num_nodes,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes,
@@ -71,6 +78,7 @@ class NeighborhoodRunner(ModelRunner):
         adj = batch[DataSeries.ADJ]
         node_embeddings = batch[DataSeries.EMBEDDING]
         neighborhoods = batch[DataSeries.NEIGHBORHOOD]
+        capacities = batch[DataSeries.CAPACITY]
         dropout_keep = self.params['dropout_keep_prob']
 
         if data_series is not Series.TRAIN:
@@ -78,26 +86,31 @@ class NeighborhoodRunner(ModelRunner):
             adj = adj[index]
             node_embeddings = node_embeddings[index]
             neighborhoods = neighborhoods[index]
+            capacities = capacities[index]
             dropout_keep = 1.0
 
         if self.params['sparse']:
             demands = features_to_demands(node_features)
             adj = sparse_matrix_to_tensor(adj)
+            capacities = sparse_matrix_to_tensor(capacities)
         elif batch_size == 1:
             demands = [features_to_demands(node_features)]
             node_features = [node_features]
             adj = [adj.todense()]
+            capacities = [capacities.todense()]
             node_embeddings = [node_embeddings]
         else:
             demands = [features_to_demands(n) for n in node_features]
             adj = [a.todense() for a in adj]
+            capacities = [cap.todense() for cap in capacities]
 
         feed_dict = {
             placeholders['node_features']: node_features,
             placeholders['demands']: demands,
             placeholders['adj']: adj,
             placeholders['node_embeddings']: node_embeddings,
-            placeholders['dropout_keep_prob']: dropout_keep
+            placeholders['dropout_keep_prob']: dropout_keep,
+            placeholders['capacities']: capacities
         }
 
         # Provide neighborhood matrices
