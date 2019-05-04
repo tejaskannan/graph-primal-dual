@@ -1,5 +1,7 @@
 import networkx as nx
 import numpy as np
+import pickle
+import scipy.sparse as sp
 from os.path import exists
 from utils.constants import SMALL_NUMBER
 from annoy import AnnoyIndex
@@ -38,30 +40,43 @@ def load_to_networkx(path):
     return graph
 
 
-def write_dataset(demands, output_path, mode='a'):
-    with open(output_path, mode) as output_file:
-        for demand in demands:
-            demand_lst = [str(i) + ':' + str(d[0]) for i, d in enumerate(demand) if abs(d) > SMALL_NUMBER]
-            output_file.write(' '.join(demand_lst) + '\n')
+def write_dataset(dataset, output_path):
+    """
+    dataset is a list of dictionaries of the form { 'dem': [], 'cap': [] }
+    """
+    with open(output_path, 'ab') as output_file:
+        for data_point in dataset:
+            compressed_demands = sp.csr_matrix(data_point['dem'])
+            pickle.dump({'dem': compressed_demands, 'cap': data_point['cap']}, output_file)
+
+        # for demand in demands:
+        #     demand_lst = [str(i) + ':' + str(d[0]) for i, d in enumerate(demand) if abs(d) > SMALL_NUMBER]
+        #     output_file.write(' '.join(demand_lst) + '\n')
 
 
-def read_dataset(demands_path, num_nodes):
+def read_dataset(data_path):
     dataset = []
-    with open(demands_path, 'r') as demands_file:
-        for demand_lst in demands_file:
-            demands = np.zeros(shape=(num_nodes, 2), dtype=float)
-            demand_values = demand_lst.strip().split(' ')
-            for value in demand_values:
-                tokens = value.split(':')
-                demand_val = float(tokens[1])
-                node = int(tokens[0])
+    with open(data_path, 'rb') as data_file:
+        try:
+            while True:
+                data_dict = pickle.load(data_file)
+                dataset.append({'dem': data_dict['dem'].todense(), 'cap': data_dict['cap']})
+        except EOFError:
+            pass
+        # for demand_lst in demands_file:
+        #     demands = np.zeros(shape=(num_nodes, 2), dtype=float)
+        #     demand_values = demand_lst.strip().split(' ')
+        #     for value in demand_values:
+        #         tokens = value.split(':')
+        #         demand_val = float(tokens[1])
+        #         node = int(tokens[0])
 
-                if demand_val > 0:
-                    demands[node][0] = demand_val
-                elif demand_val < 0:
-                    demands[node][1] = -demand_val
+        #         if demand_val > 0:
+        #             demands[node][0] = demand_val
+        #         elif demand_val < 0:
+        #             demands[node][1] = -demand_val
 
-            dataset.append(demands)
+        #     dataset.append(demands)
     return dataset
 
 

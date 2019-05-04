@@ -5,6 +5,7 @@ import numpy as np
 import json
 from utils.utils import load_params, restore_params, create_node_embeddings
 from utils.utils import append_row_to_log, create_demands, random_walk_neighborhoods
+from utils.utils import create_capacities
 from utils.constants import *
 from core.load import load_to_networkx, load_embeddings
 from core.load import write_dataset
@@ -79,9 +80,9 @@ def generate(params):
         graph_path = 'graphs/{0}.tntp'.format(graph_name)
         graph = load_to_networkx(path=graph_path)
 
-        train_file = 'datasets/{0}_train.txt'.format(dataset_name)
-        valid_file = 'datasets/{0}_valid.txt'.format(dataset_name)
-        test_file = 'datasets/{0}_test.txt'.format(dataset_name)
+        train_file = 'datasets/{0}_train.pickle'.format(dataset_name)
+        valid_file = 'datasets/{0}_valid.pickle'.format(dataset_name)
+        test_file = 'datasets/{0}_test.pickle'.format(dataset_name)
 
         file_paths = [train_file, valid_file, test_file]
         samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
@@ -91,7 +92,10 @@ def generate(params):
                 d = create_demands(graph=graph,
                                    min_max_sources=params['min_max_sources'],
                                    min_max_sinks=params['min_max_sinks'])
-                dataset.append(d)
+
+                cap = create_capacities(graph=graph, demands=d)
+
+                dataset.append({'dem': d, 'cap': cap})
                 if len(dataset) == WRITE_THRESHOLD:
                     write_dataset(dataset, file_path)
                     print('Wrote {0} samples to {1}'.format(i+1, file_path))

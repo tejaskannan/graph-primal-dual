@@ -88,6 +88,39 @@ def create_demands(graph, min_max_sources, min_max_sinks):
     return demands
 
 
+def create_capacities(graph, demands):
+    num_edges = graph.number_of_edges()
+
+    abs_demands = np.abs(demands)
+    min_capacity = 0.5 * np.min(abs_demands)
+    max_capacity = 2.0 * np.max(abs_demands)
+    capacities = np.random.uniform(low=min_capacity, high=max_capacity, size=(num_edges, 1))
+
+    sources = np.transpose(np.array(np.where(demands < 0)))
+    sinks = np.transpose(np.array(np.where(demands > 0)))
+
+    edge_index = {edge: i for i, edge in enumerate(graph.edges())}
+
+    for source in sources:
+        source_demand = abs_demands[source[0]][source[1]]
+        for sink in sinks:
+            path_gen = nx.all_simple_paths(graph, source=source[0], target=sink[0])
+            path = list(path_gen.__next__())
+
+            # Increase capacity so at least one path can carry the source's flow to the sink.
+            # This process ensures that a feasible solution exists
+            for i in range(len(path)-1):
+                edge = (path[i], path[i+1])
+                index = edge_index[edge]
+                capacities[index][0] = min(capacities[index][0], source_demand + SMALL_NUMBER)
+
+            edge = (path[-2], path[-1])
+            index = edge_index[edge]
+            capacities[index][0] = min(capacities[index][0], source_demand + SMALL_NUMBER)
+
+    return capacities
+
+
 def create_node_embeddings(graph, num_nodes, neighborhoods):
     """
     Creates node "embeddings" based on the degrees of neighboring vertices and approximate

@@ -69,7 +69,7 @@ class DatasetManager:
                 self.dataset[s] = []
 
             for graph_name, path in self.file_paths[s].items():
-                features = read_dataset(demands_path=path, num_nodes=num_nodes)
+                features = read_dataset(data_path=path)
                 self.dataset[s] += [Sample(node_features=n, graph_name=graph_name) for n in features]
 
                 # Lazily load graph adjacency matrix, neighborhoods, and node embeddings
