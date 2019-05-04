@@ -1,0 +1,8 @@
+Graph Name,tiny
+Num Nodes,4
+Num (directed) edges,7
+Avg Out Degree,1.75
+Avg In Degree,1.75
+Avg Path Length,1.5
+Diameter,3
+Strongly Connected Components,1

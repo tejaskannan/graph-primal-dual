@@ -35,9 +35,12 @@ class Counters:
 
 class Sample:
 
-    def __init__(self, node_features, graph_name):
-        self.node_features = node_features
+    def __init__(self, feat_dict, graph_name, num_nodes):
+        self.node_features = expand_sparse_matrix(feat_dict['dem'],
+                                                  n=num_nodes,
+                                                  m=2)
         self.graph_name = graph_name
+        self.capacities = expand_sparse_matrix(feat_dict['cap'], n=num_nodes)
 
 
 class GraphData:
@@ -70,7 +73,8 @@ class DatasetManager:
 
             for graph_name, path in self.file_paths[s].items():
                 features = read_dataset(data_path=path)
-                self.dataset[s] += [Sample(node_features=n, graph_name=graph_name) for n in features]
+                self.dataset[s] += [Sample(feat_dict=feat_dict, graph_name=graph_name, num_nodes=num_nodes)
+                                    for feat_dict in features]
 
                 # Lazily load graph adjacency matrix, neighborhoods, and node embeddings
                 if graph_name not in self.graph_data:
@@ -103,7 +107,7 @@ class DatasetManager:
         for i in range(0, len(data), batch_size):
             batch = data[i:i+batch_size]
 
-            node_features = [sample.node_features for sample in batch]
+            node_features = [sample.node_features.todense() for sample in batch]
             graph_names = [sample.graph_name for sample in batch]
             adj_matrices = [self.graph_data[name].adj_matrix for name in graph_names]
             neighborhoods = [self.graph_data[name].neighborhoods for name in graph_names]
@@ -184,7 +188,7 @@ class DatasetManager:
 
             sample = self.dataset[Series.TRAIN][data_index]
 
-            node_batch.append(sample.node_features)
+            node_batch.append(sample.node_features.todense())
             adj_batch.append(self.graph_data[sample.graph_name].adj_matrix)
             neighborhood_batch.append(self.graph_data[sample.graph_name].neighborhoods)
             embedding_batch.append(self.graph_data[sample.graph_name].node_embeddings)

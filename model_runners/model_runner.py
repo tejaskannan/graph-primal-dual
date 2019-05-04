@@ -39,7 +39,7 @@ class ModelRunner:
             Series.VALID: {},
             Series.TEST: {}
         }
-        dataset_path = 'datasets/{0}_{1}.txt'
+        dataset_path = 'datasets/{0}_{1}.pkl.gz'
         for dataset_name, graph_name in zip(self.params['train_dataset_names'], self.params['train_graph_names']):
             file_paths[Series.TRAIN][graph_name] = dataset_path.format(dataset_name, 'train')
             file_paths[Series.VALID][graph_name] = dataset_path.format(dataset_name, 'valid')
@@ -194,7 +194,7 @@ class ModelRunner:
         num_neighborhoods = self.params['num_neighborhoods']
 
         # Initialize model
-        model = NeighborhoodModel(params=self.params)
+        model = self.create_model(params=self.params)
 
         # Model placeholders
         ph_dict = self.create_placeholders(model=model,

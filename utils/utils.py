@@ -6,9 +6,10 @@ import json
 import gzip
 import pickle
 import csv
+import scipy.sparse as sp
 from os.path import exists
+from os import remove
 from utils.constants import *
-from scipy.sparse import csr_matrix, eye
 
 
 def load_params(params_file_path):
@@ -25,7 +26,7 @@ def add_features(graph, demands, flows, proportions, node_weights):
     graph = graph.copy()
 
     for node in graph.nodes():
-        graph.add_node(node, demand=float(demands[node][0] - demands[node][1]),
+        graph.add_node(node, demand=float(demands[node, 0] - demands[node, 1]),
                        node_weight=float(node_weights[node][0]))
 
     for src, dest in graph.edges():
@@ -40,7 +41,7 @@ def add_features_sparse(graph, demands, flows, proportions, node_weights):
     graph = graph.copy()
 
     for node in graph.nodes():
-        graph.add_node(node, demand=float(demands[node][0] - demands[node][1]),
+        graph.add_node(node, demand=float(demands[node, 0] - demands[node, 1]),
                        node_weight=float(node_weights[node][0]))
 
     for edge, flow in zip(flows.indices, flows.values):
@@ -57,7 +58,7 @@ def add_features_sparse(graph, demands, flows, proportions, node_weights):
 def features_to_demands(node_features):
     demands = np.zeros(shape=(node_features.shape[0], 1), dtype=float)
     for i in range(node_features.shape[0]):
-        demands[i][0] = node_features[i][0] - node_features[i][1]
+        demands[i][0] = node_features[i, 0] - node_features[i, 1]
     return demands
 
 
@@ -94,12 +95,13 @@ def create_capacities(graph, demands):
     abs_demands = np.abs(demands)
     min_capacity = 0.5 * np.min(abs_demands)
     max_capacity = 2.0 * np.max(abs_demands)
-    capacities = np.random.uniform(low=min_capacity, high=max_capacity, size=(num_edges, 1))
 
-    sources = np.transpose(np.array(np.where(demands < 0)))
-    sinks = np.transpose(np.array(np.where(demands > 0)))
+    adj_matrix = nx.adjacency_matrix(graph)
+    init_capacities = np.random.uniform(low=min_capacity, high=max_capacity, size=(num_edges,))
+    capacities = sp.csr_matrix((init_capacities, adj_matrix.indices, adj_matrix.indptr))
 
-    edge_index = {edge: i for i, edge in enumerate(graph.edges())}
+    sources = np.transpose(np.where(demands < 0))
+    sinks = np.transpose(np.where(demands > 0))
 
     for source in sources:
         source_demand = abs_demands[source[0]][source[1]]
@@ -111,12 +113,10 @@ def create_capacities(graph, demands):
             # This process ensures that a feasible solution exists
             for i in range(len(path)-1):
                 edge = (path[i], path[i+1])
-                index = edge_index[edge]
-                capacities[index][0] = min(capacities[index][0], source_demand + SMALL_NUMBER)
+                capacities[edge] = max(capacities[edge], source_demand + 1e-3)
 
-            edge = (path[-2], path[-1])
-            index = edge_index[edge]
-            capacities[index][0] = min(capacities[index][0], source_demand + SMALL_NUMBER)
+            edge = (path[i], path[i+1])
+            capacities[edge] = max(capacities[edge], source_demand + 1e-3)
 
     return capacities
 
@@ -241,7 +241,7 @@ def sparse_matrix_to_tensor_multiple(sparse_mat, k):
 
 
 def random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods=True):
-    mat = eye(adj_matrix.shape[0])
+    mat = sp.eye(adj_matrix.shape[0])
     neighborhoods = [mat]
     agg_mat = mat
 
@@ -277,14 +277,22 @@ def restore_params(model_path):
     return params_dict
 
 
-def expand_sparse_matrix(csr_mat, n):
+def expand_sparse_matrix(csr_mat, n, m=None):
     """
     Expands the given m x m CSR matrix to size n x n. This function
     will create a new matrix.
     """
+    if m is None:
+        m = n
+
     pad_amount = (n + 1) - len(csr_mat.indptr)
     if pad_amount <= 0:
         return csr_mat
 
     indptr = np.pad(csr_mat.indptr, (0, pad_amount), mode='edge')
-    return csr_matrix((csr_mat.data, csr_mat.indices, indptr), shape=(n, n))
+    return sp.csr_matrix((csr_mat.data, csr_mat.indices, indptr), shape=(n, m))
+
+
+def delete_if_exists(file_path):
+    if exists(file_path):
+        remove(file_path)
