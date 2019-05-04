@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 from utils.constants import COST_MAX, EXP_MAX, BIG_NUMBER, SMALL_NUMBER
-from utils.utils import sparse_subtract
 
 
 class CostFunction:

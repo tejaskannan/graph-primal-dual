@@ -3,7 +3,7 @@ import numpy as np
 from models.base_model import Model
 from core.layers import MLP, Neighborhood, SparseMinCostFlow, GRU, MinCostFlow, Gate
 from core.layers import AttentionNeighborhood, SparseDualFlow, DualFlow, SparseMax
-from utils.utils import sparse_scalar_mul, sparse_subtract
+from utils.tf_utils import mask_sp_tensor, sparse_scalar_mul, sparse_subtract
 from utils.constants import BIG_NUMBER, SMALL_NUMBER
 from cost_functions.cost_functions import get_cost_function, apply_with_capacities
 
@@ -118,22 +118,16 @@ class NeighborhoodModel(Model):
                         flow_add = tf.sparse.add(flow, flow_transpose)
                         flow_sub_abs = tf.abs(sparse_subtract(flow, flow_transpose))
                         min_flow = sparse_subtract(flow_add, flow_sub_abs)
-                        flow = tf.sparse.add(flow, sparse_scalar_mul(min_flow, -0.5),
-                                             threshold=SMALL_NUMBER)
-
-                        index_difference = tf.sets.difference(capacities.indices, flow.indices)
-                        # capacity_slices = tf.IndexedSlices(indices=capacities.indices,
-                        #                                    values=capacities.values,
-                        #                                    dense_shape=capacities.dense_shape)
-
-                        #print(index_difference)
-
-                        capacities_masked = tf.sparse.mask(capacities, index_difference.values)
+                        flow = tf.sparse.add(flow, sparse_scalar_mul(min_flow, -0.5))
+                        flow = tf.SparseTensor(indices=flow.indices,
+                                               values=tf.nn.relu(flow.values),
+                                               dense_shape=flow.dense_shape)
+                        flow = mask_sp_tensor(sp_a=flow, sp_b=capacities)
 
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow.values))
                     cost_with_capacity = apply_with_capacities(cost_fn=self.cost_fn,
                                                                x=flow.values,
-                                                               capacities=capacities_masked.values)
+                                                               capacities=capacities.values)
                     flow_cost_capacity = tf.reduce_sum(cost_with_capacity)
                 else:
                     # Remove excess flow about simple cycles
@@ -188,5 +182,5 @@ class NeighborhoodModel(Model):
 
                 self.loss = flow_cost_capacity - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow_cost_capacity, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights]
+                self.output_ops += [flow_cost_capacity, flow, flow_weight_pred, dual_cost, dual_flows, attn_coefs, node_weights, capacities]
                 self.optimizer_op = self._build_optimizer_op()

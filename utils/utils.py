@@ -209,18 +209,6 @@ def sparse_matrix_to_tensor(sparse_mat):
     return tf.SparseTensorValue(indices, mat.data, mat.shape)
 
 
-def sparse_subtract(sp_a, sp_b):
-    return tf.sparse.add(sp_a, sparse_scalar_mul(sp_b, -1))
-
-
-def sparse_scalar_mul(sparse_tensor, scalar):
-    return tf.SparseTensor(
-        indices=sparse_tensor.indices,
-        values=scalar * sparse_tensor.values,
-        dense_shape=sparse_tensor.dense_shape
-    )
-
-
 def sparse_matrix_to_tensor_multiple(sparse_mat, k):
     mat = sparse_mat.tocoo()
     indices = np.mat([mat.row, mat.col]).transpose()
