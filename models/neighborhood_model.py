@@ -41,7 +41,6 @@ class NeighborhoodModel(Model):
         should_correct_flows = kwargs['should_correct_flows']
 
         is_sparse = self.params['sparse']
-        rank = 2 if is_sparse else 3
 
         with self._sess.graph.as_default():
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
