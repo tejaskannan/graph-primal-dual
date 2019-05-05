@@ -44,7 +44,7 @@
 		"train_dataset_names": ["tiny-test"],
 		"test_graph_names": ["tiny"],
 		"test_dataset_names": ["tiny-test"],
-		"sparse": false,
+		"sparse": true,
 		"use_sparsemax": true,
 		"unique_neighborhoods": false,
 		"use_capacities": false,

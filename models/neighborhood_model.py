@@ -22,6 +22,9 @@ class NeighborhoodModel(Model):
         # V x F tensor which contains node features
         node_features = kwargs['node_features']
 
+        # V x D' tensor which contains pre-computed node embeddings
+        node_embeddings = kwargs['node_embeddings']
+
         # List of V x V sparse tensors representing node neighborhoods
         neighborhoods = kwargs['neighborhoods']
 
@@ -48,7 +51,7 @@ class NeighborhoodModel(Model):
                               activation=tf.nn.tanh,
                               activate_final=True,
                               name='node-encoder')
-                node_encoding = encoder(inputs=node_features,
+                node_encoding = encoder(inputs=tf.concat([node_embeddings, node_features], axis=-1),
                                         dropout_keep_prob=dropout_keep_prob)
 
                 node_neighborhood = AttentionNeighborhood(output_size=self.params['node_encoding'],
