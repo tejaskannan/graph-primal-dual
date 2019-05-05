@@ -15,7 +15,7 @@
 		"dual_step_size": 0.01,
 		"gradient_clip": 1,
 		"batch_size": 128,
-		"epochs": 5,
+		"epochs": 1,
 		"patience": 5,
 		"early_stop_threshold": 1e-5,
 		"graph_layers": 3,

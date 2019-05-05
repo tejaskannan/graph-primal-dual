@@ -91,18 +91,8 @@ class NeighborhoodRunner(ModelRunner):
 
         if self.params['sparse']:
             demands = features_to_demands(node_features)
-            adj = sparse_matrix_to_tensor(adj)
-            capacities = sparse_matrix_to_tensor(capacities)
-        elif batch_size == 1:
-            demands = [features_to_demands(node_features)]
-            node_features = [node_features]
-            adj = [adj.todense()]
-            capacities = [capacities.todense()]
-            node_embeddings = [node_embeddings]
         else:
             demands = [features_to_demands(n) for n in node_features]
-            adj = [a.todense() for a in adj]
-            capacities = [cap.todense() for cap in capacities]
 
         feed_dict = {
             placeholders['node_features']: node_features,
@@ -118,12 +108,9 @@ class NeighborhoodRunner(ModelRunner):
 
             # Get the jth neighborhood for each element in the batch
             if self.params['sparse']:
-                neighborhood = sparse_matrix_to_tensor(neighborhoods[j])
+                neighborhood = neighborhoods[j]
             else:
-                if batch_size == 1:
-                    neighborhood = [neighborhoods[j].todense()]
-                else:
-                    neighborhood = [n[j].todense() for n in neighborhoods]
+                neighborhood = [n[j] for n in neighborhoods]
 
             neighborhood_ph = placeholders['neighborhoods'][j]
             feed_dict[neighborhood_ph] = neighborhood

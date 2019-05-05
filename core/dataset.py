@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from core.load import read_dataset
 from utils.constants import BIG_NUMBER
 from utils.utils import expand_sparse_matrix, random_walk_neighborhoods
-from utils.utils import create_node_embeddings
+from utils.utils import create_node_embeddings, sparse_matrix_to_tensor
 from sklearn.preprocessing import StandardScaler
 
 
@@ -89,10 +89,10 @@ class DatasetManager:
 
                     self.graph_data[graph_name] = GraphData(adj_matrix, neighborhoods, embeddings)
 
-    def create_shuffled_batches(self, series, batch_size):
-        return self.create_batches(series, batch_size, shuffle=True)
+    def create_shuffled_batches(self, series, batch_size, is_sparse):
+        return self.create_batches(series, batch_size, shuffle=True, is_sparse=is_sparse)
 
-    def create_batches(self, series, batch_size, shuffle):
+    def create_batches(self, series, batch_size, shuffle, is_sparse):
         """
         Returns all batches for a single series using uniform shuffling without replacement.
         """
@@ -116,13 +116,22 @@ class DatasetManager:
             embeddings = [self.graph_data[name].node_embeddings for name in graph_names]
             capacities = [sample.capacities for sample in batch]
 
-            if batch_size == 1:
+            # Convert to correct data type in preparation for feed dict
+            if is_sparse:
+                adj_matrices = sparse_matrix_to_tensor(adj_matrices[0])
+                capacities = sparse_matrix_to_tensor(capacities[0])
+                neighborhoods = [sparse_matrix_to_tensor(n) for n in neighborhoods[0]]
                 node_features = node_features[0]
-                adj_matrices = adj_matrices[0]
-                neighborhoods = neighborhoods[0]
                 embeddings = embeddings[0]
-                graph_names = graph_names[0]
-                capacities = capacities[0]
+            else:
+                adj_matrices = [adj.todense() for adj in adj_matrices]
+                capacities = [cap.todense() for cap in capacities]
+
+                neighborhood_tensors = []
+                for neighborhood in neighborhoods:
+                    tensors = [n.todense() for n in neighborhood]
+                    neighborhood_tensors.append(tensors)
+                neighborhoods = neighborhood_tensors
 
             node_batches.append(node_features)
             adj_batches.append(adj_matrices)
@@ -140,7 +149,7 @@ class DatasetManager:
             DataSeries.CAPACITY: capacity_batches
         }
 
-    def get_train_batch(self, batch_size):
+    def get_train_batch(self, batch_size, is_sparse):
         assert self.is_train_initialized, 'Training not yet initialized.'
 
         self.counters.samples += batch_size
@@ -202,12 +211,23 @@ class DatasetManager:
             capacity_batch.append(sample.capacities)
             indices.append(index)
 
-        if batch_size == 1:
+        # Convert to correct data type in preparation for feed dict
+        if is_sparse:
+            # Sparse mode only supports a batch size of 1
             node_batch = node_batch[0]
-            adj_batch = adj_batch[0]
-            neighborhood_batch = neighborhood_batch[0]
             embedding_batch = embedding_batch[0]
-            capacity_batch = capacity_batch[0]
+            adj_batch = sparse_matrix_to_tensor(adj_batch[0])
+            capacity_batch = sparse_matrix_to_tensor(capacity_batch[0])
+            neighborhood_batch = [sparse_matrix_to_tensor(n) for n in neighborhood_batch[0]] 
+        else:
+            adj_batch = [adj.todense() for adj in adj_batch]
+            capacity_batch = [cap.todense() for cap in capacity_batch]
+
+            neighborhood_tensors = []
+            for neighborhood in neighborhood_batch:
+                tensors = [n.todense() for n in neighborhood]
+                neighborhood_tensors.append(tensors)
+            neighborhood_batch = neighborhood_tensors
 
         batch_dict = {
             DataSeries.NODE: node_batch,
