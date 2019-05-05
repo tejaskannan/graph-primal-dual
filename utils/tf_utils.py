@@ -41,17 +41,3 @@ def sparse_scalar_mul(sparse_tensor, scalar):
         values=scalar * sparse_tensor.values,
         dense_shape=sparse_tensor.dense_shape
     )
-
-
-def apply_to_sparse_batch(sparse_tensor, fn, n, b):
-    """
-    Applies the function to each n x n block in the (n*b) x (n*b) sparse tensor.
-    Returns b values, one for each block. Assumes that fn(0) = 0 and each block
-    matrix has at least 1 nonzero value.
-    """
-    indices = tf.cast(sparse_tensor.indices, tf.int32)
-    row_partitions = tf.map_fn(lambda x: x[0] // n, indices)
-    partitioned_values = tf.dynamic_partition(data=sparse_tensor.values,
-                                              partitions=row_partitions,
-                                              num_partitions=b)
-    return [fn(values) for values in partitioned_values]
