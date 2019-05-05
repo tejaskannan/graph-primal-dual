@@ -1,12 +1,12 @@
 {
 	"generate": {
-		"train_samples": 128,
-		"valid_samples": 128,
-		"test_samples": 16,
-		"graph_names": ["tiny"],
-		"dataset_names": ["tiny-test"],
-		"min_max_sources": [1, 1],
-		"min_max_sinks": [1, 1]
+		"train_samples": 50000,
+		"valid_samples": 5000,
+		"test_samples": 1000,
+		"graph_names": ["berlin-prenzlauerberg-center"],
+		"dataset_names": ["berlin-prenzlauerberg-center-50000"],
+		"min_max_sources": [1, 8],
+		"min_max_sinks": [1, 8]
 	},
 	"model": {
 		"name": "neighborhood",
@@ -28,11 +28,12 @@
 		"decoder_hidden": [16, 16],
 		"output_folder": "trained_models",
 		"cost_fn": {
-			"name": "quadratic",
+			"name": "cubic",
 			"options": {
-				"a": 1.0,
-				"b": 0.0,
-				"c": 0.0
+				"a": 8.0,
+				"b": -6.0,
+				"c": 1.5,
+				"d": 0.0
 			}
 		},
 		"flow_iters": 1000,
@@ -46,6 +47,7 @@
 		"sparse": true,
 		"use_sparsemax": true,
 		"unique_neighborhoods": false,
+		"use_capacities": false,
 		"batch_params": {
 			"selection_beg": 1e8,
 			"selection_end": 1e2,

@@ -178,8 +178,8 @@ def graph_stats(graph_name):
     append_row_to_log(['Diameter', diameter], stats_path)
     append_row_to_log(['Strongly Connected Components', strong_conn_comp], stats_path)
 
-    # Save graph visualization using GraphGiz
-    plot_graph(graph, file_path='graphs/{0}.png'.format(graph_name))
+    # Save graph visualization using GraphViz
+    # plot_graph(graph, file_path='graphs/{0}.png'.format(graph_name))
 
     # Save graph XML
     nx.write_gexf(graph, path='graphs/{0}.gexf'.format(graph_name))

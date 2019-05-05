@@ -1,0 +1,8 @@
+Graph Name,berlin-tiergarten
+Num Nodes,359
+Num (directed) edges,795
+Avg Out Degree,2.214484679665738
+Avg In Degree,2.214484679665738
+Avg Path Length,13.070252563763402
+Diameter,30
+Strongly Connected Components,1

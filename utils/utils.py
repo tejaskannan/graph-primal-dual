@@ -100,23 +100,23 @@ def create_capacities(graph, demands):
     init_capacities = np.random.uniform(low=min_capacity, high=max_capacity, size=(num_edges,))
     capacities = sp.csr_matrix((init_capacities, adj_matrix.indices, adj_matrix.indptr))
 
-    sources = np.transpose(np.where(demands < 0))
-    sinks = np.transpose(np.where(demands > 0))
+    # sources = np.transpose(np.where(demands < 0))
+    # sinks = np.transpose(np.where(demands > 0))
 
-    for source in sources:
-        source_demand = abs_demands[source[0]][source[1]]
-        for sink in sinks:
-            path_gen = nx.all_simple_paths(graph, source=source[0], target=sink[0])
-            path = list(path_gen.__next__())
+    # for source in sources:
+    #     source_demand = abs_demands[source[0]][source[1]]
+    #     for sink in sinks:
+    #         path_gen = nx.all_simple_paths(graph, source=source[0], target=sink[0])
+    #         path = list(path_gen.__next__())
 
-            # Increase capacity so at least one path can carry the source's flow to the sink.
-            # This process ensures that a feasible solution exists
-            for i in range(len(path)-1):
-                edge = (path[i], path[i+1])
-                capacities[edge] = max(capacities[edge], source_demand + 1e-3)
+    #         # Increase capacity so at least one path can carry the source's flow to the sink.
+    #         # This process ensures that a feasible solution exists
+    #         for i in range(len(path)-1):
+    #             edge = (path[i], path[i+1])
+    #             capacities[edge] = max(capacities[edge], source_demand + 1e-3)
 
-            edge = (path[i], path[i+1])
-            capacities[edge] = max(capacities[edge], source_demand + 1e-3)
+    #         edge = (path[i], path[i+1])
+    #         capacities[edge] = max(capacities[edge], source_demand + 1e-3)
 
     return capacities
 

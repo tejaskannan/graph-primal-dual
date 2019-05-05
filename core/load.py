@@ -16,6 +16,8 @@ def load_to_networkx(path):
     with open(path, 'r') as net_file:
         metadata = True
 
+        nodes = set()
+
         for line in net_file:
             if len(line) == 0:
                 continue
@@ -31,13 +33,39 @@ def load_to_networkx(path):
             if init == -1 or term == -1:
                 continue
 
-            graph.add_node(init)
-            graph.add_node(term)
-            graph.add_edge(init, term)
+            nodes.add(init)
+            nodes.add(term)
 
             edge = (init, term)
             edge_features[edge] = features
-    nx.set_edge_attributes(graph, edge_features)
+
+    # Rename nodes 0,...,n-1. Sort node set to ensure a deterministic naming.
+    node_map = {}
+    for i, node in enumerate(sorted(nodes)):
+        node_map[node] = i
+        graph.add_node(i)
+
+    # Add edges features
+    for (src, dst), features in edge_features.items():
+        graph.add_edge(node_map[src], node_map[dst], **features)
+
+    # We make the graph strongly connected to ensure that any combination of source / sink
+    # constitutes a valid problem
+    comp = nx.strongly_connected_components(graph)
+    try:
+        c1 = list(comp.__next__())
+        while True:
+            c2 = list(comp.__next__())
+
+            # For now, we don't import any edge features
+            graph.add_edge(c1[0], c2[0])
+            graph.add_edge(c2[0], c1[0])
+
+            c1 = c2
+
+    except StopIteration:
+        pass
+
     return graph
 
 
@@ -59,10 +87,6 @@ def write_dataset(dataset, output_path):
             compressed_demands = sp.csr_matrix(node_features)
             pickle.dump({'dem': compressed_demands, 'cap': data_point['cap']}, output_file)
 
-        # for demand in demands:
-        #     demand_lst = [str(i) + ':' + str(d[0]) for i, d in enumerate(demand) if abs(d) > SMALL_NUMBER]
-        #     output_file.write(' '.join(demand_lst) + '\n')
-
 
 def read_dataset(data_path):
     dataset = []
@@ -74,20 +98,6 @@ def read_dataset(data_path):
                 dataset.append({'dem': data_dict['dem'], 'cap': data_dict['cap']})
         except EOFError:
             pass
-        # for demand_lst in demands_file:
-        #     demands = np.zeros(shape=(num_nodes, 2), dtype=float)
-        #     demand_values = demand_lst.strip().split(' ')
-        #     for value in demand_values:
-        #         tokens = value.split(':')
-        #         demand_val = float(tokens[1])
-        #         node = int(tokens[0])
-
-        #         if demand_val > 0:
-        #             demands[node][0] = demand_val
-        #         elif demand_val < 0:
-        #             demands[node][1] = -demand_val
-
-        #     dataset.append(demands)
     return dataset
 
 

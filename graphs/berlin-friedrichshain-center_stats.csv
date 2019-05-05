@@ -1,0 +1,8 @@
+Graph Name,berlin-friedrichshain-center
+Num Nodes,224
+Num (directed) edges,539
+Avg Out Degree,2.40625
+Avg In Degree,2.40625
+Avg Path Length,9.77079996796925
+Diameter,26
+Strongly Connected Components,1

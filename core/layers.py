@@ -316,7 +316,7 @@ class SparseMax(Layer):
 
     def sparse_op(self, inputs, num_rows, name='sparse-sparsemax'):
         # Fetch individual rows from the sparse tensor
-        partitions = tf.cast(inputs.indices[:, 0], dtype=tf.int32)
+        partitions = tf.cast(inputs.indices[:,0], dtype=tf.int32)
         rows = tf.dynamic_partition(inputs.values, partitions, num_rows, name='{0}-dyn-part'.format(name))
 
         def clipped_sparsemax(tensor, epsilon):
@@ -341,12 +341,18 @@ class SparseMax(Layer):
         concat = tf.squeeze(tf.concat(normalized, axis=1), axis=0)
 
         # Mask out empty entries (set to -1 from beforehand)
-        mask = tf.logical_not(tf.equal(concat, -1.0))
-        filtered = tf.boolean_mask(concat, mask)
+        # We use a dynamic partition instead of a boolean mask because
+        # boolean_mask implicitly uses a gather operation. Applying gather
+        # to a sparse tensor will cause implicit conversion to dense tensors
+        # and thus use a large amount of memory.
+        mask = tf.cast(tf.equal(concat, -1.0), dtype=tf.int32)
+        partitioned_values = tf.dynamic_partition(data=concat,
+                                                  partitions=mask,
+                                                  num_partitions=2)
 
         return tf.SparseTensor(
             indices=inputs.indices,
-            values=filtered,
+            values=partitioned_values[0],
             dense_shape=inputs.dense_shape
         )
 
