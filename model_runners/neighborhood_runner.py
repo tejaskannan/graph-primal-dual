@@ -12,20 +12,20 @@ class NeighborhoodRunner(ModelRunner):
     def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
         num_neighborhoods = kwargs['num_neighborhoods']
 
-        node_shape = [None, num_nodes, self.num_node_features]
-        demands_shape = [None, num_nodes, 1]
-        adj_shape = [None, None, num_nodes]
-        neighborhood_shape = [None, None, num_nodes]
-        embedding_shape = [None, num_nodes, embedding_size]
-        capacity_shape = [None, None, num_nodes]
-
         if self.params['sparse']:
-            node_shape = node_shape[1:]
-            demands_shape = demands_shape[1:]
-            adj_shape = adj_shape[1:]
-            neighborhood_shape = neighborhood_shape[1:]
-            embedding_shape = embedding_shape[1:]
-            capacity_shape = capacity_shape[1:]
+            b = self.params['batch_size']
+            node_shape = [b * num_nodes, b * (self.num_node_features + embedding_shape)]
+            demands_shape = [b * num_nodes, b]
+            adj_shape = [None, num_nodes * b]
+            neighborhood_shape = [None, num_nodes * b]
+            capacity_shape = [None, num_nodes, * b]
+        else:
+            node_shape = [None, num_nodes, self.num_node_features + embedding_size]
+            demands_shape = [None, num_nodes, 1]
+            adj_shape = [None, None, num_nodes]
+            neighborhood_shape = [None, None, num_nodes]
+            capacity_shape = [None, None, num_nodes]
+
 
         node_ph = model.create_placeholder(dtype=tf.float32,
                                            shape=node_shape,
@@ -39,10 +39,6 @@ class NeighborhoodRunner(ModelRunner):
                                           shape=adj_shape,
                                           name='adj-ph',
                                           is_sparse=self.params['sparse'])
-        node_embedding_ph = model.create_placeholder(dtype=tf.float32,
-                                                     shape=embedding_shape,
-                                                     name='node-embedding-ph',
-                                                     is_sparse=False)
         dropout_keep_ph = model.create_placeholder(dtype=tf.float32,
                                                    shape=(),
                                                    name='dropout-keep-ph',
@@ -63,7 +59,6 @@ class NeighborhoodRunner(ModelRunner):
         return {
             'node_features': node_ph,
             'demands': demands_ph,
-            'node_embeddings': node_embedding_ph,
             'neighborhoods': neighborhoods,
             'adj': adj_ph,
             'capacities': capacity_ph,
@@ -76,7 +71,7 @@ class NeighborhoodRunner(ModelRunner):
     def create_feed_dict(self, placeholders, batch, index, batch_size, data_series):
         node_features = batch[DataSeries.NODE]
         adj = batch[DataSeries.ADJ]
-        node_embeddings = batch[DataSeries.EMBEDDING]
+        demands = batch[DataSeries.DEMAND]
         neighborhoods = batch[DataSeries.NEIGHBORHOOD]
         capacities = batch[DataSeries.CAPACITY]
         dropout_keep = self.params['dropout_keep_prob']
@@ -84,23 +79,12 @@ class NeighborhoodRunner(ModelRunner):
         if data_series is not Series.TRAIN:
             node_features = node_features[index]
             adj = adj[index]
-            node_embeddings = node_embeddings[index]
+            demands = demands[index]
             neighborhoods = neighborhoods[index]
             capacities = capacities[index]
             dropout_keep = 1.0
 
-        if self.params['sparse']:
-            demands = features_to_demands(node_features)
-            adj = sparse_matrix_to_tensor(adj)
-            capacities = sparse_matrix_to_tensor(capacities)
-        elif batch_size == 1:
-            demands = [features_to_demands(node_features)]
-            node_features = [node_features]
-            adj = [adj.todense()]
-            capacities = [capacities.todense()]
-            node_embeddings = [node_embeddings]
-        else:
-            demands = [features_to_demands(n) for n in node_features]
+        if not self.params['sparse']:
             adj = [a.todense() for a in adj]
             capacities = [cap.todense() for cap in capacities]
 
@@ -108,7 +92,6 @@ class NeighborhoodRunner(ModelRunner):
             placeholders['node_features']: node_features,
             placeholders['demands']: demands,
             placeholders['adj']: adj,
-            placeholders['node_embeddings']: node_embeddings,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['capacities']: capacities
         }
@@ -117,13 +100,8 @@ class NeighborhoodRunner(ModelRunner):
         for j in range(self.params['num_neighborhoods']+1):
 
             # Get the jth neighborhood for each element in the batch
-            if self.params['sparse']:
-                neighborhood = sparse_matrix_to_tensor(neighborhoods[j])
-            else:
-                if batch_size == 1:
-                    neighborhood = [neighborhoods[j].todense()]
-                else:
-                    neighborhood = [n[j].todense() for n in neighborhoods]
+            if not self.params['sparse']:
+                neighborhood = [n[j].todense() for n in neighborhoods]
 
             neighborhood_ph = placeholders['neighborhoods'][j]
             feed_dict[neighborhood_ph] = neighborhood

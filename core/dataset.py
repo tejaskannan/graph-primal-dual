@@ -7,7 +7,8 @@ from collections.abc import Iterable
 from core.load import read_dataset
 from utils.constants import BIG_NUMBER
 from utils.utils import expand_sparse_matrix, random_walk_neighborhoods
-from utils.utils import create_node_embeddings
+from utils.utils import create_node_embeddings, features_to_demands
+from utils.utils import sparse_block_diag, dense_block_diag
 from sklearn.preprocessing import StandardScaler
 
 
@@ -21,9 +22,9 @@ class DataSeries(Enum):
     NODE = 1,
     ADJ = 2,
     NEIGHBORHOOD = 3,
-    EMBEDDING = 4,
-    GRAPH_NAME = 5,
-    CAPACITY = 6
+    GRAPH_NAME = 4,
+    CAPACITY = 5,
+    DEMAND = 6
 
 
 class Counters:
@@ -89,10 +90,10 @@ class DatasetManager:
 
                     self.graph_data[graph_name] = GraphData(adj_matrix, neighborhoods, embeddings)
 
-    def create_shuffled_batches(self, series, batch_size):
-        return self.create_batches(series, batch_size, shuffle=True)
+    def create_shuffled_batches(self, series, batch_size, is_sparse):
+        return self.create_batches(series, batch_size, shuffle=True, is_sparse=is_sparse)
 
-    def create_batches(self, series, batch_size, shuffle):
+    def create_batches(self, series, batch_size, shuffle, is_sparse):
         """
         Returns all batches for a single series using uniform shuffling without replacement.
         """
@@ -103,31 +104,43 @@ class DatasetManager:
         node_batches = []
         adj_batches = []
         neighborhoods_batches = []
-        embeddings_batches = []
+        demand_batches = []
         graph_name_batches = []
         capacity_batches = []
         for i in range(0, len(data), batch_size):
             batch = data[i:i+batch_size]
 
-            node_features = [sample.node_features.todense() for sample in batch]
             graph_names = [sample.graph_name for sample in batch]
+
+            # Extract node features and create demand vector
+            node_features = [sample.node_features.todense() for sample in batch]
+            embeddings = [self.graph_data[name].node_embeddings for name in graph_names]
+            demands = [features_to_demands(n) for n in node_features]
+
+            # Put node embeddings and demand values together
+            node_features = np.concatenate((node_features, embeddings), axis=-1)
+
             adj_matrices = [self.graph_data[name].adj_matrix for name in graph_names]
             neighborhoods = [self.graph_data[name].neighborhoods for name in graph_names]
-            embeddings = [self.graph_data[name].node_embeddings for name in graph_names]
             capacities = [sample.capacities for sample in batch]
 
-            if batch_size == 1:
-                node_features = node_features[0]
-                adj_matrices = adj_matrices[0]
-                neighborhoods = neighborhoods[0]
-                embeddings = embeddings[0]
-                graph_names = graph_names[0]
-                capacities = capacities[0]
+            if is_sparse:
+                node_features = dense_block_diag(node_features)
+                adj_matrices = sparse_block_diag(adj_matrices)
+                demands = dense_block_diag(demands)
+                capacities = sparse_block_diag(capacities)
+
+                # Convert each neighborhood level into a sparse block matrix
+                neighborhood_levels = []
+                for i in range(len(neighborhoods[0])):
+                    level = [n[i] for n in neighborhoods]
+                    neighborhood_levels.append(sparse_block_diag(level))
+                neighborhoods = neighborhood_levels
 
             node_batches.append(node_features)
             adj_batches.append(adj_matrices)
             neighborhoods_batches.append(neighborhoods)
-            embeddings_batches.append(embeddings)
+            demand_batches.append(demands)
             graph_name_batches.append(graph_names)
             capacity_batches.append(capacities)
 
@@ -135,12 +148,12 @@ class DatasetManager:
             DataSeries.NODE: node_batches,
             DataSeries.ADJ: adj_batches,
             DataSeries.NEIGHBORHOOD: neighborhoods_batches,
-            DataSeries.EMBEDDING: embeddings_batches,
+            DataSeries.DEMAND: demand_batches,
             DataSeries.GRAPH_NAME: graph_name_batches,
             DataSeries.CAPACITY: capacity_batches
         }
 
-    def get_train_batch(self, batch_size):
+    def get_train_batch(self, batch_size, is_sparse):
         assert self.is_train_initialized, 'Training not yet initialized.'
 
         self.counters.samples += batch_size
@@ -179,7 +192,7 @@ class DatasetManager:
         node_batch = []
         adj_batch = []
         neighborhood_batch = []
-        embedding_batch = []
+        demand_batch = []
         capacity_batch = []
 
         indices = []
@@ -195,25 +208,38 @@ class DatasetManager:
 
             sample = self.dataset[Series.TRAIN][data_index]
 
-            node_batch.append(sample.node_features.todense())
+            node_features = sample.node_features.todense()
+            embeddings = self.graph_data[sample.graph_name].node_embeddings
+            demands = features_to_demands(node_features)
+
+            # Put node features and embeddings together
+            node_features = np.concatenate((node_features, embeddings), axis=-1)
+
+            node_batch.append(node_features)
             adj_batch.append(self.graph_data[sample.graph_name].adj_matrix)
             neighborhood_batch.append(self.graph_data[sample.graph_name].neighborhoods)
-            embedding_batch.append(self.graph_data[sample.graph_name].node_embeddings)
+            demand_batch.append(demands)
             capacity_batch.append(sample.capacities)
             indices.append(index)
 
-        if batch_size == 1:
-            node_batch = node_batch[0]
-            adj_batch = adj_batch[0]
-            neighborhood_batch = neighborhood_batch[0]
-            embedding_batch = embedding_batch[0]
-            capacity_batch = capacity_batch[0]
+        if is_sparse:
+            node_batch = dense_block_diag(node_batch)
+            adj_batch = sparse_block_diag(adj_batch)
+            demand_batch = dense_block_diag(demand_batch)
+            capacity_batch = sparse_block_diag(capacity_batch)
+
+            # Convert each neighborhood level into a sparse block matrix
+            neighborhood_levels = []
+            for i in range(len(neighborhood_batch[0])):
+                level = [n[i] for n in neighborhood_batch]
+                neighborhood_levels.append(sparse_block_diag(level))
+            neighborhood_batch = neighborhood_levels
 
         batch_dict = {
             DataSeries.NODE: node_batch,
             DataSeries.ADJ: adj_batch,
             DataSeries.NEIGHBORHOOD: neighborhood_batch,
-            DataSeries.EMBEDDING: embedding_batch,
+            DataSeries.DEMAND: demand_batch,
             DataSeries.CAPACITY: capacity_batch
         }
 

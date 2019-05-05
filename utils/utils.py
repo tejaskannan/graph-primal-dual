@@ -7,6 +7,7 @@ import gzip
 import pickle
 import csv
 import scipy.sparse as sp
+import scipy.linalg as linalg
 from os.path import exists
 from os import remove
 from utils.constants import *
@@ -226,6 +227,15 @@ def sparse_matrix_to_tensor_multiple(sparse_mat, k):
 
     data_expanded = np.repeat(mat.data, repeats=k, axis=0)
     return tf.SparseTensorValue(indices_expanded, data_expanded, expanded_shape)
+
+
+def sparse_block_diag(matrices):
+    block_mat = sp.block_diag(matrices, format='coo')
+    return sparse_matrix_to_tensor(block_mat)
+
+
+def dense_block_diag(matrices):
+    return linalg.block_diag(matrices)
 
 
 def random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods=True):

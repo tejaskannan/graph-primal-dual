@@ -8,7 +8,7 @@ from time import time
 from utils.utils import create_demands, append_row_to_log, create_node_embeddings
 from utils.utils import add_features_sparse, create_node_bias, restore_params
 from utils.utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
-from utils.utils import add_features, adj_mat_to_node_bias
+from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists
 from utils.constants import BIG_NUMBER, LINE
 from core.plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
 from core.load import load_to_networkx, read_dataset
@@ -75,9 +75,7 @@ class ModelRunner:
 
         log_headers = ['Epoch', 'Avg Train Loss', 'Avg Valid Loss']
         log_path = self.output_folder + 'log.csv'
-
-        if os.path.exists(log_path):
-            os.remove(log_path)
+        delete_if_exists(log_path)
 
         append_row_to_log(log_headers, log_path)
 
@@ -115,7 +113,8 @@ class ModelRunner:
             train_losses = []
             for i in range(num_train_batches):
 
-                batch, indices = self.dataset.get_train_batch(batch_size=batch_size)
+                batch, indices = self.dataset.get_train_batch(batch_size=batch_size,
+                                                              is_sparse=self.params['sparse'])
 
                 feed_dict = self.create_feed_dict(placeholders=ph_dict,
                                                   batch=batch,
@@ -140,7 +139,8 @@ class ModelRunner:
 
             # Validation Batches
             valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID,
-                                                                 batch_size=batch_size)
+                                                                 batch_size=batch_size,
+                                                                 is_sparse=self.params['sparse'])
             num_valid_batches = len(valid_batches[DataSeries.NODE])
             valid_losses = []
             for i in range(num_valid_batches):
@@ -220,13 +220,15 @@ class ModelRunner:
         self.dataset.normalize_embeddings()
 
         test_batches = self.dataset.create_batches(series=Series.TEST,
-                                                   batch_size=1,
-                                                   shuffle=False)
+                                                   batch_size=self.params['batch_size'],
+                                                   shuffle=False,
+                                                   is_sparse=self.params['sparse'])
         num_test_batches = len(test_batches[DataSeries.NODE])
 
         # Iniitalize Testing Log
         log_headers = ['Test Instance', 'Graph', 'Flow Cost', 'Dual Cost', 'Time (sec)']
-        log_path = model_path + 'test.csv'
+        log_path = model_path + 'cost.csv'
+        delete_if_exists(log_path)
         append_row_to_log(log_headers, log_path)
 
         for i in range(num_test_batches):
@@ -234,54 +236,58 @@ class ModelRunner:
             feed_dict = self.create_feed_dict(placeholders=ph_dict,
                                               batch=test_batches,
                                               index=i,
-                                              batch_size=1,
+                                              batch_size=self.params['batch_size'],
                                               data_series=Series.TEST)
+
+            batch_size = len(test_batches[DataSeries.GRAPH_NAME][i])
 
             start = time()
             outputs = model.inference(feed_dict=feed_dict)
-            end = time()
+            elapsed = time() - start
+            avg_time = elapsed / batch_size
 
-            graph_name = test_batches[DataSeries.GRAPH_NAME][i]
-            graph = graphs[graph_name]
+            for j in range(batch_size):
+                graph_name = test_batches[DataSeries.GRAPH_NAME][i][j]
+                graph = graphs[graph_name]
 
-            flow_cost = outputs[1]
-            flows = outputs[2]
-            flow_proportions = outputs[3]
-            dual_cost = outputs[4]
-            weights = outputs[6]
-            node_weights = outputs[7]
+                flow_cost = outputs[1][j]
+                flows = outputs[2][j]
+                flow_proportions = outputs[3][j]
+                dual_cost = outputs[4][j]
+                weights = outputs[6][j]
+                node_weights = outputs[7][j]
 
-            demands = test_batches[DataSeries.NODE][i]
-            if self.params['sparse']:
-                flow_graph = add_features_sparse(graph,
-                                                 demands=demands,
-                                                 flows=flows,
-                                                 proportions=flow_proportions,
-                                                 node_weights=node_weights)
-            else:
-                flow_graph = add_features(graph,
-                                          demands=demands,
-                                          flows=flows[0],
-                                          proportions=flow_proportions[0],
-                                          node_weights=node_weights[0])
-
-            # Log Outputs
-            flow_cost = flow_cost[0] if not self.params['sparse'] else flow_cost
-            dual_cost = dual_cost[0] if not self.params['sparse'] else dual_cost
-            append_row_to_log([i, graph_name, flow_cost, dual_cost, end - start], log_path)
-
-            # Write output graph to Graph XML
-            nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, i))
-
-            if self.params['plot_flows']:
+                demands = test_batches[DataSeries.NODE][i][j]
                 if self.params['sparse']:
-                    plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, i))
-                    plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, i))
+                    flow_graph = add_features_sparse(graph,
+                                                     demands=demands,
+                                                     flows=flows,
+                                                     proportions=flow_proportions,
+                                                     node_weights=node_weights)
                 else:
-                    plot_flow_graph(flow_graph, flows[0], '{0}flows-{1}-{2}.png'.format(model_path, graph_name, i))
-                    plot_flow_graph(flow_graph, flow_proportions[0], '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, i))
+                    flow_graph = add_features(graph,
+                                              demands=demands,
+                                              flows=flows,
+                                              proportions=flow_proportions,
+                                              node_weights=node_weights)
 
-            plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, i), num_samples=5)
+                index = i * self.params['batch_size'] + j
+                
+                # Log Outputs
+                append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
+
+                # Write output graph to Graph XML
+                nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, index))
+
+                if self.params['plot_flows']:
+                    if self.params['sparse']:
+                        plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index))
+                        plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
+                    else:
+                        plot_flow_graph(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index))
+                        plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
+
+                plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=5)
 
     def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
         raise NotImplementedError()
