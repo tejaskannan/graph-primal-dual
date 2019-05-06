@@ -126,6 +126,8 @@ class ModelRunner:
                 avg_loss = outputs[0]
                 loss = outputs[1]
 
+                print(loss)
+
                 train_losses.append(avg_loss)
                 self.dataset.report_losses(loss, indices)
 

@@ -9,12 +9,12 @@
 		"min_max_sinks": [1, 8]
 	},
 	"model": {
-		"name": "neighborhood",
+		"name": "adj",
 		"learning_rate": 0.001,
 		"dual_momentum": 0.9,
 		"dual_step_size": 0.01,
 		"gradient_clip": 1,
-		"batch_size": 128,
+		"batch_size": 8,
 		"epochs": 1,
 		"patience": 5,
 		"early_stop_threshold": 1e-5,
@@ -44,7 +44,7 @@
 		"train_dataset_names": ["tiny-test"],
 		"test_graph_names": ["tiny"],
 		"test_dataset_names": ["tiny-test"],
-		"sparse": true,
+		"sparse": false,
 		"use_sparsemax": true,
 		"unique_neighborhoods": false,
 		"use_capacities": false,

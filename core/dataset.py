@@ -124,7 +124,7 @@ class DatasetManager:
                 node_features = node_features[0]
                 embeddings = embeddings[0]
             else:
-                adj_matrices = [adj.todense() for adj in adj_matrices]
+                #adj_matrices = [adj.todense() for adj in adj_matrices]
                 capacities = [cap.todense() for cap in capacities]
 
                 neighborhood_tensors = []
@@ -220,7 +220,7 @@ class DatasetManager:
             capacity_batch = sparse_matrix_to_tensor(capacity_batch[0])
             neighborhood_batch = [sparse_matrix_to_tensor(n) for n in neighborhood_batch[0]] 
         else:
-            adj_batch = [adj.todense() for adj in adj_batch]
+            #adj_batch = [adj.todense() for adj in adj_batch]
             capacity_batch = [cap.todense() for cap in capacity_batch]
 
             neighborhood_tensors = []

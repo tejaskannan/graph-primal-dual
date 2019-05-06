@@ -64,15 +64,18 @@ def adjacency_list(graph):
 def pad_adj_list(adj_lst, max_degree, num_nodes):
     padded = []
     for lst in adj_lst:
-        pd = np.pad(lst, pad_width=(0, num_nodes-len(lst)),
-                    mode='constant', fill_value=num_nodes)
+        pd = np.pad(lst, pad_width=(0, max_degree-len(lst)),
+                    mode='constant', constant_values=num_nodes)
         padded.append(pd)
+    padded.append(np.full(shape=(max_degree, ), fill_value=num_nodes))
     return padded
 
 
-def neighborhood_adj_lists(adj_matrix, k, unique_neighborhoods=True):
+def neighborhood_adj_lists(adj_matrix, k, unique_neighborhoods=True, inverted=False):
 
     # List of V x V sparse matrices
+    if inverted:
+        adj_matrix = adj_matrix.transpose(copy=True)
     neighborhoods = random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods)
 
     adj_lists = []

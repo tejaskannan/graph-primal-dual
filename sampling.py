@@ -2,6 +2,9 @@ import tensorflow as tf
 import numpy as np
 import networkx as nx
 from core.load import load_to_networkx
+from utils.tf_utils import masked_gather, weighted_sum
+from utils.utils import neighborhood_adj_lists
+from core.layers import AdjGAT
 
 
 def random_walks(adj_lst, num_paths, k):
@@ -62,9 +65,7 @@ def get_node_features(paths, node_features):
 
     return tf.reduce_sum(path_features, axis=-2)
 
-
-
-graph = load_to_networkx('graphs/tiny.tntp')
+graph = load_to_networkx('graphs/berlin-tiergarten.tntp')
 adj_lst = list(map(list, iter(graph.adj.values())))
 
 max_degree = max(map(lambda x: len(x), adj_lst))
@@ -73,8 +74,12 @@ print('Max Degree: {0}'.format(max_degree))
 adj_lst_np = []
 for neighbors in adj_lst:
     if len(neighbors) < max_degree:
-        neighbors = np.random.choice(neighbors, size=max_degree, replace=True)
+        #neighbors = np.random.choice(neighbors, size=max_degree, replace=True)
+        neighbors = np.pad(neighbors, pad_width=(0, max_degree-len(neighbors)), mode='constant',
+                           constant_values=graph.number_of_nodes())
     adj_lst_np.append(neighbors)
+
+adj_lst_np.append(np.full(shape=(max_degree,), fill_value=graph.number_of_nodes()))
 adj_lst_np = np.array(adj_lst_np)
 
 # Create node features
@@ -82,28 +87,63 @@ eigen = nx.eigenvector_centrality(graph, max_iter=1000)
 out_deg = nx.out_degree_centrality(graph)
 in_deg = nx.in_degree_centrality(graph)
 
-node_features = np.zeros(shape=(graph.number_of_nodes(), 3))
+node_features = np.zeros(shape=(graph.number_of_nodes()+1, 3))
 for node in graph.nodes():
-    node_features[node, 0] = eigen[node]
-    node_features[node, 1] = out_deg[node]
-    node_features[node, 2] = in_deg[node]
+    # node_features[node, 0] = eigen[node]
+    # node_features[node, 1] = out_deg[node]
+    # node_features[node, 2] = in_deg[node]
 
-# print(node_features)
+    node_features[node, 0] = node + 1
+    node_features[node, 1] = node + 2
+    node_features[node, 2] = node + 3
+
+final_node = graph.number_of_nodes()
+node_features[final_node, 0] = 0
+node_features[final_node, 1] = 0
+node_features[final_node, 2] = 0
+
+mask_index = [[4], [4]]
 
 num_samples = 1
 path_length = 3
 
+b = 2
+weights = []
+for i in range(b):
+    w = []
+    for j in range(graph.number_of_nodes()+1):
+        index = i * graph.number_of_nodes() + j
+        w.append(np.arange(start=index, stop=max_degree+index))
+    weights.append(w)
+weights = np.array(weights)
+
 with tf.Session() as sess:
+
+    adj_ph = tf.placeholder(dtype=tf.int32, shape=(b,) + adj_lst_np.shape, name='adj-ph')
+    node_ph = tf.placeholder(dtype=tf.float32, shape=(b,) + node_features.shape, name='node-ph')
+    mask_ph = tf.placeholder(dtype=tf.int32, shape=(2, 1), name='mask-ph')
+    weights_ph = tf.placeholder(dtype=tf.float32, shape=weights.shape, name='weights-ph')
+
+    # paths = random_walks(adj_ph, num_samples, k=path_length)
+    # op = get_node_features(paths, node_ph)
+
+    # op = masked_gather(values=node_ph, indices=adj_ph, mask_index=mask_ph)
+    gat = AdjGAT(output_size=3, num_heads=1)
+    op = gat(inputs=node_ph, adj_lst=adj_ph, mask_index=mask_ph)
+    # op = weighted_sum(values=node_ph,
+    #                   indices=adj_ph,
+    #                   weights=weights_ph)
+
+    feed_dict = {
+        adj_ph: [adj_lst_np, adj_lst_np],
+        node_ph: [node_features, node_features],
+        #weights_ph: weights
+        mask_ph: mask_index
+    }
 
     init_op = tf.global_variables_initializer()
     sess.run(init_op)
 
-    adj_ph = tf.placeholder(dtype=tf.int32, shape=(2,) + adj_lst_np.shape, name='adj-ph')
-    node_ph = tf.placeholder(dtype=tf.float32, shape=(2,) + node_features.shape, name='node-ph')
-
-    paths = random_walks(adj_ph, num_samples, k=path_length)
-    op = get_node_features(paths, node_ph)
-
-    output = sess.run(op, feed_dict={adj_ph: [adj_lst_np, adj_lst_np], node_ph: [node_features, node_features]})
+    output = sess.run(op, feed_dict=feed_dict)
 
     print(output)

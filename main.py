@@ -16,6 +16,7 @@ from model_runners.neighborhood_runner import NeighborhoodRunner
 from model_runners.gat_runner import GATRunner
 from model_runners.gcn_runner import GCNRunner
 from model_runners.uniform_baseline import UniformBaseline
+from model_runners.adj_runner import AdjRunner
 
 
 def main():
@@ -118,6 +119,8 @@ def get_model_runner(params):
         return GATRunner(params=params)
     elif params['name'] == 'gcn':
         return GCNRunner(params=params)
+    elif params['name'] == 'adj':
+        return AdjRunner(params=params)
     raise ValueError('Model with name {0} does not exist.'.format(params['name']))
 
 

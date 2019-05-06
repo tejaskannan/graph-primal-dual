@@ -57,7 +57,7 @@ def gather_rows(values, indices, name='gather-rows'):
     return gathered_values, value_indices
 
 
-def masked_gather(values, indices, mask_index, name='masked-gather'):
+def masked_gather(values, indices, mask_index, set_zero=False, name='masked-gather'):
     """
     This function retrieves rows along axis 1 of 'values' corresponding
     to the given indices. All indices which equal to mask_index
@@ -71,16 +71,20 @@ def masked_gather(values, indices, mask_index, name='masked-gather'):
     gathered_values, value_indices = gather_rows(values, indices)
 
     index_shape = tf.shape(indices)
-    indices_y = tf.reshape(value_indices[:,1], [index_shape[0], -1])
-
-    mask = tf.cast(tf.equal(indices_y, mask_index), tf.float32)
-    mask = -BIG_NUMBER * mask
-
     new_shape = [index_shape[0], index_shape[1], index_shape[2], tf.shape(values)[2]] 
     gathered_values = tf.reshape(gathered_values, new_shape)
 
+    indices_y = tf.reshape(value_indices[:,1], [index_shape[0], -1])
+
+    mask = tf.cast(tf.equal(indices_y, mask_index), tf.float32)
     mask = tf.reshape(mask, new_shape[0:3] + [-1])
-    masked_values = gathered_values + mask
+
+    if set_zero:
+        mask = 1.0 - mask
+        masked_values = gathered_values * mask
+    else:
+        mask = -BIG_NUMBER * mask
+        masked_values = gathered_values + mask
 
     return masked_values, mask
 
