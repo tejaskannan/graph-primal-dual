@@ -19,6 +19,42 @@ def plot_costs(costs_lst, out_path):
     plt.close()
 
 
+def plot_flow_graph_adj(graph, flows, adj_lst, demands, file_path):
+    edge_cmap = cm.get_cmap(name='Reds')
+
+    agraph = nx.drawing.nx_agraph.to_agraph(graph)
+    agraph.node_attr['style'] = 'filled'
+    agraph.graph_attr['pad'] = 2.0
+    agraph.graph_attr['overlap'] = 'scalexy'
+    agraph.graph_attr['sep'] = 1.0
+
+    for node in graph.nodes():
+        n = agraph.get_node(node)
+        demand = demands[node, 0] - demands[node, 1]
+        if demand > 0.0:
+            n.attr['shape'] = 'diamond'
+        elif demand < 0.0:
+            n.attr['shape'] = 'square'
+        n.attr['label'] = str(round(demand, 2))
+
+    min_flow_val = np.min(flows)
+    max_flow_val = np.max(flows)
+    for src, dst in graph.edges():
+        e = agraph.get_edge(src, dst)
+
+        out_index = np.where(adj_lst[src] == dst)[0]
+        if len(out_index) == 0:
+            flow = 0.0
+        else:
+            flow = float(flows[src, out_index[0]])
+
+        e.attr['color'] = colors.rgb2hex(edge_cmap(flow / max_flow_val)[:3])
+        if flow > SMALL_NUMBER:
+            e.attr['label'] = str(round(flow, 2))
+
+    agraph.draw(file_path, prog='neato')
+
+
 # Flows is a |V| x |V| matrix of flow values
 def plot_flow_graph(graph, flows, file_path, use_node_weights=True):
     cmap = cm.get_cmap(name='Reds')

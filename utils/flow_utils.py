@@ -11,6 +11,7 @@ def mcf_solver(pred_weights, demand, flow_indices, max_iters):
 
     Returns: B x (V+1) x D tensor containing flow volumes
     """
+
     def body(flow, prev_flow):
         # Get incoming flows, B * (V+1) * D x 1  tensor
         inflow = tf.gather_nd(flow, flow_indices)
@@ -33,9 +34,10 @@ def mcf_solver(pred_weights, demand, flow_indices, max_iters):
     flow = tf.zeros_like(pred_weights, dtype=tf.float32)
     prev_flow = flow + BIG_NUMBER
     shape_invariants = [flow.get_shape(), prev_flow.get_shape()]
-    flow, pflow = tf.while_loop(cond, body,
+    flow, pflow = tf.while_loop(cond=cond,
+                                body=body,
                                 loop_vars=[flow, prev_flow],
                                 parallel_iterations=1,
                                 shape_invariants=shape_invariants,
                                 maximum_iterations=max_iters)
-    return flow
+    return flow, pflow

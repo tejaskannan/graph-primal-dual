@@ -91,16 +91,16 @@ class AdjModel(Model):
                 # Normalize weights for outgoing neighbors
                 normalized_weights = tf.nn.softmax(pred_weights, axis=-1)
 
-                flow = mcf_solver(pred_weights=normalized_weights,
-                                  demand=demands,
-                                  flow_indices=flow_indices,
-                                  max_iters=self.params['flow_iters'])
+                flow, pflow = mcf_solver(pred_weights=normalized_weights,
+                                         demand=demands,
+                                         flow_indices=flow_indices,
+                                         max_iters=self.params['flow_iters'])
 
                 flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
                 self.loss = flow_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [node_weights]
+                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, pflow]
                 self.optimizer_op = self._build_optimizer_op()
 
                 # # Compute minimum cost flow from flow weights
