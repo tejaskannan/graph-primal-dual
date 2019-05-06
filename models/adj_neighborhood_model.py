@@ -91,8 +91,16 @@ class AdjModel(Model):
                                                 mask_index=num_nodes)
                 pred_weights = tf.squeeze(pred_weights, axis=-1)
 
+                # Mask to remove nonexistent edges
+                mask_indices = tf.expand_dims(num_nodes, axis=-1)
+                mask = 1.0 - tf.cast(tf.equal(adj_lst, mask_indices), tf.float32)
+
                 # Normalize weights for outgoing neighbors
-                normalized_weights = tf.nn.softmax(pred_weights, axis=-1)
+                if self.params['use_sparsemax']:
+                    sparsemax = SparseMax(epsilon=1e-5)
+                    normalized_weights = sparsemax(inputs=pred_weights, mask=mask)
+                else:
+                    normalized_weights = tf.nn.softmax(pred_weights, axis=-1)
 
                 flow, pflow = mcf_solver(pred_weights=normalized_weights,
                                          demand=demands,
@@ -114,9 +122,6 @@ class AdjModel(Model):
                                    activate_final=False,
                                    name='dual-decoder')
                 dual_vars = dual_decoder(inputs=node_encoding)
-
-                mask_indices = tf.expand_dims(num_nodes, axis=-1)
-                mask = 1.0 - tf.cast(tf.equal(adj_lst, mask_indices), tf.float32)
 
                 # B x (V + 1) x D tensor of repeated dual variables
                 dual = mask * dual_vars

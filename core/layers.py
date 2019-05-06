@@ -354,14 +354,16 @@ class SparseMax(Layer):
         obs_indices = tf.concat([indices_x, indices_y], axis=-1)
 
         # k(z) indices within the final dimension of the 3D tensor
-        indices = tf.concat([obs_indices, tf.reshape(k_z - 1, [-1, 1])], axis=1)
+        k_z_indices = tf.nn.relu(tf.reshape(k_z - 1, [-1, 1]))
+        indices = tf.concat([obs_indices, k_z_indices], axis=1)
 
         # Partial sums less than (z)
         tau_sum = tf.gather_nd(partial_sums, indices)
         tau_sum_reshape = tf.reshape(tau_sum, tf.shape(k_z))
 
         # Threshold value tau(z)
-        tau_z = (tau_sum_reshape - 1) / tf.cast(k_z, dtype=z.dtype)
+        k_z = tf.clip_by_value(tf.cast(k_z, dtype=z.dtype), SMALL_NUMBER, BIG_NUMBER)
+        tau_z = (tau_sum_reshape - 1) / k_z
         tau_z = tf.expand_dims(tau_z, axis=-1)
 
         # Take max of reduced z values with zero

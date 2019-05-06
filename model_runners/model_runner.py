@@ -292,10 +292,6 @@ class ModelRunner:
                     adj_lst = outputs[3][j]
                     pred_weights = outputs[4][j]
 
-                    print(LINE)
-                    print(outputs[5][j])
-                    print(LINE)
-
                     demands = test_batches[DataSeries.NODE][i][j]
 
                     index = i * batch_size + j
