@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from utils.constants import BIG_NUMBER, SMALL_NUMBER, FLOW_THRESHOLD
+from utils.tf_utils import masked_gather, weighted_sum
 
 
 class Layer:
@@ -203,6 +204,66 @@ class GAT(Layer):
             # Average over all attention heads
             attn_heads = (1.0 / self.num_heads) * tf.add_n(heads)
             return self.activation(attn_heads)
+
+
+class AdjGAT(Layer):
+    """
+    Graph Attention Layer from https://arxiv.org/abs/1710.10903
+    """
+    def __init__(self, output_size, num_heads, activation=tf.nn.relu, name='GAT'):
+        super(AdjGAT, self).__init__(output_size, activation, name)
+        self.num_heads = num_heads
+
+    def __call__(self, inputs, **kwargs):
+
+        # B x V x N tensor (N is the max number of neighbors)
+        adj_lst = kwargs['adj_lst']
+
+        # B x 1 tensor denoting the mask index for each graph
+        mask_index = kwargs['mask_index']
+
+        weight_dropout_keep = kwargs['weight_dropout_keep'] if 'weight_dropout_keep' in kwargs else 1.0
+        attn_dropout_keep = kwargs['attn_dropout_keep'] if 'attn_dropout_keep' in kwargs else 1.0
+
+        with tf.name_scope(self.name):
+            heads = []
+            for i in range(self.num_heads):
+                # Apply weight matrix to the set of inputs, B x V x D' Tensor
+                input_mlp = MLP(hidden_sizes=[],
+                                output_size=self.output_size,
+                                bias_final=False,
+                                activation=None,
+                                name='{0}-W-{1}'.format(self.name, i))
+                transformed_inputs = input_mlp(inputs=inputs, dropout_keep_prob=weight_dropout_keep)
+
+                # Create unnormalized attention weights, B x V x 1
+                attn_mlp = MLP(hidden_sizes=[],
+                               output_size=1,
+                               bias_final=False,
+                               activation=None,
+                               name='{0}-a-{1}'.format(self.name, i))
+                attn_weights = attn_mlp(inputs=transformed_inputs, dropout_keep_prob=attn_dropout_keep)
+
+                # B x V x N x 1 tensor containing unormalized weights per node
+                masked_weights, _ = masked_gather(values=attn_weights,
+                                                  indices=adj_lst,
+                                                  mask_index=mask_index)                
+                masked_weights = tf.squeeze(masked_weights, axis=-1)
+
+                # Compute normalized attention weights, B x V x N
+                attn_coefs = tf.nn.softmax(masked_weights, axis=-1)
+
+                # Apply attention weights, B x V x F'
+                attn_head = weighted_sum(values=transformed_inputs,
+                                         indices=adj_lst,
+                                         weights=attn_coefs)
+                attn_head = tf.contrib.layers.bias_add(attn_head, scope='{0}-b-{1}'.format(self.name, i))
+                heads.append(attn_head)
+
+            # Average over all attention heads
+            attn_heads = (1.0 / self.num_heads) * tf.add_n(heads)
+            return self.activation(attn_heads)
+
 
 
 class Gate(Layer):

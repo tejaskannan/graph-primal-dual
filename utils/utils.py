@@ -55,6 +55,76 @@ def add_features_sparse(graph, demands, flows, proportions, node_weights):
     return graph
 
 
+def adjacency_list(graph):
+    adj_lst = list(map(list, iter(graph.adj.values())))
+    max_degree = max(map(lambda x: len(x), adj_lst))
+    return adj_lst, max_degree
+
+
+def pad_adj_list(adj_lst, max_degree, num_nodes):
+    padded = []
+    for lst in adj_lst:
+        pd = np.pad(lst, pad_width=(0, num_nodes-len(lst)),
+                    mode='constant', fill_value=num_nodes)
+        padded.append(pd)
+    return padded
+
+
+def neighborhood_adj_lists(adj_matrix, k, unique_neighborhoods=True):
+
+    # List of V x V sparse matrices
+    neighborhoods = random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods)
+
+    adj_lists = []
+    max_degrees = []
+    for neighborhood in neighborhoods:
+        rows, cols = neighborhood.nonzero()
+
+        adj_dict = {}
+        for r, c in zip(rows, cols):
+            if r not in adj_dict:
+                adj_dict[r] = []
+            adj_dict[r].append(c)
+
+        # Create adjacency list
+        adj_lst = []
+        for node in sorted(adj_dict.keys()):
+            adj_lst.append(list(sorted(adj_dict[node])))
+
+        max_degree = max(map(lambda x: len(x), adj_lst))
+        max_degrees.append(max_degree)
+        adj_lists.append(adj_lst)
+
+    return adj_lists, max_degrees
+
+
+def neighborhood_batch(adj_matrices, k, unique_neighborhoods=True):
+    """
+    adj_matrices is a list of length B, each element is the adj matrix for the bth sample
+    k is the number of neighborhood levels to compute
+    """
+
+    neigborhood_levels = [] # B x K x N x D_k
+    degrees = [] # B x K
+    num_nodes = [] # B
+    for adj in adj_matrices:
+        neighborhoods, degree = neighborhood_adj_lists(adj, k, unique_neighborhoods)
+
+        neighborhood_level.append(neighborhoods)
+        degrees.append(degree)
+        num_nodes.append(adj.shape[0])
+
+    neighborhood_batches = [] # K x B x N x D_k
+
+    for i in range(k):
+        max_degree = max(map(lambda x: len(x[i]), degrees))
+        neighborhood_batch = [pad_adj_list(nbrhood[i], max_degree, n) 
+                              for nbrhood, n in zip(neighborhood_levels, num_nodes)]
+        neighborhood_batches.append(neighborhood_batch)
+
+    return neighborhood_batches, num_nodes
+
+
 def features_to_demands(node_features):
     demands = np.zeros(shape=(node_features.shape[0], 1), dtype=float)
     for i in range(node_features.shape[0]):

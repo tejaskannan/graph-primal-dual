@@ -89,7 +89,7 @@ def weighted_sum(values, indices, weights, name='weighted-sum'):
     """
     values: B x V x F tensor
     indices: B x V x D tensor
-    weights: B x V x 1 tensor
+    weights: B x V x D tensor
 
     Returns: B x V x F tensor
     """
@@ -103,7 +103,6 @@ def weighted_sum(values, indices, weights, name='weighted-sum'):
     gathered_values = tf.reshape(gathered_values, new_shape)
 
     # B x V x D x F tensor
-    weights = tf.reshape(weights, [index_shape[0], index_shape[1], 1, 1])
-    weighted_values = gathered_values * weights
+    weighted_values = gathered_values * tf.expand_dims(weights, axis=-1)
 
     return tf.reduce_sum(weighted_values, axis=-2)
