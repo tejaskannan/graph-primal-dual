@@ -5,7 +5,7 @@ from core.layers import MLP, AdjGAT, GRU
 from core.layers import DualFlow, SparseMax
 from utils.constants import BIG_NUMBER, SMALL_NUMBER
 from utils.tf_utils import masked_gather
-from utils.flow_utils import mcf_solver
+from utils.flow_utils import mcf_solver, dual_flow
 from cost_functions.cost_functions import get_cost_function, apply_with_capacities
 
 
@@ -31,6 +31,9 @@ class AdjModel(Model):
 
         # B*V*D x 3 tensor containing 3D indices used to compute inflow
         flow_indices = kwargs['flow_indices']
+
+        # B*V*D x 3 tensor containing 2D indices of outgoing neighbors
+        out_indices = kwargs['out_indices']
 
         # B x 1
         num_nodes = kwargs['num_nodes'] 
@@ -96,12 +99,53 @@ class AdjModel(Model):
                                          flow_indices=flow_indices,
                                          max_iters=self.params['flow_iters'])
 
+                # if should_correct_flows:
+                #     out_flow = tf.reshape(tf.gather_nd(flow, out_indices), tf.shape(pred_weights))
+                #     in_flow = tf.reshape(tf.gather_nd(flow, flow_indices), tf.shape(pred_weights))
+                #     flow_diff = tf.minimum(out_flow, in_flow)
+                #     flow = tf.nn.relu(flow - flow_diff)
+
                 flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
-                self.loss = flow_cost
+                # Compute Dual Problem and associated cost
+                dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
+                                   output_size=1,
+                                   activation=tf.nn.tanh,
+                                   activate_final=False,
+                                   name='dual-decoder')
+                dual_vars = dual_decoder(inputs=node_encoding)
+
+                mask_indices = tf.expand_dims(num_nodes, axis=-1)
+                mask = 1.0 - tf.cast(tf.equal(adj_lst, mask_indices), tf.float32)
+
+                # B x (V + 1) x D tensor of repeated dual variables
+                dual = mask * dual_vars
+
+                # Need to compute transpose (via a masked gather)
+                dual_tr, _ = masked_gather(values=dual_vars,
+                                           indices=adj_lst,
+                                           mask_index=num_nodes,
+                                           set_zero=True)
+                dual_tr = tf.squeeze(dual_tr, axis=-1)
+                dual_diff = dual - dual_tr
+
+                # B x V x D
+                dual_flows = dual_flow(dual_diff=dual_diff,
+                                       adj_mask=mask,
+                                       cost_fn=self.cost_fn,
+                                       step_size=self.params['dual_step_size'],
+                                       momentum=self.params['dual_momentum'],
+                                       max_iters=self.params['dual_iters'])
+
+                dual_demand = tf.reduce_sum(dual_vars * demands, axis=[1, 2])
+                dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
+                dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
+
+                self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, pflow]
+                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost]
                 self.optimizer_op = self._build_optimizer_op()
+
 
                 # # Compute minimum cost flow from flow weights
                 # pred_weights = adj * tf.transpose(node_weights, perm=[0, 2, 1])

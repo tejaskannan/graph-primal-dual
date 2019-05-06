@@ -41,3 +41,29 @@ def mcf_solver(pred_weights, demand, flow_indices, max_iters):
                                 shape_invariants=shape_invariants,
                                 maximum_iterations=max_iters)
     return flow, pflow
+
+
+def dual_flow(dual_diff, adj_mask, cost_fn, step_size, momentum, max_iters, name='dual-flow'):
+
+        def body(flow, acc, prev_flow):
+            momentum_acc = momentum * acc
+            derivative = cost_fn.derivative(flow - momentum_acc) - dual_diff
+            next_acc = momentum_acc + step_size * derivative
+            next_flow = tf.nn.relu(adj_mask * (flow - next_acc))
+            return [next_flow, next_acc, flow]
+
+        def cond(flow, momentum, prev_flow):
+            return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
+
+        dual_flows = dual_diff
+        acc = tf.zeros_like(dual_diff, dtype=tf.float32)
+        prev_dual_flows = dual_flows + BIG_NUMBER
+        shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
+        dual_flows, _, _ = tf.while_loop(cond, body,
+                                         loop_vars=[dual_flows, acc, prev_dual_flows],
+                                         parallel_iterations=1,
+                                         shape_invariants=shape_invariants,
+                                         maximum_iterations=max_iters,
+                                         name=name + '-while-loop')
+
+        return dual_flows

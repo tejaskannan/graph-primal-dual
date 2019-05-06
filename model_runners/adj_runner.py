@@ -38,6 +38,10 @@ class AdjRunner(ModelRunner):
                                                    shape=[np.prod(adj_shape), 3],
                                                    name='flow-indices-ph',
                                                    is_sparse=False)
+        out_indices_ph = model.create_placeholder(dtype=tf.int32,
+                                                  shape=[np.prod(adj_shape), 3],
+                                                  name='out-indices-ph',
+                                                  is_sparse=False)
         node_embedding_ph = model.create_placeholder(dtype=tf.float32,
                                                      shape=embedding_shape,
                                                      name='node-embedding-ph',
@@ -57,6 +61,7 @@ class AdjRunner(ModelRunner):
             'node_embeddings': node_embedding_ph,
             'adj_lst': adj_ph,
             'flow_indices': flow_indices_ph,
+            'out_indices': out_indices_ph,
             'num_output_features': num_nodes,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes_ph,
@@ -93,22 +98,39 @@ class AdjRunner(ModelRunner):
         inv_adj_tensors = np.array([pad_adj_list(adj_lst, max_degree, n_nodes) for adj_lst in inv_adj_lists])
 
         # 2D indexing used to extract inflow
-        indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
+        flow_indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
+        out_indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
         index = 0
         for x in range(adj_tensors.shape[0]):
             for y in range(adj_tensors.shape[1]):
                 for i, z in enumerate(inv_adj_tensors[x, y]):
                     indexof = np.where(adj_tensors[x, z] == y)[0]
 
-                    indices[index, 0] = x
-                    indices[index, 1] = z
+                    flow_indices[index, 0] = x
+                    flow_indices[index, 1] = z
 
                     if len(indexof) > 0:
-                        indices[index, 2] = indexof[0]
+                        flow_indices[index, 2] = indexof[0]
                     else:
-                        indices[index, 2] = max_degree-1
+                        flow_indices[index, 2] = max_degree-1
+
+                    # Reverse Edge
+                    indexof = np.where(adj_tensors[x, y] == z)[0]
+
+                    out_indices[index, 0] = x
+                    out_indices[index, 1] = y
+                    if len(indexof) > 0:
+                        out_indices[index, 2] = indexof[0]
+                    else:
+                        out_indices[index, 2] = max_degree-1
 
                     index += 1
+
+        # print(adj_lists[0])
+        # print(inv_adj_lists[0])
+
+        # print(flow_indices[0:max_degree*n_nodes,:])
+        # print(out_indices[0:max_degree*n_nodes,:])
 
         # Add dummy embeddings, features and demands
         demands = np.insert(demands, demands.shape[1], 0, axis=1)
@@ -126,7 +148,8 @@ class AdjRunner(ModelRunner):
             placeholders['node_embeddings']: node_embeddings,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: num_nodes,
-            placeholders['flow_indices']: indices
+            placeholders['flow_indices']: flow_indices,
+            placeholders['out_indices']: out_indices
         }
 
         return feed_dict

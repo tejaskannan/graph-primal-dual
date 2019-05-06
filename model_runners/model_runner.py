@@ -55,8 +55,6 @@ class ModelRunner:
         # Load Graphs
         graphs, _, num_nodes, max_degree = self._load_graphs()
 
-        print(max_degree)
-
         num_neighborhoods = self.params['num_neighborhoods']
 
         # Initialize model
@@ -204,7 +202,8 @@ class ModelRunner:
         ph_dict = self.create_placeholders(model=model,
                                            num_nodes=num_nodes,
                                            embedding_size=self.embedding_size,
-                                           num_neighborhoods=num_neighborhoods)
+                                           num_neighborhoods=num_neighborhoods,
+                                           max_degree=max_degree)
 
         # Create model
         model.build(**ph_dict)
@@ -292,6 +291,10 @@ class ModelRunner:
                     flow_cost = outputs[2][j]
                     adj_lst = outputs[3][j]
                     pred_weights = outputs[4][j]
+
+                    print(LINE)
+                    print(outputs[5][j])
+                    print(LINE)
 
                     demands = test_batches[DataSeries.NODE][i][j]
 
