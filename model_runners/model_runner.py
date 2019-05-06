@@ -11,6 +11,7 @@ from utils.utils import sparse_matrix_to_tensor, features_to_demands, random_wal
 from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists
 from utils.constants import BIG_NUMBER, LINE
 from core.plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
+from core.plot import plot_flow_graph_adj
 from core.load import load_to_networkx, read_dataset
 from core.dataset import DatasetManager, Series, DataSeries
 
@@ -52,7 +53,9 @@ class ModelRunner:
     def train(self):
 
         # Load Graphs
-        graphs, _, num_nodes = self._load_graphs()
+        graphs, _, num_nodes, max_degree = self._load_graphs()
+
+        print(max_degree)
 
         num_neighborhoods = self.params['num_neighborhoods']
 
@@ -63,7 +66,8 @@ class ModelRunner:
         ph_dict = self.create_placeholders(model=model,
                                            num_nodes=num_nodes,
                                            embedding_size=self.embedding_size,
-                                           num_neighborhoods=num_neighborhoods)
+                                           num_neighborhoods=num_neighborhoods,
+                                           max_degree=max_degree)
 
         # Create model
         model.build(**ph_dict)
@@ -125,8 +129,6 @@ class ModelRunner:
                 outputs = model.run_train_step(feed_dict=feed_dict)
                 avg_loss = outputs[0]
                 loss = outputs[1]
-
-                print(loss)
 
                 train_losses.append(avg_loss)
                 self.dataset.report_losses(loss, indices)
@@ -191,7 +193,7 @@ class ModelRunner:
 
     def test(self, model_path):
         # Load Graphs
-        _, graphs, num_nodes = self._load_graphs()
+        _, graphs, num_nodes, max_degree = self._load_graphs()
 
         num_neighborhoods = self.params['num_neighborhoods']
 
@@ -279,33 +281,42 @@ class ModelRunner:
                         plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
                         plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
                 else:
-                    flow_cost = outputs[1][j]
-                    flows = outputs[2][j]
-                    flow_proportions = outputs[3][j]
-                    dual_cost = outputs[4][j]
-                    weights = outputs[6][j]
-                    node_weights = outputs[7][j]
+                    # flow_cost = outputs[1][j]
+                    # flows = outputs[2][j]
+                    # flow_proportions = outputs[3][j]
+                    # dual_cost = outputs[4][j]
+                    # weights = outputs[6][j]
+                    # node_weights = outputs[7][j]
+
+                    flow = outputs[1][j]
+                    flow_cost = outputs[2][j]
+                    adj_lst = outputs[3][j]
+                    pred_weights = outputs[4][j]
 
                     demands = test_batches[DataSeries.NODE][i][j]
 
                     index = i * batch_size + j
 
-                    flow_graph = add_features(graph,
-                                              demands=demands,
-                                              flows=flows,
-                                              proportions=flow_proportions,
-                                              node_weights=node_weights)
+                    # flow_graph = add_features(graph,
+                    #                           demands=demands,
+                    #                           flows=flows,
+                    #                           proportions=flow_proportions,
+                    #                           node_weights=node_weights)
 
                     if self.params['plot_flows']:
-                        plot_flow_graph(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index))
-                        plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
-                        plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
+                        path = '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index)
+                        weight_path = '{0}flows-weights-{1}-{2}.png'.format(model_path, graph_name, index)
+                        plot_flow_graph_adj(graph, flows=flow, adj_lst=adj_lst, demands=demands, file_path=path)
+                        plot_flow_graph_adj(graph, flows=pred_weights, adj_lst=adj_lst, demands=demands, file_path=weight_path)
+                        #plot_flow_graph(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index))
+                        #plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
+                        #plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
 
                 # Log Outputs
-                append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
+                #append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
 
                 # Write output graph to Graph XML
-                nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, index))
+                #nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, index))
 
     def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
         raise NotImplementedError()
@@ -336,5 +347,13 @@ class ModelRunner:
 
         num_train_nodes = np.max([g.number_of_nodes() for g in train_graphs.values()])
         num_test_nodes = np.max([g.number_of_nodes() for g in test_graphs.values()])
+        num_nodes = max(num_train_nodes, num_test_nodes)
 
-        return train_graphs, test_graphs, max(num_train_nodes, num_test_nodes)
+        train_out_deg = np.max([max([d for _, d in g.out_degree()]) for g in train_graphs.values()])
+        train_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in train_graphs.values()])
+
+        test_out_deg = np.max([max([d for _, d in g.out_degree()]) for g in test_graphs.values()])
+        test_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in test_graphs.values()])
+        max_degree = max(max(train_out_deg, train_in_deg), max(test_out_deg, test_in_deg))
+
+        return train_graphs, test_graphs, num_nodes, max_degree

@@ -7,19 +7,18 @@ from core.dataset import DatasetManager, Series, DataSeries
 from model_runners.model_runner import ModelRunner
 from models.adj_neighborhood_model import AdjModel
 
-# This is hard coded only for now.
-MAX_DEGREE = 3
 
 class AdjRunner(ModelRunner):
 
     def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
         num_neighborhoods = kwargs['num_neighborhoods']
+        max_degree = kwargs['max_degree']
 
         # Placeholder shapes
         b = self.params['batch_size']
         node_shape = [b, num_nodes+1, self.num_node_features]
         demands_shape = [b, num_nodes+1, 1]
-        adj_shape = [b, num_nodes+1, MAX_DEGREE]
+        adj_shape = [b, num_nodes+1, max_degree]
         embedding_shape = [b, num_nodes+1, embedding_size]
         num_nodes_shape = [b, 1]
 
@@ -77,6 +76,8 @@ class AdjRunner(ModelRunner):
             node_embeddings = node_embeddings[index]
             dropout_keep = 1.0
 
+        max_degree = int(placeholders['adj_lst'].get_shape()[2])
+
         demands = np.array([features_to_demands(n) for n in node_features])
 
         # This won't work for multiple graphs because we already
@@ -86,10 +87,10 @@ class AdjRunner(ModelRunner):
         n_nodes = np.max(num_nodes)
 
         adj_lists = [neighborhood_adj_lists(mat, 1, False)[0][1] for mat in adj]
-        adj_tensors = np.array([pad_adj_list(adj_lst, MAX_DEGREE, n_nodes) for adj_lst in adj_lists])
+        adj_tensors = np.array([pad_adj_list(adj_lst, max_degree, n_nodes) for adj_lst in adj_lists])
 
         inv_adj_lists = [neighborhood_adj_lists(mat, 1, False, True)[0][1] for mat in adj]
-        inv_adj_tensors = np.array([pad_adj_list(adj_lst, MAX_DEGREE, n_nodes) for adj_lst in inv_adj_lists])
+        inv_adj_tensors = np.array([pad_adj_list(adj_lst, max_degree, n_nodes) for adj_lst in inv_adj_lists])
 
         # 2D indexing used to extract inflow
         indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
@@ -105,7 +106,7 @@ class AdjRunner(ModelRunner):
                     if len(indexof) > 0:
                         indices[index, 2] = indexof[0]
                     else:
-                        indices[index, 2] = MAX_DEGREE-1
+                        indices[index, 2] = max_degree-1
 
                     index += 1
 
