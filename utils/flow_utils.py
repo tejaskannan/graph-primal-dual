@@ -47,7 +47,8 @@ def dual_flow(dual_diff, adj_mask, cost_fn, step_size, momentum, max_iters, name
 
         def body(flow, acc, prev_flow):
             momentum_acc = momentum * acc
-            derivative = cost_fn.derivative(flow - momentum_acc) - dual_diff
+            predicted = tf.nn.relu(adj_mask * (flow - momentum_acc))
+            derivative = cost_fn.derivative(predicted) + dual_diff
             next_acc = momentum_acc + step_size * derivative
             next_flow = tf.nn.relu(adj_mask * (flow - next_acc))
             return [next_flow, next_acc, flow]

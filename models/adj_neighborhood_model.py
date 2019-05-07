@@ -135,7 +135,9 @@ class AdjModel(Model):
                                            mask_index=num_nodes,
                                            set_zero=True)
                 dual_tr = tf.squeeze(dual_tr, axis=-1)
-                dual_diff = dual - dual_tr
+
+                # alpha_j - alpha_i
+                dual_diff = dual_tr - dual
 
                 # B x V x D
                 dual_flows = dual_flow(dual_diff=dual_diff,
@@ -146,10 +148,10 @@ class AdjModel(Model):
                                        max_iters=self.params['dual_iters'])
 
                 dual_demand = tf.reduce_sum(dual_vars * demands, axis=[1, 2])
-                dual_flow_cost = self.cost_fn.apply(dual_flows) - dual_diff * dual_flows
+                dual_flow_cost = self.cost_fn.apply(dual_flows) + dual_diff * dual_flows
                 dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, node_weights]
+                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, node_weights, dual_flows, dual_diff, dual_vars]
                 self.optimizer_op = self._build_optimizer_op()
