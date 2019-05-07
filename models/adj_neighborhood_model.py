@@ -69,19 +69,12 @@ class AdjModel(Model):
                                                           use_adj_lists=True,
                                                           name='node-neighborhood')
 
-                # node_neighborhood = AdjGAT(output_size=self.params['node_encoding'],
-                #                            num_heads=self.params['num_heads'],
-                #                            activation=tf.nn.tanh,
-                #                            name='node-gat')
                 node_gru = GRU(output_size=self.params['node_encoding'],
                                activation=tf.nn.tanh,
                                name='node-gru')
 
                 # Combine message passing steps
                 for _ in range(self.params['graph_layers']):
-                    # next_encoding = node_neighborhood(inputs=node_encoding,
-                    #                                   adj_lst=adj_lst,
-                    #                                   mask_index=num_nodes)
                     next_encoding, attn_weights = node_neighborhood(inputs=node_encoding,
                                                                     neighborhoods=neighborhoods,
                                                                     mask_index=num_nodes,
@@ -161,5 +154,5 @@ class AdjModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost]
+                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, node_weights]
                 self.optimizer_op = self._build_optimizer_op()

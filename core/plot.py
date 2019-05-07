@@ -19,8 +19,9 @@ def plot_costs(costs_lst, out_path):
     plt.close()
 
 
-def plot_flow_graph_adj(graph, flows, adj_lst, demands, file_path):
+def plot_flow_graph_adj(graph, use_flow_props, file_path, use_node_weights=True):
     edge_cmap = cm.get_cmap(name='Reds')
+    node_cmap = cm.get_cmap(name='viridis')
 
     agraph = nx.drawing.nx_agraph.to_agraph(graph)
     agraph.node_attr['style'] = 'filled'
@@ -28,29 +29,40 @@ def plot_flow_graph_adj(graph, flows, adj_lst, demands, file_path):
     agraph.graph_attr['overlap'] = 'scalexy'
     agraph.graph_attr['sep'] = 1.0
 
-    for node in graph.nodes():
+    if use_node_weights:
+        weights = [w for _, w in graph.nodes.data('node_weight')]
+        min_weight = min(weights)
+        max_weight = max(weights)
+
+    for node, data in graph.nodes(data=True):
         n = agraph.get_node(node)
-        demand = demands[node, 0] - demands[node, 1]
+
+        demand = data['demand']
         if demand > 0.0:
             n.attr['shape'] = 'diamond'
         elif demand < 0.0:
             n.attr['shape'] = 'square'
         n.attr['label'] = str(round(demand, 2))
 
-    min_flow_val = np.min(flows)
-    max_flow_val = np.max(flows)
-    for src, dst in graph.edges():
+        if use_node_weights:
+            normalized_weight = (data['node_weight'] - min_weight) / (max_weight - min_weight)
+            rgb = node_cmap(normalized_weight)[:3]
+            n.attr['fillcolor'] = colors.rgb2hex(rgb)
+            n.attr['fontcolor'] = font_color(rgb)
+        else:
+            n.attr['fillcolor'] = '#BAD7E6'
+
+
+    flow_label = 'flow_proportion' if use_flow_props else 'flow'
+    flow_vals = [v for _, _, v in graph.edges.data(flow_label)]
+
+    max_flow_val = max(flow_vals)
+    for src, dst, val in graph.edges.data(flow_label):
         e = agraph.get_edge(src, dst)
 
-        out_index = np.where(adj_lst[src] == dst)[0]
-        if len(out_index) == 0:
-            flow = 0.0
-        else:
-            flow = float(flows[src, out_index[0]])
-
-        e.attr['color'] = colors.rgb2hex(edge_cmap(flow / max_flow_val)[:3])
-        if flow > SMALL_NUMBER:
-            e.attr['label'] = str(round(flow, 2))
+        e.attr['color'] = colors.rgb2hex(edge_cmap(val / max_flow_val)[:3])
+        if abs(val) > SMALL_NUMBER:
+            e.attr['label'] = str(round(val, 2))
 
     agraph.draw(file_path, prog='neato')
 

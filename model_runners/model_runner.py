@@ -10,6 +10,7 @@ from utils.utils import add_features_sparse, create_node_bias, restore_params
 from utils.utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
 from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists, max_degrees
 from utils.constants import BIG_NUMBER, LINE
+from utils import graph_utils
 from core.plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
 from core.plot import plot_flow_graph_adj
 from core.load import load_to_networkx, read_dataset
@@ -293,8 +294,8 @@ class ModelRunner:
                     flow_cost = outputs[2][j]
                     adj_lst = outputs[3][j]
                     pred_weights = outputs[4][j]
-
-                    demands = test_batches[DataSeries.NODE][i][j]
+                    dual_cost = outputs[5][j]
+                    node_weights = outputs[6][j]
 
                     index = i * batch_size + j
 
@@ -304,20 +305,40 @@ class ModelRunner:
                     #                           proportions=flow_proportions,
                     #                           node_weights=node_weights)
 
+                    # Demands are passed in as V x 2 matrices. We convert back
+                    # to vector format here. Cast to numpy array to enable 
+                    # flattening to 1D vector.
+                    demands = test_batches[DataSeries.NODE][i][j]
+                    demands = np.multiply(demands, np.array([[1, -1]]))
+                    demands = np.array(np.sum(demands, axis=-1))
+
+                    node_features = {
+                        'demand': demands,
+                        'node_weight': node_weights
+                    }
+                    edge_features = {
+                        'flow': flow,
+                        'flow_proportion': pred_weights 
+                    }
+
+                    flow_graph = graph_utils.add_features(graph=graph,
+                                                          node_features=node_features,
+                                                          edge_features=edge_features)
+
                     if self.params['plot_flows']:
                         path = '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index)
                         weight_path = '{0}flows-weights-{1}-{2}.png'.format(model_path, graph_name, index)
-                        plot_flow_graph_adj(graph, flows=flow, adj_lst=adj_lst, demands=demands, file_path=path)
-                        plot_flow_graph_adj(graph, flows=pred_weights, adj_lst=adj_lst, demands=demands, file_path=weight_path)
+                        plot_flow_graph_adj(flow_graph, use_flow_props=False, file_path=path)
+                        plot_flow_graph_adj(flow_graph, use_flow_props=True, file_path=weight_path)
                         #plot_flow_graph(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index))
                         #plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
                         #plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
 
                 # Log Outputs
-                #append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
+                append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
 
                 # Write output graph to Graph XML
-                #nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, index))
+                nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, index))
 
     def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
         raise NotImplementedError()
