@@ -5,14 +5,10 @@ import tensorflow as tf
 import os
 from datetime import datetime
 from time import time
-from utils.utils import create_demands, append_row_to_log, create_node_embeddings
-from utils.utils import add_features_sparse, create_node_bias, restore_params
-from utils.utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
-from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists
+from utils.utils import append_row_to_log, delete_if_exists
 from utils.constants import BIG_NUMBER, LINE
-from utils import graph_utils
-from core.plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
-from core.plot import plot_flow_graph_adj
+from utils.graph_utils import add_features
+from core.plot import plot_flow_graph_adj, plot_weights
 from core.load import load_to_networkx, read_dataset
 from core.dataset import DatasetManager, Series
 
@@ -214,7 +210,14 @@ class ModelRunner:
         delete_if_exists(log_path)
         append_row_to_log(log_headers, log_path)
 
+        # Compute indices which will be used for plotting. This is done in a deterministic
+        # manner to make it easier to compare different runs.
         num_test_batches = len(test_batches)
+        num_test_samples = num_test_batches * batch_size
+        num_plot_samples = num_test_samples * self.params['plot_fraction']
+        step = int(num_test_samples / num_plot_samples)
+        plot_indices = set(range(0, num_test_samples, step))
+
         for i, batch in enumerate(test_batches):
 
             feed_dict = self.create_feed_dict(placeholders=ph_dict,
@@ -244,6 +247,7 @@ class ModelRunner:
                 pred_weights = outputs[4][j]
                 dual_cost = outputs[5][j]
                 node_weights = outputs[6][j]
+                attn_weights = outputs[7][j]
 
                 demands = np.array(batch[j].demands)
 
@@ -256,16 +260,23 @@ class ModelRunner:
                     'flow_proportion': pred_weights 
                 }
 
-                flow_graph = graph_utils.add_features(graph=graph,
-                                                      node_features=node_features,
-                                                      edge_features=edge_features)
+                flow_graph = add_features(graph=graph,
+                                          node_features=node_features,
+                                          edge_features=edge_features)
 
-                if self.params['plot_flows']:
-                    path = '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index)
-                    weight_path = '{0}flows-weights-{1}-{2}.png'.format(model_path, graph_name, index)
-                    plot_flow_graph_adj(flow_graph, use_flow_props=False, file_path=path)
-                    plot_flow_graph_adj(flow_graph, use_flow_props=True, file_path=weight_path)
-                    #plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
+                if self.params['plot_flows'] and index in plot_indices:
+                    flow_path = '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index)
+                    prop_path = '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index)
+                    attn_weight_path = '{0}attn-weights-{1}-{2}.png'.format(model_path, graph_name, index)
+
+                    plot_flow_graph_adj(flow_graph, use_flow_props=False, file_path=flow_path)
+                    plot_flow_graph_adj(flow_graph, use_flow_props=True, file_path=prop_path)
+                    
+                    num_nodes = batch[j].num_nodes
+                    plot_weights(weight_matrix=attn_weights,
+                                 file_path=attn_weight_path,
+                                 num_samples=self.params['plot_weight_samples'],
+                                 num_nodes=num_nodes)
 
                 # Log Outputs
                 append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)

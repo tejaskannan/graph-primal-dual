@@ -6,11 +6,11 @@ from bisect import bisect_right
 from collections.abc import Iterable
 from core.load import read_sparse_npz, load_to_networkx
 from utils.constants import BIG_NUMBER
-from utils.utils import expand_sparse_matrix, random_walk_neighborhoods
+from utils.utils import expand_sparse_matrix
 from utils.utils import create_node_embeddings, sparse_matrix_to_tensor
 from utils.utils import expand_matrix, demands_to_features
 from utils.graph_utils import adjacency_list, pad_adj_list, neighborhood_adj_lists
-from utils.graph_utils import adj_matrix_to_list
+from utils.graph_utils import adj_matrix_to_list, random_walk_neighborhoods
 from sklearn.preprocessing import StandardScaler
 
 
@@ -125,7 +125,7 @@ class DatasetManager:
         # Find the maximum outgoing degrees for each neighborhood level
         max_degrees = np.zeros(shape=(unique_neighborhoods+1,))
         for gd in self.graph_data.values():
-            degrees = [np.max(mat.sum(axis=-1)) for mat in gd.neighborhoods]        
+            degrees = [np.max(mat.sum(axis=-1)) for mat in gd.neighborhoods]
             max_degrees = np.maximum(max_degrees, degrees)
         self.max_neighborhood_degrees = max_degrees.astype(int)
 

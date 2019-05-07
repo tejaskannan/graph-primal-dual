@@ -5,11 +5,11 @@ import numpy as np
 import json
 import scipy.sparse as sp
 from utils.utils import load_params, restore_params, create_node_embeddings
-from utils.utils import append_row_to_log, create_demands, random_walk_neighborhoods
+from utils.utils import append_row_to_log, create_demands
 from utils.utils import create_capacities, delete_if_exists, serialize_dict
+from utils.graph_utils import random_walk_neighborhoods
 from utils.constants import *
-from core.load import load_to_networkx, load_embeddings
-from core.load import write_dataset, write_sparse_npz
+from core.load import load_to_networkx, load_embeddings, write_sparse_npz
 from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner

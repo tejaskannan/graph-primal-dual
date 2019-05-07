@@ -1,6 +1,6 @@
 import numpy as np
 import networkx as nx
-from utils.utils import random_walk_neighborhoods
+import scipy.sparse as sp
 
 
 def add_features(graph, node_features, edge_features):
@@ -94,6 +94,30 @@ def adj_matrix_to_list(adj_matrix, inverted=False):
         adj_lst.append(list(sorted(adj_dict[node])))
 
     return adj_lst
+
+
+def random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods=True):
+    mat = sp.eye(adj_matrix.shape[0], format='csr')
+    neighborhoods = [mat]
+    agg_mat = mat
+
+    for _ in range(k):
+        mat = mat.dot(adj_matrix)
+        mat.data[:] = 1
+
+        if unique_neighborhoods:
+            # Remove already reached nodes
+            mat = mat - agg_mat
+            mat.data = np.maximum(mat.data, 0)
+            mat.eliminate_zeros()
+            mat.data[:] = 1
+
+            agg_mat += mat
+            agg_mat.data[:] = 1
+
+        neighborhoods.append(mat)
+
+    return neighborhoods
 
 
 def adjacency_list(graph):

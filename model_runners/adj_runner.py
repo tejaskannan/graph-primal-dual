@@ -1,10 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from utils.utils import sparse_matrix_to_tensor, features_to_demands
-from utils.graph_utils import neighborhood_adj_lists, pad_adj_list
-from utils.graph_utils import adj_matrix_to_list
-from utils.utils import neighborhood_batch
-from utils.constants import BIG_NUMBER, LINE
+from utils.graph_utils import pad_adj_list, adj_matrix_to_list
 from core.dataset import DatasetManager, Series
 from model_runners.model_runner import ModelRunner
 from models.adj_neighborhood_model import AdjModel
@@ -108,7 +104,7 @@ class AdjRunner(ModelRunner):
         # 2D indexing used for inflow and flow corrections
         flow_indices = np.zeros(shape=(np.prod(adj_lsts.shape), 3))
         out_indices = np.zeros(shape=(np.prod(adj_lsts.shape), 3))
-        
+
         index_a = 0
         index_b = 0
         for x in range(adj_lsts.shape[0]):
@@ -141,10 +137,9 @@ class AdjRunner(ModelRunner):
 
                     index_b += 1
 
-
         # Add dummy embeddings, features and demands to account for added node
         demands = np.insert(demands, demands.shape[1], 0, axis=1)
-        node_features = np.insert(node_features, node_features.shape[1], 0, axis=1)
+        node_features = np.insert(node_features, node_features.shape[1], 0, axis=1)        
         node_embeddings = np.insert(node_embeddings, node_embeddings.shape[1], 0, axis=1)
 
         feed_dict = {

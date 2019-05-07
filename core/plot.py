@@ -52,7 +52,6 @@ def plot_flow_graph_adj(graph, use_flow_props, file_path, use_node_weights=True)
         else:
             n.attr['fillcolor'] = '#BAD7E6'
 
-
     flow_label = 'flow_proportion' if use_flow_props else 'flow'
     flow_vals = [v for _, _, v in graph.edges.data(flow_label)]
 
@@ -124,6 +123,7 @@ def plot_graph(graph, file_path):
 
     agraph.draw(file_path, prog='neato')
 
+
 # Flows is a |V| x |V| sparse tensor value
 def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
     cmap = cm.get_cmap(name='Reds')
@@ -175,9 +175,12 @@ def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
     agraph.draw(file_path, prog='neato')
 
 
-def plot_weights(weight_matrix, file_path, num_samples=-1):
+def plot_weights(weight_matrix, file_path, num_nodes, num_samples=-1):
     if weight_matrix.ndim == 3:
         weight_matrix = weight_matrix[0]
+
+    # Remove dummy nodes used to pad matrices
+    weight_matrix = weight_matrix[0:num_nodes,:]
 
     # Default to using all elements
     num_samples = weight_matrix.shape[0] if num_samples == -1 else num_samples
@@ -212,7 +215,7 @@ def plot_weights(weight_matrix, file_path, num_samples=-1):
 def font_color(background_rgb):
     r, g, b = background_rgb
 
-    luma = 255 * (0.2126 * r  + 0.7152 * g + 0.0722 * b)
+    luma = 255 * (0.2126 * r + 0.7152 * g + 0.0722 * b)
 
     if luma < 128:
         return '#FFFFFF'

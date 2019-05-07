@@ -1,12 +1,12 @@
 {
 	"generate": {
-		"train_samples": 1024,
-		"valid_samples": 128,
-		"test_samples": 128,
-		"graph_names": ["tiny"],
-		"dataset_names": ["tiny-1000"],
-		"min_max_sources": [1, 2],
-		"min_max_sinks": [1, 2]
+		"train_samples": 1000,
+		"valid_samples": 100,
+		"test_samples": 100,
+		"graph_names": ["berlin-tiergarten"],
+		"dataset_names": ["berlin-tiergarten-1000"],
+		"min_max_sources": [1, 10],
+		"min_max_sinks": [1, 10]
 	},
 	"model": {
 		"name": "adj",
@@ -14,7 +14,7 @@
 		"dual_momentum": 0.9,
 		"dual_step_size": 0.01,
 		"gradient_clip": 1,
-		"batch_size": 2,
+		"batch_size": 50,
 		"epochs": 1,
 		"patience": 5,
 		"early_stop_threshold": 1e-5,
@@ -39,9 +39,10 @@
 		"flow_iters": 1000,
 		"dual_iters": 100,
 		"plot_flows": true,
+		"plot_fraction": 0.005, 
 		"plot_weight_samples": 25,
-		"train_graph_names": ["tiny"],
-		"train_dataset_names": ["tiny-1000"],
+		"train_graph_names": ["berlin-prenzlauerberg-center", "berlin-tiergarten"],
+		"train_dataset_names": ["berlin-prenzlauerberg-center-1000", "berlin-tiergarten-1000"],
 		"test_graph_names": ["tiny"],
 		"test_dataset_names": ["tiny-1000"],
 		"sparse": false,

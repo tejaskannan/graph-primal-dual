@@ -1,12 +1,10 @@
 import tensorflow as tf
-import numpy as np
 from models.base_model import Model
-from core.layers import MLP, AdjGAT, GRU, AttentionNeighborhood
-from core.layers import DualFlow, SparseMax
+from core.layers import MLP, AdjGAT, GRU, AttentionNeighborhood, SparseMax
 from utils.constants import BIG_NUMBER, SMALL_NUMBER
 from utils.tf_utils import masked_gather
 from utils.flow_utils import mcf_solver, dual_flow
-from cost_functions.cost_functions import get_cost_function, apply_with_capacities
+from cost_functions.cost_functions import get_cost_function
 
 
 class AdjModel(Model):
@@ -39,9 +37,9 @@ class AdjModel(Model):
         out_indices = kwargs['out_indices']
 
         # B x 1
-        num_nodes = kwargs['num_nodes'] 
+        num_nodes = kwargs['num_nodes']
 
-        # Float
+        # Floating point number between 0 and 1
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
         # Boolean
@@ -153,5 +151,5 @@ class AdjModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, node_weights, dual_flows, dual_diff, dual_vars]
+                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, node_weights, attn_weights]
                 self.optimizer_op = self._build_optimizer_op()

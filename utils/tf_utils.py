@@ -71,10 +71,10 @@ def masked_gather(values, indices, mask_index, set_zero=False, name='masked-gath
     gathered_values, value_indices = gather_rows(values, indices)
 
     index_shape = tf.shape(indices)
-    new_shape = [index_shape[0], index_shape[1], index_shape[2], tf.shape(values)[2]] 
+    new_shape = [index_shape[0], index_shape[1], index_shape[2], tf.shape(values)[2]]
     gathered_values = tf.reshape(gathered_values, new_shape)
 
-    indices_y = tf.reshape(value_indices[:,1], [index_shape[0], -1])
+    indices_y = tf.reshape(value_indices[:, 1], [index_shape[0], -1])
 
     mask = tf.cast(tf.equal(indices_y, mask_index), tf.float32)
     mask = tf.reshape(mask, new_shape[0:3] + [-1])
@@ -103,7 +103,7 @@ def weighted_sum(values, indices, weights, name='weighted-sum'):
 
     # B x V x D x F tensor
     index_shape = tf.shape(indices)
-    new_shape = [index_shape[0], index_shape[1], index_shape[2], tf.shape(values)[2]] 
+    new_shape = [index_shape[0], index_shape[1], index_shape[2], tf.shape(values)[2]]
     gathered_values = tf.reshape(gathered_values, new_shape)
 
     # B x V x D x F tensor
