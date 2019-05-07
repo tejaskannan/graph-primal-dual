@@ -107,25 +107,40 @@ def neighborhood_batch(adj_matrices, k, unique_neighborhoods=True):
     k is the number of neighborhood levels to compute
     """
 
-    neigborhood_levels = [] # B x K x N x D_k
-    degrees = [] # B x K
+    neighborhood_levels = [] # B x K x N x D_k
     num_nodes = [] # B
+    max_degrees = [] # B x K
     for adj in adj_matrices:
-        neighborhoods, degree = neighborhood_adj_lists(adj, k, unique_neighborhoods)
+        neighborhoods, _ = neighborhood_adj_lists(adj, k, unique_neighborhoods)
 
-        neighborhood_level.append(neighborhoods)
-        degrees.append(degree)
+        # List of maximum degrees for each neighborhood level on this instance
+        max_degrees.append([max(map(lambda x: len(x), nbrhood)) for nbrhood in neighborhoods])
+
+        neighborhood_levels.append(neighborhoods)
         num_nodes.append(adj.shape[0])
 
     neighborhood_batches = [] # K x B x N x D_k
 
     for i in range(k):
-        max_degree = max(map(lambda x: len(x[i]), degrees))
+        max_degree = max(map(lambda d: d[i], max_degrees))
+
         neighborhood_batch = [pad_adj_list(nbrhood[i], max_degree, n) 
                               for nbrhood, n in zip(neighborhood_levels, num_nodes)]
-        neighborhood_batches.append(neighborhood_batch)
+        neighborhood_batches.append(np.array(neighborhood_batch))
 
-    return neighborhood_batches, num_nodes
+    return neighborhood_batches, np.reshape(num_nodes, [-1, 1])
+
+
+def max_degrees(graphs, k, unique_neighborhoods=True):
+    adj_matrices = [nx.adjacency_matrix(graph) for graph in graphs]
+
+    max_degrees = np.zeros(shape=(k+1,))
+    for adj in adj_matrices:
+        neighborhoods = random_walk_neighborhoods(adj, k=k, unique_neighborhoods=unique_neighborhoods)
+        degrees = [np.max(mat.sum(axis=-1)) for mat in neighborhoods]        
+        max_degrees = np.maximum(max_degrees, degrees)
+
+    return max_degrees
 
 
 def features_to_demands(node_features):
@@ -302,7 +317,7 @@ def sparse_matrix_to_tensor_multiple(sparse_mat, k):
 
 
 def random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods=True):
-    mat = sp.eye(adj_matrix.shape[0])
+    mat = sp.eye(adj_matrix.shape[0], format='csr')
     neighborhoods = [mat]
     agg_mat = mat
 

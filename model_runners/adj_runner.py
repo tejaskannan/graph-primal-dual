@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 from utils.utils import sparse_matrix_to_tensor, features_to_demands
 from utils.utils import neighborhood_adj_lists, pad_adj_list
+from utils.utils import neighborhood_batch
 from utils.constants import BIG_NUMBER, LINE
 from core.dataset import DatasetManager, Series, DataSeries
 from model_runners.model_runner import ModelRunner
@@ -13,6 +14,7 @@ class AdjRunner(ModelRunner):
     def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
         num_neighborhoods = kwargs['num_neighborhoods']
         max_degree = kwargs['max_degree']
+        degrees = kwargs['degrees']
 
         # Placeholder shapes
         b = self.params['batch_size']
@@ -55,11 +57,20 @@ class AdjRunner(ModelRunner):
                                                 name='num-nodes-ph',
                                                 is_sparse=False)
 
+        neighborhood_phs = []
+        for i in range(self.params['num_neighborhoods']+1):
+            ph = model.create_placeholder(dtype=tf.int32,
+                                          shape=[b, num_nodes+1, degrees[i]],
+                                          name='neighborhood-{0}-ph'.format(i),
+                                          is_sparse=False)
+            neighborhood_phs.append(ph)
+
         return {
             'node_features': node_ph,
             'demands': demands_ph,
             'node_embeddings': node_embedding_ph,
             'adj_lst': adj_ph,
+            'neighborhoods': neighborhood_phs,
             'flow_indices': flow_indices_ph,
             'out_indices': out_indices_ph,
             'num_output_features': num_nodes,
@@ -85,9 +96,9 @@ class AdjRunner(ModelRunner):
 
         demands = np.array([features_to_demands(n) for n in node_features])
 
-        # This won't work for multiple graphs because we already
-        # pad the matrices. This padding, however, should be removed.
-        num_nodes = np.reshape([mat.shape[0] for mat in adj], [-1, 1])
+        neighborhoods, num_nodes = neighborhood_batch(adj_matrices=adj,
+                                                      k=self.params['num_neighborhoods']+1,
+                                                      unique_neighborhoods=self.params['unique_neighborhoods'])
 
         n_nodes = np.max(num_nodes)
 
@@ -152,6 +163,10 @@ class AdjRunner(ModelRunner):
             placeholders['flow_indices']: flow_indices,
             placeholders['out_indices']: out_indices
         }
+
+        for i, nbrhood in enumerate(neighborhoods):
+            ph = placeholders['neighborhoods'][i]
+            feed_dict[ph] = nbrhood
 
         return feed_dict
 

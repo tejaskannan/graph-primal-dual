@@ -8,7 +8,7 @@ from time import time
 from utils.utils import create_demands, append_row_to_log, create_node_embeddings
 from utils.utils import add_features_sparse, create_node_bias, restore_params
 from utils.utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
-from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists
+from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists, max_degrees
 from utils.constants import BIG_NUMBER, LINE
 from core.plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
 from core.plot import plot_flow_graph_adj
@@ -53,7 +53,7 @@ class ModelRunner:
     def train(self):
 
         # Load Graphs
-        graphs, _, num_nodes, max_degree = self._load_graphs()
+        graphs, _, num_nodes, max_degree, degrees = self._load_graphs()
 
         num_neighborhoods = self.params['num_neighborhoods']
 
@@ -65,7 +65,8 @@ class ModelRunner:
                                            num_nodes=num_nodes,
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
-                                           max_degree=max_degree)
+                                           max_degree=max_degree,
+                                           degrees=degrees)
 
         # Create model
         model.build(**ph_dict)
@@ -191,7 +192,7 @@ class ModelRunner:
 
     def test(self, model_path):
         # Load Graphs
-        _, graphs, num_nodes, max_degree = self._load_graphs()
+        _, graphs, num_nodes, max_degree, degrees = self._load_graphs()
 
         num_neighborhoods = self.params['num_neighborhoods']
 
@@ -203,7 +204,8 @@ class ModelRunner:
                                            num_nodes=num_nodes,
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
-                                           max_degree=max_degree)
+                                           max_degree=max_degree,
+                                           degrees=degrees)
 
         # Create model
         model.build(**ph_dict)
@@ -348,6 +350,10 @@ class ModelRunner:
         num_test_nodes = np.max([g.number_of_nodes() for g in test_graphs.values()])
         num_nodes = max(num_train_nodes, num_test_nodes)
 
+        graphs = list(train_graphs.values()) + list(test_graphs.values())
+        degrees = max_degrees(graphs, k=self.params['num_neighborhoods'],
+                              unique_neighborhoods=self.params['unique_neighborhoods'])
+
         train_out_deg = np.max([max([d for _, d in g.out_degree()]) for g in train_graphs.values()])
         train_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in train_graphs.values()])
 
@@ -355,4 +361,4 @@ class ModelRunner:
         test_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in test_graphs.values()])
         max_degree = max(max(train_out_deg, train_in_deg), max(test_out_deg, test_in_deg))
 
-        return train_graphs, test_graphs, num_nodes, max_degree
+        return train_graphs, test_graphs, num_nodes, max_degree, degrees

@@ -493,10 +493,12 @@ class AttentionNeighborhood(Layer):
     neighborhood individually.
     """
 
-    def __init__(self, output_size, num_heads, is_sparse, activation=tf.nn.tanh, name='neighborhood'):
+    def __init__(self, output_size, num_heads, is_sparse,
+                 use_adj_lists=False, activation=tf.nn.tanh, name='neighborhood'):
         super(AttentionNeighborhood, self).__init__(output_size, activation, name)
         self.is_sparse = is_sparse
         self.num_heads = num_heads
+        self.use_adj_lists = use_adj_lists
 
     def __call__(self, inputs, **kwargs):
 
@@ -505,16 +507,23 @@ class AttentionNeighborhood(Layer):
 
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
-        if self.is_sparse:
-            agg_layer = SparseGAT(output_size=self.output_size,
-                                  num_heads=self.num_heads,
-                                  activation=self.activation,
-                                  name='{0}-sparse-GAT'.format(self.name))
+
+        if self.use_adj_lists:
+            agg_layer = AdjGAT(output_size=self.output_size,
+                               num_heads=self.num_heads,
+                               activation=self.activation,
+                               name='{0}-adj-GAT'.format(self.name))
         else:
-            agg_layer = GAT(output_size=self.output_size,
-                            num_heads=self.num_heads,
-                            activation=self.activation,
-                            name='{0}-GAT'.format(self.name))
+            if self.is_sparse:
+                agg_layer = SparseGAT(output_size=self.output_size,
+                                      num_heads=self.num_heads,
+                                      activation=self.activation,
+                                      name='{0}-sparse-GAT'.format(self.name))
+            else:
+                agg_layer = GAT(output_size=self.output_size,
+                                num_heads=self.num_heads,
+                                activation=self.activation,
+                                name='{0}-GAT'.format(self.name))
 
         # Layer to compute attention weights for each aggregated neighborhood
         attn_layer = MLP(hidden_sizes=[],
@@ -528,16 +537,23 @@ class AttentionNeighborhood(Layer):
         for neighborhood_mat in neighborhoods:
 
             # V x F tensor of aggregated node features over the given neighborhood
-            if self.is_sparse:
+            if self.use_adj_lists:
                 neighborhood_agg = agg_layer(inputs=inputs,
-                                             adj_matrix=neighborhood_mat,
+                                             adj_lst=neighborhood_mat,
+                                             mask_index=kwargs['mask_index'],
                                              weight_dropout_keep=dropout_keep_prob,
                                              attn_dropout_keep=dropout_keep_prob)
             else:
-                neighborhood_agg = agg_layer(inputs=inputs,
-                                             bias=neighborhood_mat,
-                                             weight_dropout_keep=dropout_keep_prob,
-                                             attn_dropout_keep=dropout_keep_prob)
+                if self.is_sparse:
+                    neighborhood_agg = agg_layer(inputs=inputs,
+                                                 adj_matrix=neighborhood_mat,
+                                                 weight_dropout_keep=dropout_keep_prob,
+                                                 attn_dropout_keep=dropout_keep_prob)
+                else:
+                    neighborhood_agg = agg_layer(inputs=inputs,
+                                                 bias=neighborhood_mat,
+                                                 weight_dropout_keep=dropout_keep_prob,
+                                                 attn_dropout_keep=dropout_keep_prob)
 
             # V x 1 tensor of attention weights
             attn_weights = attn_layer(inputs=neighborhood_agg, dropout_keep_prob=dropout_keep_prob)
