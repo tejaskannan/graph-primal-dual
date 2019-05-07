@@ -9,7 +9,7 @@ from utils.utils import append_row_to_log, create_demands, random_walk_neighborh
 from utils.utils import create_capacities, delete_if_exists, serialize_dict
 from utils.constants import *
 from core.load import load_to_networkx, load_embeddings
-from core.load import write_dataset, write_sparse_npz, read_sparse_npz
+from core.load import write_dataset, write_sparse_npz
 from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner

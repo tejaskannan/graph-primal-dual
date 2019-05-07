@@ -126,7 +126,7 @@ def read_sparse_npz(folder):
 
     def read(folder, name):
         file_path = path.join(folder, name)
-        return np.load(file=file_path, mmap_mode='r')
+        return np.load(file=file_path)
 
     data = read(folder, 'data.npz')
     indices = read(folder, 'indices.npz')

@@ -1,27 +1,33 @@
 import numpy as np
 import tensorflow as tf
 from utils.utils import sparse_matrix_to_tensor, features_to_demands
-from utils.utils import neighborhood_adj_lists, pad_adj_list
+from utils.graph_utils import neighborhood_adj_lists, pad_adj_list
+from utils.graph_utils import adj_matrix_to_list
 from utils.utils import neighborhood_batch
 from utils.constants import BIG_NUMBER, LINE
-from core.dataset import DatasetManager, Series, DataSeries
+from core.dataset import DatasetManager, Series
 from model_runners.model_runner import ModelRunner
 from models.adj_neighborhood_model import AdjModel
 
 
 class AdjRunner(ModelRunner):
 
-    def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
-        num_neighborhoods = kwargs['num_neighborhoods']
+    def create_placeholders(self, model, **kwargs):
+
+        # Model parameters
+        b = self.params['batch_size']
+        num_neighborhoods = self.params['num_neighborhoods']
+
+        embedding_size = kwargs['embedding_size']
+        max_num_nodes = kwargs['max_num_nodes'] + 1
         max_degree = kwargs['max_degree']
-        degrees = kwargs['degrees']
+        max_neighborhood_degrees = kwargs['max_neighborhood_degrees']
 
         # Placeholder shapes
-        b = self.params['batch_size']
-        node_shape = [b, num_nodes+1, self.num_node_features]
-        demands_shape = [b, num_nodes+1, 1]
-        adj_shape = [b, num_nodes+1, max_degree]
-        embedding_shape = [b, num_nodes+1, embedding_size]
+        node_shape = [b, max_num_nodes, self.num_node_features]
+        demands_shape = [b, max_num_nodes, 1]
+        adj_shape = [b, max_num_nodes, max_degree]
+        embedding_shape = [b, max_num_nodes, embedding_size]
         num_nodes_shape = [b, 1]
 
         node_ph = model.create_placeholder(dtype=tf.float32,
@@ -58,9 +64,10 @@ class AdjRunner(ModelRunner):
                                                 is_sparse=False)
 
         neighborhood_phs = []
-        for i in range(self.params['num_neighborhoods']+1):
+        for i in range(num_neighborhoods + 1):
+            shape = [b, max_num_nodes, max_neighborhood_degrees[i]]
             ph = model.create_placeholder(dtype=tf.int32,
-                                          shape=[b, num_nodes+1, degrees[i]],
+                                          shape=shape,
                                           name='neighborhood-{0}-ph'.format(i),
                                           is_sparse=False)
             neighborhood_phs.append(ph)
@@ -73,51 +80,41 @@ class AdjRunner(ModelRunner):
             'neighborhoods': neighborhood_phs,
             'flow_indices': flow_indices_ph,
             'out_indices': out_indices_ph,
-            'num_output_features': num_nodes,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes_ph,
             'should_correct_flows': True
         }
 
-    def create_feed_dict(self, placeholders, batch, index, batch_size, data_series):
-        node_features = batch[DataSeries.NODE]
-        adj = batch[DataSeries.ADJ]
-        node_embeddings = batch[DataSeries.EMBEDDING]
-        dropout_keep = self.params['dropout_keep_prob']
+    def create_feed_dict(self, placeholders, batch, batch_size, data_series, **kwargs):
 
-        # Handles differneces with online batch selection representation
-        if data_series is not Series.TRAIN:
-            node_features = node_features[index]
-            adj = adj[index]
-            node_embeddings = node_embeddings[index]
-            dropout_keep = 1.0
+        # Padding parameters
+        max_degree = kwargs['max_degree']
+        max_num_nodes = kwargs['max_num_nodes']
+        max_neighborhood_degrees = kwargs['max_neighborhood_degrees']
 
-        max_degree = int(placeholders['adj_lst'].get_shape()[2])
+        # Fetch features for each sample in the given batch
+        node_features = np.array([sample.node_features for sample in batch])
+        demands = np.array([sample.demands for sample in batch])
+        adj_lsts = np.array([sample.adj_lst for sample in batch])
+        node_embeddings = np.array([sample.embeddings for sample in batch])
+        num_nodes = np.array([sample.num_nodes for sample in batch])
+        dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
 
-        demands = np.array([features_to_demands(n) for n in node_features])
+        # Inverted adjacency list used to compute indexes
+        inv_adj_lists = [adj_matrix_to_list(sample.adj_mat, inverted=True) for sample in batch]
+        inv_adj_tensors = np.array([pad_adj_list(adj_lst, max_degree, max_num_nodes, n)
+                                    for adj_lst, n in zip(inv_adj_lists, num_nodes)])
 
-        neighborhoods, num_nodes = neighborhood_batch(adj_matrices=adj,
-                                                      k=self.params['num_neighborhoods']+1,
-                                                      unique_neighborhoods=self.params['unique_neighborhoods'])
-
-        n_nodes = np.max(num_nodes)
-
-        adj_lists = [neighborhood_adj_lists(mat, 1, False)[0][1] for mat in adj]
-        adj_tensors = np.array([pad_adj_list(adj_lst, max_degree, n_nodes) for adj_lst in adj_lists])
-
-        inv_adj_lists = [neighborhood_adj_lists(mat, 1, False, True)[0][1] for mat in adj]
-        inv_adj_tensors = np.array([pad_adj_list(adj_lst, max_degree, n_nodes) for adj_lst in inv_adj_lists])
-
-        # 2D indexing used to extract inflow
-        flow_indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
-        out_indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
+        # 2D indexing used for inflow and flow corrections
+        flow_indices = np.zeros(shape=(np.prod(adj_lsts.shape), 3))
+        out_indices = np.zeros(shape=(np.prod(adj_lsts.shape), 3))
         
         index_a = 0
         index_b = 0
-        for x in range(adj_tensors.shape[0]):
-            for y in range(adj_tensors.shape[1]):
+        for x in range(adj_lsts.shape[0]):
+            for y in range(adj_lsts.shape[1]):
                 for i, z in enumerate(inv_adj_tensors[x, y]):
-                    indexof = np.where(adj_tensors[x, z] == y)[0]
+                    indexof = np.where(adj_lsts[x, z] == y)[0]
 
                     flow_indices[index_a, 0] = x
 
@@ -130,9 +127,9 @@ class AdjRunner(ModelRunner):
 
                     index_a += 1
 
-                for i, z in enumerate(adj_tensors[x, y]):
+                for i, z in enumerate(adj_lsts[x, y]):
                     # Reverse Edge
-                    indexof = np.where(adj_tensors[x, z] == y)[0]
+                    indexof = np.where(adj_lsts[x, z] == y)[0]
 
                     out_indices[index_b, 0] = x
                     if len(indexof) > 0:
@@ -144,29 +141,27 @@ class AdjRunner(ModelRunner):
 
                     index_b += 1
 
-        # Add dummy embeddings, features and demands
+
+        # Add dummy embeddings, features and demands to account for added node
         demands = np.insert(demands, demands.shape[1], 0, axis=1)
-
-        node_features = np.array(node_features)
         node_features = np.insert(node_features, node_features.shape[1], 0, axis=1)
-
-        node_embeddings = np.array(node_embeddings)
         node_embeddings = np.insert(node_embeddings, node_embeddings.shape[1], 0, axis=1)
 
         feed_dict = {
             placeholders['node_features']: node_features,
             placeholders['demands']: demands,
-            placeholders['adj_lst']: adj_tensors,
+            placeholders['adj_lst']: adj_lsts,
             placeholders['node_embeddings']: node_embeddings,
             placeholders['dropout_keep_prob']: dropout_keep,
-            placeholders['num_nodes']: num_nodes,
+            placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['flow_indices']: flow_indices,
             placeholders['out_indices']: out_indices
         }
 
-        for i, nbrhood in enumerate(neighborhoods):
+        for i in range(self.params['num_neighborhoods'] + 1):
+            neighborhood = [sample.neighborhoods[i] for sample in batch]
             ph = placeholders['neighborhoods'][i]
-            feed_dict[ph] = nbrhood
+            feed_dict[ph] = neighborhood
 
         return feed_dict
 

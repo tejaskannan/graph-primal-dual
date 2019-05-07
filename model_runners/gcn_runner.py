@@ -1,7 +1,7 @@
 import tensorflow as tf
 from model_runners.model_runner import ModelRunner
-from models.gat_model import GATModel
-from core.dataset import DataSeries, Series
+from models.gcn_model import GCNModel
+from core.dataset import Series
 from utils.utils import features_to_demands, gcn_aggregator
 
 
@@ -78,4 +78,4 @@ class GCNRunner(ModelRunner):
         return feed_dict
 
     def create_model(self, params):
-        return GATModel(params=params)
+        return GCNModel(params=params)

@@ -1,7 +1,7 @@
 import tensorflow as tf
 from model_runners.model_runner import ModelRunner
 from models.gat_model import GATModel
-from core.dataset import DataSeries, Series
+from core.dataset import Series
 from utils.utils import features_to_demands
 
 

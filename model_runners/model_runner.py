@@ -8,13 +8,13 @@ from time import time
 from utils.utils import create_demands, append_row_to_log, create_node_embeddings
 from utils.utils import add_features_sparse, create_node_bias, restore_params
 from utils.utils import sparse_matrix_to_tensor, features_to_demands, random_walk_neighborhoods
-from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists, max_degrees
+from utils.utils import add_features, adj_mat_to_node_bias, delete_if_exists
 from utils.constants import BIG_NUMBER, LINE
 from utils import graph_utils
 from core.plot import plot_flow_graph_sparse, plot_flow_graph, plot_weights
 from core.plot import plot_flow_graph_adj
 from core.load import load_to_networkx, read_dataset
-from core.dataset import DatasetManager, Series, DataSeries
+from core.dataset import DatasetManager, Series
 
 
 PRINT_THRESHOLD = 100
@@ -36,25 +36,26 @@ class ModelRunner:
         self.num_node_features = 2
         self.embedding_size = 2 * self.params['num_neighborhoods'] + 2
 
-        file_paths = {
+        folders = {
             Series.TRAIN: {},
             Series.VALID: {},
             Series.TEST: {}
         }
-        dataset_path = 'datasets/{0}_{1}.pkl.gz'
+        dataset_folder = 'datasets/{0}/{1}'
         for dataset_name, graph_name in zip(self.params['train_dataset_names'], self.params['train_graph_names']):
-            file_paths[Series.TRAIN][graph_name] = dataset_path.format(dataset_name, 'train')
-            file_paths[Series.VALID][graph_name] = dataset_path.format(dataset_name, 'valid')
+            folders[Series.TRAIN][graph_name] = dataset_folder.format(dataset_name, 'train')
+            folders[Series.VALID][graph_name] = dataset_folder.format(dataset_name, 'valid')
 
         for dataset_name, graph_name in zip(self.params['test_dataset_names'], self.params['test_graph_names']):
-            file_paths[Series.TEST][graph_name] = dataset_path.format(dataset_name, 'test')
+            folders[Series.TEST][graph_name] = dataset_folder.format(dataset_name, 'test')
 
-        self.dataset = DatasetManager(file_paths=file_paths, params=self.params['batch_params'])
+        self.dataset = DatasetManager(data_folders=folders, params=self.params)
+        self.dataset.load_graphs(normalize=True)
 
     def train(self):
 
         # Load Graphs
-        graphs, _, num_nodes, max_degree, degrees = self._load_graphs()
+        graphs = self.dataset.train_graphs
 
         num_neighborhoods = self.params['num_neighborhoods']
 
@@ -63,11 +64,11 @@ class ModelRunner:
 
         # Model placeholders
         ph_dict = self.create_placeholders(model=model,
-                                           num_nodes=num_nodes,
+                                           max_num_nodes=self.dataset.max_num_nodes,
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
-                                           max_degree=max_degree,
-                                           degrees=degrees)
+                                           max_degree=self.dataset.max_degree,
+                                           max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
         # Create model
         model.build(**ph_dict)
@@ -84,19 +85,11 @@ class ModelRunner:
         append_row_to_log(log_headers, log_path)
 
         # Load training and validation datasets
-        self.dataset.load(series=Series.TRAIN,
-                          graphs=graphs,
-                          num_nodes=num_nodes,
-                          num_neighborhoods=num_neighborhoods,
-                          unique_neighborhoods=self.params['unique_neighborhoods'])
-        self.dataset.load(series=Series.VALID,
-                          graphs=graphs,
-                          num_nodes=num_nodes,
-                          num_neighborhoods=num_neighborhoods,
-                          unique_neighborhoods=self.params['unique_neighborhoods'])
+        self.dataset.load(series=Series.TRAIN)
+        self.dataset.load(series=Series.VALID)
 
+        # Intialize training variables for online batch selection
         self.dataset.init(num_epochs=self.params['epochs'])
-        self.dataset.normalize_embeddings()
 
         # Variables for early stopping
         convergence_count = 0
@@ -104,7 +97,7 @@ class ModelRunner:
 
         # Sparse batches must be size 1 due to the lack of support for 3D sparse operations
         # in tensorflow
-        batch_size = 1 if self.params['sparse'] else self.params['batch_size']
+        batch_size = self.params['batch_size']
 
         for epoch in range(self.params['epochs']):
 
@@ -117,14 +110,15 @@ class ModelRunner:
             train_losses = []
             for i in range(num_train_batches):
 
-                batch, indices = self.dataset.get_train_batch(batch_size=batch_size,
-                                                              is_sparse=self.params['sparse'])
+                batch, indices = self.dataset.get_train_batch(batch_size=batch_size)
 
                 feed_dict = self.create_feed_dict(placeholders=ph_dict,
                                                   batch=batch,
-                                                  index=i,
                                                   batch_size=batch_size,
-                                                  data_series=Series.TRAIN)
+                                                  data_series=Series.TRAIN,
+                                                  max_degree=self.dataset.max_degree,
+                                                  max_num_nodes=self.dataset.max_num_nodes,
+                                                  max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
                 outputs = model.run_train_step(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -133,37 +127,31 @@ class ModelRunner:
                 train_losses.append(avg_loss)
                 self.dataset.report_losses(loss, indices)
 
-                if not self.params['sparse'] or (i+1) % PRINT_THRESHOLD == 0:
-                    if self.params['sparse']:
-                        start = (i+1) - PRINT_THRESHOLD
-                        avg_loss = np.average(train_losses[start:i+1])
-                    print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
+                print('Average train loss for batch {0}/{1}: {2}'.format(i+1, num_train_batches, avg_loss))
 
             print(LINE)
 
             # Validation Batches
-            valid_batches = self.dataset.create_shuffled_batches(series=Series.VALID,
-                                                                 batch_size=batch_size,
-                                                                 is_sparse=self.params['sparse'])
-            num_valid_batches = len(valid_batches[DataSeries.NODE])
+            valid_batches = self.dataset.create_batches(series=Series.VALID,
+                                                        batch_size=batch_size,
+                                                        shuffle=True)
+            num_valid_batches = len(valid_batches)
             valid_losses = []
-            for i in range(num_valid_batches):
+            for i, batch in enumerate(valid_batches):
 
                 feed_dict = self.create_feed_dict(placeholders=ph_dict,
-                                                  batch=valid_batches,
-                                                  index=i,
+                                                  batch=batch,
                                                   batch_size=batch_size,
-                                                  data_series=Series.VALID)
+                                                  data_series=Series.VALID,
+                                                  max_degree=self.dataset.max_degree,
+                                                  max_num_nodes=self.dataset.max_num_nodes,
+                                                  max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs[0]
                 valid_losses.append(avg_loss)
 
-                if not self.params['sparse'] or (i+1) % PRINT_THRESHOLD == 0:
-                    if self.params['sparse']:
-                        start = (i+1) - PRINT_THRESHOLD
-                        avg_loss = np.average(valid_losses[start:i+1])
-                    print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
+                print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
 
             print(LINE)
 
@@ -193,7 +181,7 @@ class ModelRunner:
 
     def test(self, model_path):
         # Load Graphs
-        _, graphs, num_nodes, max_degree, degrees = self._load_graphs()
+        graphs = self.dataset.test_graphs
 
         num_neighborhoods = self.params['num_neighborhoods']
 
@@ -202,137 +190,82 @@ class ModelRunner:
 
         # Model placeholders
         ph_dict = self.create_placeholders(model=model,
-                                           num_nodes=num_nodes,
+                                           max_num_nodes=self.dataset.max_num_nodes,
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
-                                           max_degree=max_degree,
-                                           degrees=degrees)
+                                           max_degree=self.dataset.max_degree,
+                                           max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
         # Create model
         model.build(**ph_dict)
         model.init()
         model.restore(model_path)
 
-        # Load test data and normalize embeddings
-        self.dataset.load(series=Series.TRAIN,
-                          num_nodes=num_nodes,
-                          graphs=graphs,
-                          num_neighborhoods=num_neighborhoods)
-        self.dataset.load(series=Series.TEST,
-                          num_nodes=num_nodes,
-                          graphs=graphs,
-                          num_neighborhoods=num_neighborhoods,
-                          unique_neighborhoods=self.params['unique_neighborhoods'])
-        self.dataset.normalize_embeddings()
+        # Load test data
+        self.dataset.load(series=Series.TEST)
 
-        batch_size = 1 if self.params['sparse'] else self.params['batch_size']
-
+        batch_size = self.params['batch_size']
         test_batches = self.dataset.create_batches(series=Series.TEST,
                                                    batch_size=batch_size,
-                                                   shuffle=False,
-                                                   is_sparse=self.params['sparse'])
-        num_test_batches = len(test_batches[DataSeries.NODE])
-
+                                                   shuffle=False)
         # Iniitalize Testing Log
         log_headers = ['Test Instance', 'Graph', 'Flow Cost', 'Dual Cost', 'Time (sec)']
         log_path = model_path + 'costs.csv'
         delete_if_exists(log_path)
-
         append_row_to_log(log_headers, log_path)
 
-        for i in range(num_test_batches):
+        num_test_batches = len(test_batches)
+        for i, batch in enumerate(test_batches):
 
             feed_dict = self.create_feed_dict(placeholders=ph_dict,
-                                              batch=test_batches,
-                                              index=i,
+                                              batch=batch,
                                               batch_size=batch_size,
-                                              data_series=Series.TEST)
+                                              data_series=Series.VALID,
+                                              max_degree=self.dataset.max_degree,
+                                              max_num_nodes=self.dataset.max_num_nodes,
+                                              max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
             start = time()
             outputs = model.inference(feed_dict=feed_dict)
             elapsed = time() - start
 
-            batch_samples = len(test_batches[DataSeries.GRAPH_NAME][i])
-            avg_time = elapsed / batch_samples
+            avg_time = elapsed / batch_size
 
-            for j in range(batch_samples):
+            for j in range(batch_size):
 
-                graph_name = test_batches[DataSeries.GRAPH_NAME][i][j]
+                index = i * batch_size + j
+
+                graph_name = batch[j].graph_name
                 graph = graphs[graph_name]
 
-                if self.params['sparse']:
-                    flow_cost = outputs[1]
-                    flows = outputs[2]
-                    flow_proportions = outputs[3]
-                    dual_cost = outputs[4]
-                    weights = outputs[6]
-                    node_weights = outputs[7]
+                flow = outputs[1][j]
+                flow_cost = outputs[2][j]
+                adj_lst = outputs[3][j]
+                pred_weights = outputs[4][j]
+                dual_cost = outputs[5][j]
+                node_weights = outputs[6][j]
 
-                    demands = test_batches[DataSeries.NODE][i]
+                demands = np.array(batch[j].demands)
 
-                    index = i
+                node_features = {
+                    'demand': demands,
+                    'node_weight': node_weights
+                }
+                edge_features = {
+                    'flow': flow,
+                    'flow_proportion': pred_weights 
+                }
 
-                    flow_graph = add_features_sparse(graph,
-                                                     demands=demands,
-                                                     flows=flows,
-                                                     proportions=flow_proportions,
-                                                     node_weights=node_weights)
+                flow_graph = graph_utils.add_features(graph=graph,
+                                                      node_features=node_features,
+                                                      edge_features=edge_features)
 
-                    if self.params['plot_flows']:
-                        plot_flow_graph_sparse(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index))
-                        plot_flow_graph_sparse(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
-                        plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
-                else:
-                    # flow_cost = outputs[1][j]
-                    # flows = outputs[2][j]
-                    # flow_proportions = outputs[3][j]
-                    # dual_cost = outputs[4][j]
-                    # weights = outputs[6][j]
-                    # node_weights = outputs[7][j]
-
-                    flow = outputs[1][j]
-                    flow_cost = outputs[2][j]
-                    adj_lst = outputs[3][j]
-                    pred_weights = outputs[4][j]
-                    dual_cost = outputs[5][j]
-                    node_weights = outputs[6][j]
-
-                    index = i * batch_size + j
-
-                    # flow_graph = add_features(graph,
-                    #                           demands=demands,
-                    #                           flows=flows,
-                    #                           proportions=flow_proportions,
-                    #                           node_weights=node_weights)
-
-                    # Demands are passed in as V x 2 matrices. We convert back
-                    # to vector format here. Cast to numpy array to enable 
-                    # flattening to 1D vector.
-                    demands = test_batches[DataSeries.NODE][i][j]
-                    demands = np.multiply(demands, np.array([[1, -1]]))
-                    demands = np.array(np.sum(demands, axis=-1))
-
-                    node_features = {
-                        'demand': demands,
-                        'node_weight': node_weights
-                    }
-                    edge_features = {
-                        'flow': flow,
-                        'flow_proportion': pred_weights 
-                    }
-
-                    flow_graph = graph_utils.add_features(graph=graph,
-                                                          node_features=node_features,
-                                                          edge_features=edge_features)
-
-                    if self.params['plot_flows']:
-                        path = '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index)
-                        weight_path = '{0}flows-weights-{1}-{2}.png'.format(model_path, graph_name, index)
-                        plot_flow_graph_adj(flow_graph, use_flow_props=False, file_path=path)
-                        plot_flow_graph_adj(flow_graph, use_flow_props=True, file_path=weight_path)
-                        #plot_flow_graph(flow_graph, flows, '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index))
-                        #plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index))
-                        #plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
+                if self.params['plot_flows']:
+                    path = '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index)
+                    weight_path = '{0}flows-weights-{1}-{2}.png'.format(model_path, graph_name, index)
+                    plot_flow_graph_adj(flow_graph, use_flow_props=False, file_path=path)
+                    plot_flow_graph_adj(flow_graph, use_flow_props=True, file_path=weight_path)
+                    #plot_weights(weights, '{0}weights-{1}-{2}.png'.format(model_path, graph_name, index), num_samples=self.params['plot_weight_samples'])
 
                 # Log Outputs
                 append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
@@ -340,10 +273,10 @@ class ModelRunner:
                 # Write output graph to Graph XML
                 nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, index))
 
-    def create_placeholders(self, model, num_nodes, embedding_size, **kwargs):
+    def create_placeholders(self, model, **kwargs):
         raise NotImplementedError()
 
-    def create_feed_dict(self, placeholders, batch, index, batch_size, data_series):
+    def create_feed_dict(self, placeholders, batch, batch_size, data_series, **kwargs):
         raise NotImplementedError()
 
     def create_model(self, params):

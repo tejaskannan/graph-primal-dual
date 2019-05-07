@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+from utils.utils import random_walk_neighborhoods
 
 
 def add_features(graph, node_features, edge_features):
@@ -34,6 +35,65 @@ def add_features(graph, node_features, edge_features):
                 graph.add_edge(node, neighbor, **v)
 
     return graph
+
+
+def max_degrees(graphs, k, unique_neighborhoods=True):
+    adj_matrices = [nx.adjacency_matrix(graph) for graph in graphs]
+
+    max_degrees = np.zeros(shape=(k+1,))
+    for adj in adj_matrices:
+        neighborhoods = random_walk_neighborhoods(adj, k=k, unique_neighborhoods=unique_neighborhoods)
+        degrees = [np.max(mat.sum(axis=-1)) for mat in neighborhoods]        
+        max_degrees = np.maximum(max_degrees, degrees)
+
+    return max_degrees
+
+
+def pad_adj_list(adj_lst, max_degree, max_num_nodes,  mask_number):
+    padded = []
+    for lst in adj_lst:
+        pd = np.pad(lst, pad_width=(0, max_degree-len(lst)),
+                    mode='constant', constant_values=mask_number)
+        padded.append(pd)
+
+    while len(padded) <= max_num_nodes:
+        padded.append(np.full(shape=(max_degree, ), fill_value=mask_number))
+
+    # Returns a max_num_nodes x max_degree numpy array
+    return np.array(padded)
+
+
+def neighborhood_adj_lists(neighborhoods, max_degrees, max_num_nodes, mask_number):
+    neighborhood_lists = []
+    for neighborhood, degree in zip(neighborhoods, max_degrees):
+        adj_lst = adj_matrix_to_list(neighborhood)
+        adj_lst = pad_adj_list(adj_lst=adj_lst,
+                               max_degree=degree,
+                               mask_number=mask_number,
+                               max_num_nodes=max_num_nodes)
+        neighborhood_lists.append(adj_lst)
+
+    return neighborhood_lists
+
+
+def adj_matrix_to_list(adj_matrix, inverted=False):
+    if inverted:
+        adj_matrix = adj_matrix.transpose(copy=True)
+
+    rows, cols = adj_matrix.nonzero()
+
+    adj_dict = {}
+    for r, c in zip(rows, cols):
+        if r not in adj_dict:
+            adj_dict[r] = []
+        adj_dict[r].append(c)
+
+    # Create adjacency list
+    adj_lst = []
+    for node in sorted(adj_dict.keys()):
+        adj_lst.append(list(sorted(adj_dict[node])))
+
+    return adj_lst
 
 
 def adjacency_list(graph):

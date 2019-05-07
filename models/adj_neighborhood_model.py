@@ -44,9 +44,6 @@ class AdjModel(Model):
         # Float
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
-        # Integer
-        num_output_features = kwargs['num_output_features']
-
         # Boolean
         should_correct_flows = kwargs['should_correct_flows']
 

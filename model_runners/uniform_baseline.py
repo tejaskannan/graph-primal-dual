@@ -5,7 +5,7 @@ import scipy.sparse as sp
 import os
 from time import time
 from core.load import load_to_networkx
-from core.dataset import DatasetManager, Series, DataSeries
+from core.dataset import DatasetManager, Series
 from core.layers import SparseMinCostFlow
 from core.plot import plot_flow_graph_sparse
 from utils.utils import features_to_demands, sparse_matrix_to_tensor
@@ -36,7 +36,7 @@ class UniformBaseline:
         for dataset_name, graph_name in zip(self.params['test_dataset_names'], self.params['test_graph_names']):
             file_paths[Series.TEST][graph_name] = dataset_path.format(dataset_name, 'test')
 
-        self.dataset = DatasetManager(file_paths=file_paths, params=self.params['batch_params'])
+        self.dataset = DatasetManager(file_paths=file_paths, params=self.params)
 
     def eval(self):
 

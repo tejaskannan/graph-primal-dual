@@ -55,52 +55,6 @@ def add_features_sparse(graph, demands, flows, proportions, node_weights):
     return graph
 
 
-def adjacency_list(graph):
-    adj_lst = list(map(list, iter(graph.adj.values())))
-    max_degree = max(map(lambda x: len(x), adj_lst))
-    return adj_lst, max_degree
-
-
-def pad_adj_list(adj_lst, max_degree, num_nodes):
-    padded = []
-    for lst in adj_lst:
-        pd = np.pad(lst, pad_width=(0, max_degree-len(lst)),
-                    mode='constant', constant_values=num_nodes)
-        padded.append(pd)
-    padded.append(np.full(shape=(max_degree, ), fill_value=num_nodes))
-    return padded
-
-
-def neighborhood_adj_lists(adj_matrix, k, unique_neighborhoods=True, inverted=False):
-
-    # List of V x V sparse matrices
-    if inverted:
-        adj_matrix = adj_matrix.transpose(copy=True)
-    neighborhoods = random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods)
-
-    adj_lists = []
-    max_degrees = []
-    for neighborhood in neighborhoods:
-        rows, cols = neighborhood.nonzero()
-
-        adj_dict = {}
-        for r, c in zip(rows, cols):
-            if r not in adj_dict:
-                adj_dict[r] = []
-            adj_dict[r].append(c)
-
-        # Create adjacency list
-        adj_lst = []
-        for node in sorted(adj_dict.keys()):
-            adj_lst.append(list(sorted(adj_dict[node])))
-
-        max_degree = max(map(lambda x: len(x), adj_lst))
-        max_degrees.append(max_degree)
-        adj_lists.append(adj_lst)
-
-    return adj_lists, max_degrees
-
-
 def neighborhood_batch(adj_matrices, k, unique_neighborhoods=True):
     """
     adj_matrices is a list of length B, each element is the adj matrix for the bth sample
@@ -131,23 +85,21 @@ def neighborhood_batch(adj_matrices, k, unique_neighborhoods=True):
     return neighborhood_batches, np.reshape(num_nodes, [-1, 1])
 
 
-def max_degrees(graphs, k, unique_neighborhoods=True):
-    adj_matrices = [nx.adjacency_matrix(graph) for graph in graphs]
-
-    max_degrees = np.zeros(shape=(k+1,))
-    for adj in adj_matrices:
-        neighborhoods = random_walk_neighborhoods(adj, k=k, unique_neighborhoods=unique_neighborhoods)
-        degrees = [np.max(mat.sum(axis=-1)) for mat in neighborhoods]        
-        max_degrees = np.maximum(max_degrees, degrees)
-
-    return max_degrees
-
-
 def features_to_demands(node_features):
     demands = np.zeros(shape=(node_features.shape[0], 1), dtype=float)
     for i in range(node_features.shape[0]):
         demands[i][0] = node_features[i, 0] - node_features[i, 1]
     return demands
+
+
+def demands_to_features(demands):
+    features = np.zeros(shape=(demands.shape[0], 2), dtype=float)
+    for i in range(demands.shape[0]):
+        if demands[i, 0] > 0:
+            features[i, 0] = demands[i, 0]
+        elif demands[i, 0] < 0:
+            features[i, 1] = demands[i, 0]
+    return features
 
 
 def create_demands(graph, min_max_sources, min_max_sinks):
@@ -188,32 +140,33 @@ def create_capacities(graph, demands):
     init_capacities = np.random.uniform(low=min_capacity, high=max_capacity, size=(num_edges,))
     capacities = sp.csr_matrix((init_capacities, adj_matrix.indices, adj_matrix.indptr))
 
-    # sources = np.transpose(np.where(demands < 0))
-    # sinks = np.transpose(np.where(demands > 0))
+    sources = np.transpose(np.where(demands < 0))
+    sinks = np.transpose(np.where(demands > 0))
 
-    # for source in sources:
-    #     source_demand = abs_demands[source[0]][source[1]]
-    #     for sink in sinks:
-    #         path_gen = nx.all_simple_paths(graph, source=source[0], target=sink[0])
-    #         path = list(path_gen.__next__())
+    for source in sources:
+        source_demand = abs_demands[source[0]][source[1]]
+        for sink in sinks:
+            path_gen = nx.all_simple_paths(graph, source=source[0], target=sink[0])
+            path = list(path_gen.__next__())
 
-    #         # Increase capacity so at least one path can carry the source's flow to the sink.
-    #         # This process ensures that a feasible solution exists
-    #         for i in range(len(path)-1):
-    #             edge = (path[i], path[i+1])
-    #             capacities[edge] = max(capacities[edge], source_demand + 1e-3)
+            # Increase capacity so at least one path can carry the source's flow to the sink.
+            # This process ensures that a feasible solution exists
+            for i in range(len(path)-1):
+                edge = (path[i], path[i+1])
+                capacities[edge] = max(capacities[edge], source_demand + 1e-3)
 
-    #         edge = (path[i], path[i+1])
-    #         capacities[edge] = max(capacities[edge], source_demand + 1e-3)
+            edge = (path[i], path[i+1])
+            capacities[edge] = max(capacities[edge], source_demand + 1e-3)
 
     return capacities
 
 
-def create_node_embeddings(graph, num_nodes, neighborhoods):
+def create_node_embeddings(graph, neighborhoods):
     """
     Creates node "embeddings" based on the degrees of neighboring vertices and approximate
     centrality measures
     """
+    num_nodes = graph.number_of_nodes()
     embeddings = np.zeros(shape=(num_nodes, 2 * (len(neighborhoods) - 1) + 2), dtype=float)
 
     eigen = nx.eigenvector_centrality_numpy(graph)
@@ -367,6 +320,12 @@ def expand_sparse_matrix(csr_mat, n, m=None):
 
     indptr = np.pad(csr_mat.indptr, (0, pad_amount), mode='edge')
     return sp.csr_matrix((csr_mat.data, csr_mat.indices, indptr), shape=(n, m))
+
+
+def expand_matrix(mat, n, m):
+    new_mat = np.zeros(shape=(n, m))
+    new_mat[:mat.shape[0], :mat.shape[1]] = mat
+    return mat
 
 
 def delete_if_exists(file_path):

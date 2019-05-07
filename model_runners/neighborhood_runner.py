@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from utils.utils import sparse_matrix_to_tensor, features_to_demands
 from utils.constants import BIG_NUMBER, LINE
-from core.dataset import DatasetManager, Series, DataSeries
+from core.dataset import DatasetManager, Series
 from model_runners.model_runner import ModelRunner
 from models.neighborhood_model import NeighborhoodModel
 
