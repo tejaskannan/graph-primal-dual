@@ -100,37 +100,38 @@ class AdjRunner(ModelRunner):
         # 2D indexing used to extract inflow
         flow_indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
         out_indices = np.zeros(shape=(np.prod(adj_tensors.shape), 3))
-        index = 0
+        
+        index_a = 0
+        index_b = 0
         for x in range(adj_tensors.shape[0]):
             for y in range(adj_tensors.shape[1]):
                 for i, z in enumerate(inv_adj_tensors[x, y]):
                     indexof = np.where(adj_tensors[x, z] == y)[0]
 
-                    flow_indices[index, 0] = x
-                    flow_indices[index, 1] = z
+                    flow_indices[index_a, 0] = x
 
                     if len(indexof) > 0:
-                        flow_indices[index, 2] = indexof[0]
+                        flow_indices[index_a, 1] = z
+                        flow_indices[index_a, 2] = indexof[0]
                     else:
-                        flow_indices[index, 2] = max_degree-1
+                        flow_indices[index_a, 1] = num_nodes[x]
+                        flow_indices[index_a, 2] = max_degree-1
 
+                    index_a += 1
+
+                for i, z in enumerate(adj_tensors[x, y]):
                     # Reverse Edge
-                    indexof = np.where(adj_tensors[x, y] == z)[0]
+                    indexof = np.where(adj_tensors[x, z] == y)[0]
 
-                    out_indices[index, 0] = x
-                    out_indices[index, 1] = y
+                    out_indices[index_b, 0] = x
                     if len(indexof) > 0:
-                        out_indices[index, 2] = indexof[0]
+                        out_indices[index_b, 1] = z
+                        out_indices[index_b, 2] = indexof[0]
                     else:
-                        out_indices[index, 2] = max_degree-1
+                        out_indices[index_b, 1] = num_nodes[x]
+                        out_indices[index_b, 2] = max_degree-1
 
-                    index += 1
-
-        # print(adj_lists[0])
-        # print(inv_adj_lists[0])
-
-        # print(flow_indices[0:max_degree*n_nodes,:])
-        # print(out_indices[0:max_degree*n_nodes,:])
+                    index_b += 1
 
         # Add dummy embeddings, features and demands
         demands = np.insert(demands, demands.shape[1], 0, axis=1)

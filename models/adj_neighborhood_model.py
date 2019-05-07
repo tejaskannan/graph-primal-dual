@@ -107,11 +107,10 @@ class AdjModel(Model):
                                          flow_indices=flow_indices,
                                          max_iters=self.params['flow_iters'])
 
-                # if should_correct_flows:
-                #     out_flow = tf.reshape(tf.gather_nd(flow, out_indices), tf.shape(pred_weights))
-                #     in_flow = tf.reshape(tf.gather_nd(flow, flow_indices), tf.shape(pred_weights))
-                #     flow_diff = tf.minimum(out_flow, in_flow)
-                #     flow = tf.nn.relu(flow - flow_diff)
+                if should_correct_flows:
+                    rev_flow = tf.reshape(tf.gather_nd(flow, out_indices), tf.shape(pred_weights))
+                    flow_diff = tf.minimum(flow, rev_flow)
+                    flow = tf.nn.relu(flow - flow_diff)
 
                 flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
