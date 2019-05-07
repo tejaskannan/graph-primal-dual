@@ -372,3 +372,8 @@ def expand_sparse_matrix(csr_mat, n, m=None):
 def delete_if_exists(file_path):
     if exists(file_path):
         remove(file_path)
+
+
+def serialize_dict(dictionary, file_path):
+    with gzip.GzipFile(file_path, 'wb') as file:
+        pickle.dump(obj=dictionary, file=file)

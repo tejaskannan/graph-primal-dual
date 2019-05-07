@@ -3,12 +3,13 @@ import argparse
 import networkx as nx
 import numpy as np
 import json
+import scipy.sparse as sp
 from utils.utils import load_params, restore_params, create_node_embeddings
 from utils.utils import append_row_to_log, create_demands, random_walk_neighborhoods
-from utils.utils import create_capacities, delete_if_exists
+from utils.utils import create_capacities, delete_if_exists, serialize_dict
 from utils.constants import *
 from core.load import load_to_networkx, load_embeddings
-from core.load import write_dataset
+from core.load import write_dataset, write_sparse_npz, read_sparse_npz
 from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
@@ -81,13 +82,22 @@ def generate(params):
         graph_path = 'graphs/{0}.tntp'.format(graph_name)
         graph = load_to_networkx(path=graph_path)
 
-        train_file = 'datasets/{0}_train.pkl.gz'.format(dataset_name)
-        valid_file = 'datasets/{0}_valid.pkl.gz'.format(dataset_name)
-        test_file = 'datasets/{0}_test.pkl.gz'.format(dataset_name)
+        dataset_folder = 'datasets/{0}/'.format(dataset_name)
 
-        file_paths = [train_file, valid_file, test_file]
+        if not os.path.exists(dataset_folder):
+            os.mkdir(dataset_folder)
+
+        # Save parameters
+        serialize_dict(dictionary=params, file_path=dataset_folder + 'params.pkl.gz')
+
+        file_paths = ['train', 'valid', 'test']
         samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
         for file_path, num_samples in zip(file_paths, samples):
+
+            # Create folder to put this data series in
+            series_folder = dataset_folder + file_path
+            if not os.path.exists(series_folder):
+                os.mkdir(series_folder)
             
             # Create new file if there is an existing dataset with this name
             delete_if_exists(file_path)
@@ -98,19 +108,16 @@ def generate(params):
                                    min_max_sources=params['min_max_sources'],
                                    min_max_sinks=params['min_max_sinks'])
 
-                cap = create_capacities(graph=graph, demands=d)
+                # cap = create_capacities(graph=graph, demands=d)
 
-                dataset.append({'dem': d, 'cap': cap})
-                if len(dataset) == WRITE_THRESHOLD:
-                    write_dataset(dataset, file_path)
-                    print('Wrote {0} samples to {1}'.format(i+1, file_path))
-                    dataset = []
+                dataset.append(sp.csr_matrix(d))
 
-            # Clean up
-            if len(dataset) > 0:
-                write_dataset(dataset, file_path)
+                if (i+1) % WRITE_THRESHOLD == 0:
+                    print('Computed {0}/{1} samples for {2}.'.format(i+1, num_samples, file_path))
 
+            write_sparse_npz(dataset=dataset, folder=series_folder)
             print('Completed {0}.'.format(file_path))
+
 
 def get_model_runner(params):
     if params['name'] == 'neighborhood':

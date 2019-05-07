@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 import gzip
 import scipy.sparse as sp
-from os.path import exists
+from os import path
 from utils.constants import SMALL_NUMBER
 from annoy import AnnoyIndex
 
@@ -98,6 +98,47 @@ def read_dataset(data_path):
                 dataset.append({'dem': data_dict['dem'], 'cap': data_dict['cap']})
         except EOFError:
             pass
+    return dataset
+
+
+def write_sparse_npz(dataset, folder):
+    """
+    Serializes the given matrices  as sparse matrices in a set of files. We use a custom function
+    here because the scipy.sparse.save_npz function only allows for a single sparse matrix.
+    """
+    data = {str(i): sp_mat.data for i, sp_mat in enumerate(dataset)}
+    indices = {str(i): sp_mat.indices for i, sp_mat in enumerate(dataset)}
+    ind_ptrs = {str(i): sp_mat.indptr for i, sp_mat in enumerate(dataset)}
+    shape = {str(i): sp_mat.shape for i, sp_mat in enumerate(dataset)}
+
+    labels = np.arange(start=0, stop=len(dataset))
+
+    file_names = ['data.npz', 'indices.npz', 'indptr.npz', 'shape.npz']
+    matrices = [data, indices, ind_ptrs, shape]
+
+    for name, mat in zip(file_names, matrices):
+        file_path = path.join(folder, name)
+        with open(file_path, 'wb') as file:
+            np.savez_compressed(file, **mat)
+
+
+def read_sparse_npz(folder):
+
+    def read(folder, name):
+        file_path = path.join(folder, name)
+        return np.load(file=file_path, mmap_mode='r')
+
+    data = read(folder, 'data.npz')
+    indices = read(folder, 'indices.npz')
+    indptr = read(folder, 'indptr.npz')
+    shape = read(folder, 'shape.npz')
+
+    dataset = []
+    for i in range(len(data)):
+        index = str(i)
+        mat = sp.csr_matrix((data[index], indices[index], indptr[index]), shape=shape[index])
+        dataset.append(mat)
+
     return dataset
 
 
