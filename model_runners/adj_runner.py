@@ -38,13 +38,13 @@ class AdjRunner(ModelRunner):
                                           shape=adj_shape,
                                           name='adj-ph',
                                           is_sparse=False)
-        flow_indices_ph = model.create_placeholder(dtype=tf.int32,
-                                                   shape=[np.prod(adj_shape), 3],
-                                                   name='flow-indices-ph',
-                                                   is_sparse=False)
-        out_indices_ph = model.create_placeholder(dtype=tf.int32,
+        in_indices_ph = model.create_placeholder(dtype=tf.int32,
+                                                 shape=[np.prod(adj_shape), 3],
+                                                 name='in-indices-ph',
+                                                 is_sparse=False)
+        rev_indices_ph = model.create_placeholder(dtype=tf.int32,
                                                   shape=[np.prod(adj_shape), 3],
-                                                  name='out-indices-ph',
+                                                  name='rev-indices-ph',
                                                   is_sparse=False)
         node_embedding_ph = model.create_placeholder(dtype=tf.float32,
                                                      shape=embedding_shape,
@@ -74,8 +74,8 @@ class AdjRunner(ModelRunner):
             'node_embeddings': node_embedding_ph,
             'adj_lst': adj_ph,
             'neighborhoods': neighborhood_phs,
-            'flow_indices': flow_indices_ph,
-            'out_indices': out_indices_ph,
+            'in_indices': in_indices_ph,
+            'rev_indices': rev_indices_ph,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes_ph,
             'should_correct_flows': True
@@ -96,46 +96,15 @@ class AdjRunner(ModelRunner):
         num_nodes = np.array([sample.num_nodes for sample in batch])
         dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
 
-        # Inverted adjacency list used to compute indexes
-        inv_adj_lists = [adj_matrix_to_list(sample.adj_mat, inverted=True) for sample in batch]
-        inv_adj_tensors = np.array([pad_adj_list(adj_lst, max_degree, max_num_nodes, n)
-                                    for adj_lst, n in zip(inv_adj_lists, num_nodes)])
+        # 3D indexing used for flow computation and correction
+        batch_indices = np.arange(start=0, stop=batch_size)
+        batch_indices = np.repeat(batch_indices, adj_lsts.shape[1] * max_degree).reshape((-1, 1))
 
-        # 2D indexing used for inflow and flow corrections
-        flow_indices = np.zeros(shape=(np.prod(adj_lsts.shape), 3))
-        out_indices = np.zeros(shape=(np.prod(adj_lsts.shape), 3))
+        rev_indices = np.vstack([sample.rev_indices for sample in batch])
+        rev_indices = np.concatenate([batch_indices, rev_indices], axis=1)
 
-        index_a = 0
-        index_b = 0
-        for x in range(adj_lsts.shape[0]):
-            for y in range(adj_lsts.shape[1]):
-                for i, z in enumerate(inv_adj_tensors[x, y]):
-                    indexof = np.where(adj_lsts[x, z] == y)[0]
-
-                    flow_indices[index_a, 0] = x
-
-                    if len(indexof) > 0:
-                        flow_indices[index_a, 1] = z
-                        flow_indices[index_a, 2] = indexof[0]
-                    else:
-                        flow_indices[index_a, 1] = num_nodes[x]
-                        flow_indices[index_a, 2] = max_degree-1
-
-                    index_a += 1
-
-                for i, z in enumerate(adj_lsts[x, y]):
-                    # Reverse Edge
-                    indexof = np.where(adj_lsts[x, z] == y)[0]
-
-                    out_indices[index_b, 0] = x
-                    if len(indexof) > 0:
-                        out_indices[index_b, 1] = z
-                        out_indices[index_b, 2] = indexof[0]
-                    else:
-                        out_indices[index_b, 1] = num_nodes[x]
-                        out_indices[index_b, 2] = max_degree-1
-
-                    index_b += 1
+        in_indices = np.vstack([sample.in_indices for sample in batch])
+        in_indices = np.concatenate([batch_indices, in_indices], axis=1)
 
         # Add dummy embeddings, features and demands to account for added node
         demands = np.insert(demands, demands.shape[1], 0, axis=1)
@@ -149,8 +118,8 @@ class AdjRunner(ModelRunner):
             placeholders['node_embeddings']: node_embeddings,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
-            placeholders['flow_indices']: flow_indices,
-            placeholders['out_indices']: out_indices
+            placeholders['in_indices']: in_indices,
+            placeholders['rev_indices']: rev_indices
         }
 
         for i in range(self.params['num_neighborhoods'] + 1):

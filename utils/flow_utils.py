@@ -2,7 +2,7 @@ import tensorflow as tf
 from utils.constants import BIG_NUMBER, FLOW_THRESHOLD
 
 
-def mcf_solver(pred_weights, demand, flow_indices, max_iters, name='mcf-solver'):
+def mcf_solver(pred_weights, demand, in_indices, max_iters, name='mcf-solver'):
     """
     pred_weights: B x (V+1) x D tensor
     demand: B x (V+1) x 1 tensor
@@ -13,7 +13,7 @@ def mcf_solver(pred_weights, demand, flow_indices, max_iters, name='mcf-solver')
 
     def body(flow, prev_flow):
         # Get incoming flows, B * (V+1) * D x 1  tensor
-        inflow = tf.gather_nd(flow, flow_indices)
+        inflow = tf.gather_nd(flow, in_indices)
         inflow = tf.reshape(inflow, tf.shape(pred_weights))
 
         total_inflow = tf.reduce_sum(inflow, axis=-1, keepdims=True)

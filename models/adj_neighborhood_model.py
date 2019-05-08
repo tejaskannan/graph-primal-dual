@@ -31,10 +31,10 @@ class AdjModel(Model):
         neighborhoods = kwargs['neighborhoods']
 
         # B*V*D x 3 tensor containing 3D indices used to compute inflow
-        flow_indices = kwargs['flow_indices']
+        in_indices = kwargs['in_indices']
 
         # B*V*D x 3 tensor containing 2D indices of outgoing neighbors
-        out_indices = kwargs['out_indices']
+        rev_indices = kwargs['rev_indices']
 
         # B x 1
         num_nodes = kwargs['num_nodes']
@@ -106,11 +106,11 @@ class AdjModel(Model):
 
                 flow, pflow = mcf_solver(pred_weights=normalized_weights,
                                          demand=demands,
-                                         flow_indices=flow_indices,
+                                         in_indices=in_indices,
                                          max_iters=self.params['flow_iters'])
 
                 if should_correct_flows:
-                    rev_flow = tf.reshape(tf.gather_nd(flow, out_indices), tf.shape(pred_weights))
+                    rev_flow = tf.reshape(tf.gather_nd(flow, rev_indices), tf.shape(pred_weights))
                     flow_diff = tf.minimum(flow, rev_flow)
                     flow = tf.nn.relu(flow - flow_diff)
 

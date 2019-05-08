@@ -120,7 +120,6 @@ def generate(params):
 
             if len(dataset) > 0:
                 index, _ = file_index(i)
-                print(index)
                 write_sparse_npz(dataset=dataset, folder=series_folder, index=index)
             print('Completed {0}.'.format(file_path))
 

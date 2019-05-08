@@ -38,7 +38,8 @@ class Sample:
 class BatchSample:
 
     def __init__(self, node_features, demands, adj_lst, adj_mat,
-                 neighborhoods, embeddings, num_nodes, graph_name):
+                 neighborhoods, embeddings, num_nodes, graph_name,
+                 rev_indices, in_indices):
         self.node_features = node_features
         self.demands = demands
         self.adj_lst = adj_lst
@@ -47,6 +48,8 @@ class BatchSample:
         self.embeddings = embeddings
         self.num_nodes = num_nodes
         self.graph_name = graph_name
+        self.rev_indices = rev_indices
+        self.in_indices = in_indices
 
 
 class GraphData:
@@ -69,6 +72,44 @@ class GraphData:
 
         # Save the true number of nodes in this graph
         self.num_nodes = graph.number_of_nodes()
+
+    def set_edge_indices(self, adj_lst, max_degree, max_num_nodes):
+        dim0 = np.prod(adj_lst.shape)
+
+        # These arrays hold 2D coordinates
+        self.in_indices = np.zeros(shape=(dim0, 2))
+        self.rev_indices = np.zeros(shape=(dim0, 2))
+
+        inv_adj_lst = adj_matrix_to_list(self.adj_mat, inverted=True)
+        inv_adj_lst = pad_adj_list(inv_adj_lst, max_degree, max_num_nodes, self.num_nodes)
+
+        index_a = 0
+        index_b = 0
+        for x in range(adj_lst.shape[0]):
+            for y in inv_adj_lst[x]:
+                indexof = np.where(adj_lst[y] == x)[0]
+
+                if len(indexof) > 0:
+                    self.in_indices[index_a, 0] = y
+                    self.in_indices[index_a, 1] = indexof[0]
+                else:
+                    self.in_indices[index_a, 0] = self.num_nodes
+                    self.in_indices[index_a, 1] = max_degree-1
+
+                index_a += 1
+
+            for y in adj_lst[x]:
+                # Reverse Edge
+                indexof = np.where(adj_lst[y] == x)[0]
+
+                if len(indexof) > 0:
+                    self.rev_indices[index_b, 0] = y
+                    self.rev_indices[index_b, 1] = indexof[0]
+                else:
+                    self.rev_indices[index_b, 0] = self.num_nodes
+                    self.rev_indices[index_b, 1] = max_degree-1
+
+                index_b += 1
 
 
 class DatasetManager:
@@ -166,13 +207,18 @@ class DatasetManager:
 
         # Expand graph data to ensure consistent sizing
         for gd in self.graph_data.values():
-            gd.adj_mat = expand_sparse_matrix(gd.adj_mat, n=self.max_num_nodes)
-            gd.embeddings = expand_matrix(gd.embeddings, n=self.max_num_nodes,
-                                          m=gd.embeddings.shape[1])
             gd.adj_lst = pad_adj_list(adj_lst=gd.adj_lst,
                                       max_degree=self.max_degree,
                                       max_num_nodes=self.max_num_nodes,
                                       mask_number=gd.num_nodes)
+            gd.set_edge_indices(adj_lst=gd.adj_lst,
+                                max_degree=self.max_degree,
+                                max_num_nodes=self.max_num_nodes)
+
+
+            gd.adj_mat = expand_sparse_matrix(gd.adj_mat, n=self.max_num_nodes)
+            gd.embeddings = expand_matrix(gd.embeddings, n=self.max_num_nodes,
+                                          m=gd.embeddings.shape[1])
             gd.neighborhoods = neighborhood_adj_lists(neighborhoods=gd.neighborhoods,
                                                       max_degrees=self.max_neighborhood_degrees,
                                                       max_num_nodes=self.max_num_nodes,
@@ -204,7 +250,7 @@ class DatasetManager:
                                         for demand in demands]
 
                 assert len(self.dataset[s]) == num_samples
-                print('Completed graph {0} for {1}.'.format(graph_name, s.name))
+                print('Completed loading graph {0} for {1}.'.format(graph_name, s.name))
 
 
     def create_batches(self, series, batch_size, shuffle):
@@ -232,7 +278,9 @@ class DatasetManager:
                                 neighborhoods=gd.neighborhoods,
                                 embeddings=gd.embeddings,
                                 num_nodes=gd.num_nodes,
-                                graph_name=gd.graph_name)
+                                graph_name=gd.graph_name,
+                                rev_indices=gd.rev_indices,
+                                in_indices=gd.in_indices)
                 batch.append(b)
             batches.append(batch)
 
@@ -299,7 +347,9 @@ class DatasetManager:
                             neighborhoods=gd.neighborhoods,
                             embeddings=gd.embeddings,
                             num_nodes=gd.num_nodes,
-                            graph_name=gd.graph_name)
+                            graph_name=gd.graph_name,
+                            rev_indices=gd.rev_indices,
+                            in_indices=gd.in_indices)
             batch.append(b)
             indices.append(index)
 
