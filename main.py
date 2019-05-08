@@ -147,6 +147,7 @@ def random_walks(graph_name, unique_neighborhoods):
     total = graph.number_of_nodes()**2
 
     limit = int(unique_neighborhoods)
+    count = 0
 
     print('Graph: {0}'.format(graph_name))
     print('Number of Entries: {0}'.format(total))
@@ -155,8 +156,16 @@ def random_walks(graph_name, unique_neighborhoods):
         frac = (total - nonzero) / total
         print('Frac of zero entries for walks of length {0}: {1}'.format(i, frac))
 
+        count += 1
+
         if frac == limit:
             break
+
+    print(LINE)
+
+    max_degrees = [np.max(mat.sum(axis=-1)) for mat in neighborhoods]        
+    for i in range(count):
+        print('Maximum out degree at neighborhood level {0}: {1}'.format(i, max_degrees[i]))
 
 
 def graph_stats(graph_name):

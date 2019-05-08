@@ -126,7 +126,7 @@ def read_sparse_npz(folder, file_index):
 
     def read(folder, name):
         file_path = path.join(folder, name)
-        return np.load(file=file_path)
+        return np.load(file=file_path, mmap_mode='r')
 
     data = read(folder, 'data-{0}.npz'.format(file_index))
     indices = read(folder, 'indices-{0}.npz'.format(file_index))
@@ -138,6 +138,12 @@ def read_sparse_npz(folder, file_index):
         index = str(i)
         mat = sp.csr_matrix((data[index], indices[index], indptr[index]), shape=shape[index])
         dataset.append(mat)
+
+    # Close NPZ File objects to avoid leaking file descriptors
+    data.close()
+    indices.close()
+    indptr.close()
+    shape.close()
 
     return dataset
 

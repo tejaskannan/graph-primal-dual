@@ -252,7 +252,6 @@ class DatasetManager:
                 assert len(self.dataset[s]) == num_samples
                 print('Completed loading graph {0} for {1}.'.format(graph_name, s.name))
 
-
     def create_batches(self, series, batch_size, shuffle):
         """
         Returns all batches for a single series using uniform shuffling without replacement.
