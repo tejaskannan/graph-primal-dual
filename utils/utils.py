@@ -312,3 +312,12 @@ def delete_if_exists(file_path):
 def serialize_dict(dictionary, file_path):
     with gzip.GzipFile(file_path, 'wb') as file:
         pickle.dump(obj=dictionary, file=file)
+
+
+def deserialize_dict(file_path):
+    with gzip.GzipFile(file_path, 'rb') as file:
+        return pickle.load(file)
+
+
+def file_index(i):
+    return i // WRITE_THRESHOLD, i % WRITE_THRESHOLD

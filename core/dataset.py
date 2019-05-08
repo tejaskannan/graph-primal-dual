@@ -5,8 +5,8 @@ from enum import Enum
 from bisect import bisect_right
 from collections.abc import Iterable
 from core.load import read_sparse_npz, load_to_networkx
-from utils.constants import BIG_NUMBER
-from utils.utils import expand_sparse_matrix
+from utils.constants import BIG_NUMBER, WRITE_THRESHOLD
+from utils.utils import expand_sparse_matrix, deserialize_dict
 from utils.utils import create_node_embeddings, sparse_matrix_to_tensor
 from utils.utils import expand_matrix, demands_to_features
 from utils.graph_utils import adjacency_list, pad_adj_list, neighborhood_adj_lists
@@ -73,8 +73,35 @@ class GraphData:
 
 class DatasetManager:
 
-    def __init__(self, data_folders, params):
-        self.data_folders = data_folders
+    def __init__(self, params):
+
+        self.data_folders = {
+            Series.TRAIN: {},
+            Series.VALID: {},
+            Series.TEST: {}
+        }
+        self.num_samples = {
+            Series.TRAIN: {},
+            Series.VALID: {},
+            Series.TEST: {}
+        }
+        dataset_folder_base = 'datasets/{0}/'
+        for dataset_name, graph_name in zip(params['train_dataset_names'], params['train_graph_names']):
+            dataset_folder = dataset_folder_base.format(dataset_name)
+            self.data_folders[Series.TRAIN][graph_name] = dataset_folder + 'train'
+
+            dataset_params = deserialize_dict(dataset_folder + 'params.pkl.gz')
+            self.num_samples[Series.TRAIN][graph_name] = dataset_params['train_samples']
+
+        for dataset_name, graph_name in zip(params['test_dataset_names'], params['test_graph_names']):
+            dataset_folder = dataset_folder_base.format(dataset_name)
+            self.data_folders[Series.VALID][graph_name] = dataset_folder + 'valid'
+            self.data_folders[Series.TEST][graph_name] = dataset_folder + 'test'
+
+            dataset_params = deserialize_dict(dataset_folder + 'params.pkl.gz')
+            self.num_samples[Series.VALID][graph_name] = dataset_params['valid_samples']
+            self.num_samples[Series.TEST][graph_name] = dataset_params['test_samples']
+
         self.params = params
         self.dataset = {}
         self.graph_data = {}
@@ -164,11 +191,21 @@ class DatasetManager:
 
             for graph_name, folder in self.data_folders[s].items():
 
-                # Load demands as Sparse CSR matrices to save memory.
-                demands = read_sparse_npz(folder=folder)
+                num_samples = self.num_samples[s][graph_name]
+                num_files = int(math.ceil(num_samples / WRITE_THRESHOLD))
 
-                self.dataset[s] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.max_num_nodes)
-                                    for demand in demands]
+                print('Started loading {0} {1} samples for graph {2}.'.format(num_samples, s.name, graph_name))
+
+                for file_index in range(num_files):
+                    # Load demands as Sparse CSR matrices to save memory.
+                    demands = read_sparse_npz(folder=folder, file_index=file_index)
+
+                    self.dataset[s] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.max_num_nodes)
+                                        for demand in demands]
+
+                assert len(self.dataset[s]) == num_samples
+                print('Completed graph {0} for {1}.'.format(graph_name, s.name))
+
 
     def create_batches(self, series, batch_size, shuffle):
         """

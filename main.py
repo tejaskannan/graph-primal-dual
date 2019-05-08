@@ -5,7 +5,7 @@ import numpy as np
 import json
 import scipy.sparse as sp
 from utils.utils import load_params, restore_params, create_node_embeddings
-from utils.utils import append_row_to_log, create_demands
+from utils.utils import append_row_to_log, create_demands, file_index
 from utils.utils import create_capacities, delete_if_exists, serialize_dict
 from utils.graph_utils import random_walk_neighborhoods
 from utils.constants import *
@@ -113,9 +113,15 @@ def generate(params):
                 dataset.append(sp.csr_matrix(d))
 
                 if (i+1) % WRITE_THRESHOLD == 0:
-                    print('Computed {0}/{1} samples for {2}.'.format(i+1, num_samples, file_path))
+                    index, _ = file_index(i)
+                    write_sparse_npz(dataset=dataset, folder=series_folder, index=index)
+                    print('Completed {0}/{1} samples for {2}.'.format(i+1, num_samples, file_path))
+                    dataset = []
 
-            write_sparse_npz(dataset=dataset, folder=series_folder)
+            if len(dataset) > 0:
+                index, _ = file_index(i)
+                print(index)
+                write_sparse_npz(dataset=dataset, folder=series_folder, index=index)
             print('Completed {0}.'.format(file_path))
 
 

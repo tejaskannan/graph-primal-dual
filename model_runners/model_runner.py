@@ -32,20 +32,7 @@ class ModelRunner:
         self.num_node_features = 2
         self.embedding_size = 2 * self.params['num_neighborhoods'] + 2
 
-        folders = {
-            Series.TRAIN: {},
-            Series.VALID: {},
-            Series.TEST: {}
-        }
-        dataset_folder = 'datasets/{0}/{1}'
-        for dataset_name, graph_name in zip(self.params['train_dataset_names'], self.params['train_graph_names']):
-            folders[Series.TRAIN][graph_name] = dataset_folder.format(dataset_name, 'train')
-            folders[Series.VALID][graph_name] = dataset_folder.format(dataset_name, 'valid')
-
-        for dataset_name, graph_name in zip(self.params['test_dataset_names'], self.params['test_graph_names']):
-            folders[Series.TEST][graph_name] = dataset_folder.format(dataset_name, 'test')
-
-        self.dataset = DatasetManager(data_folders=folders, params=self.params)
+        self.dataset = DatasetManager(params=self.params)
         self.dataset.load_graphs(normalize=True)
 
     def train(self):

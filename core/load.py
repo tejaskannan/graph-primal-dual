@@ -101,7 +101,7 @@ def read_dataset(data_path):
     return dataset
 
 
-def write_sparse_npz(dataset, folder):
+def write_sparse_npz(dataset, folder, index):
     """
     Serializes the given matrices  as sparse matrices in a set of files. We use a custom function
     here because the scipy.sparse.save_npz function only allows for a single sparse matrix.
@@ -113,25 +113,25 @@ def write_sparse_npz(dataset, folder):
 
     labels = np.arange(start=0, stop=len(dataset))
 
-    file_names = ['data.npz', 'indices.npz', 'indptr.npz', 'shape.npz']
+    file_names = ['data-{0}.npz', 'indices-{0}.npz', 'indptr-{0}.npz', 'shape-{0}.npz']
     matrices = [data, indices, ind_ptrs, shape]
 
     for name, mat in zip(file_names, matrices):
-        file_path = path.join(folder, name)
+        file_path = path.join(folder, name.format(index))
         with open(file_path, 'wb') as file:
             np.savez_compressed(file, **mat)
 
 
-def read_sparse_npz(folder):
+def read_sparse_npz(folder, file_index):
 
     def read(folder, name):
         file_path = path.join(folder, name)
         return np.load(file=file_path)
 
-    data = read(folder, 'data.npz')
-    indices = read(folder, 'indices.npz')
-    indptr = read(folder, 'indptr.npz')
-    shape = read(folder, 'shape.npz')
+    data = read(folder, 'data-{0}.npz'.format(file_index))
+    indices = read(folder, 'indices-{0}.npz'.format(file_index))
+    indptr = read(folder, 'indptr-{0}.npz'.format(file_index))
+    shape = read(folder, 'shape-{0}.npz'.format(file_index))
 
     dataset = []
     for i in range(len(data)):
