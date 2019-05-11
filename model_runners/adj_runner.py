@@ -71,14 +71,14 @@ class AdjRunner(ModelRunner):
         return {
             'node_features': node_ph,
             'demands': demands_ph,
-            'node_embeddings': node_embedding_ph,
             'adj_lst': adj_ph,
             'neighborhoods': neighborhood_phs,
             'in_indices': in_indices_ph,
             'rev_indices': rev_indices_ph,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes_ph,
-            'should_correct_flows': False
+            'should_correct_flows': False,
+            'max_num_nodes': max_num_nodes
         }
 
     def create_feed_dict(self, placeholders, batch, batch_size, data_series, **kwargs):
@@ -92,7 +92,6 @@ class AdjRunner(ModelRunner):
         node_features = np.array([sample.node_features for sample in batch])
         demands = np.array([sample.demands for sample in batch])
         adj_lsts = np.array([sample.adj_lst for sample in batch])
-        node_embeddings = np.array([sample.embeddings for sample in batch])
         num_nodes = np.array([sample.num_nodes for sample in batch])
         dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
 
@@ -109,13 +108,11 @@ class AdjRunner(ModelRunner):
         # Add dummy embeddings, features and demands to account for added node
         demands = np.insert(demands, demands.shape[1], 0, axis=1)
         node_features = np.insert(node_features, node_features.shape[1], 0, axis=1)        
-        node_embeddings = np.insert(node_embeddings, node_embeddings.shape[1], 0, axis=1)
 
         feed_dict = {
             placeholders['node_features']: node_features,
             placeholders['demands']: demands,
             placeholders['adj_lst']: adj_lsts,
-            placeholders['node_embeddings']: node_embeddings,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['in_indices']: in_indices,

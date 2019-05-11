@@ -254,7 +254,7 @@ class DatasetManager:
 
     def create_batches(self, series, batch_size, shuffle):
         """
-        Returns all batches for a single series using uniform shuffling without replacement.
+        Generator for batches of a single series using uniform shuffling without replacement.
         """
         data = self.dataset[series]
         if shuffle:
@@ -281,9 +281,8 @@ class DatasetManager:
                                 rev_indices=gd.rev_indices,
                                 in_indices=gd.in_indices)
                 batch.append(b)
-            batches.append(batch)
-
-        return batches
+            
+            yield batch
 
     def get_train_batch(self, batch_size):
         assert self.is_train_initialized, 'Training not yet initialized.'
@@ -402,3 +401,6 @@ class DatasetManager:
             embeddings = self.graph_data[graph_name].embeddings
             transformed_embeddings = self.scaler.transform(embeddings)
             self.graph_data[graph_name].embeddings = transformed_embeddings
+
+    def num_batches(self, series, batch_size):
+        return int(sum(self.num_samples[series].values()) / batch_size)

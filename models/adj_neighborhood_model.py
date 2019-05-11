@@ -21,9 +21,6 @@ class AdjModel(Model):
         # B x V x F tensor which contains node features
         node_features = kwargs['node_features']
 
-        # B x V x E tensor which contains pre-computed node embeddings
-        node_embeddings = kwargs['node_embeddings']
-
         # B x V x D tensor containing the padded adjacency list
         adj_lst = kwargs['adj_lst']
 
@@ -45,13 +42,29 @@ class AdjModel(Model):
         # Boolean
         should_correct_flows = kwargs['should_correct_flows']
 
+        # Scalar Int
+        max_num_nodes = kwargs['max_num_nodes']
+
         with self._sess.graph.as_default():
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
 
+                node_indices = tf.range(start=0, limit=max_num_nodes)
+                node_indices = tf.tile(tf.expand_dims(node_indices, axis=0),
+                                       multiples=(tf.shape(num_nodes)[0], 1))
+
+                node_embedding_init = tf.random.normal(shape=(max_num_nodes, self.params['node_embedding_size']))
+                node_embedding_var = tf.Variable(node_embedding_init,
+                                                 trainable=True,
+                                                 name='node-embedding-var')
+                node_embeddings = tf.nn.embedding_lookup(params=node_embedding_var,
+                                                         ids=node_indices,
+                                                         max_norm=1,
+                                                         name='node-embedding-lookup')
+
                 # Node encoding, B x V x K
-                encoder = MLP(hidden_sizes=self.params['encoder_hidden'],
+                encoder = MLP(hidden_sizes=[],
                               output_size=self.params['node_encoding'],
-                              activation=tf.nn.tanh,
+                              activation=None,
                               activate_final=True,
                               name='node-encoder')
                 node_encoding = encoder(inputs=tf.concat([node_embeddings, node_features], axis=-1),

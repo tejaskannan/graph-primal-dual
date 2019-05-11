@@ -118,7 +118,7 @@ class ModelRunner:
             valid_batches = self.dataset.create_batches(series=Series.VALID,
                                                         batch_size=batch_size,
                                                         shuffle=True)
-            num_valid_batches = len(valid_batches)
+            num_valid_batches = self.dataset.num_batches(series=Series.VALID, batch_size=batch_size)
             valid_losses = []
             for i, batch in enumerate(valid_batches):
 
@@ -199,9 +199,12 @@ class ModelRunner:
 
         # Compute indices which will be used for plotting. This is done in a deterministic
         # manner to make it easier to compare different runs.
-        num_test_batches = len(test_batches)
+        num_test_batches = self.dataset.num_batches(series=Series.TEST, batch_size=batch_size)
         num_test_samples = num_test_batches * batch_size
         num_plot_samples = num_test_samples * self.params['plot_fraction']
+
+        print(num_plot_samples)
+
         step = int(num_test_samples / num_plot_samples)
         plot_indices = set(range(0, num_test_samples, step))
 
