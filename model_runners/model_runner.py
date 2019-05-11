@@ -233,14 +233,12 @@ class ModelRunner:
                 adj_lst = outputs[3][j]
                 pred_weights = outputs[4][j]
                 dual_cost = outputs[5][j]
-                node_weights = outputs[6][j]
-                attn_weights = outputs[7][j]
+                attn_weights = outputs[6][j]
 
                 demands = np.array(batch[j].demands)
 
                 node_features = {
-                    'demand': demands,
-                    'node_weight': node_weights
+                    'demand': demands
                 }
                 edge_features = {
                     'flow': flow,
@@ -256,8 +254,8 @@ class ModelRunner:
                     prop_path = '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index)
                     attn_weight_path = '{0}attn-weights-{1}-{2}.png'.format(model_path, graph_name, index)
 
-                    plot_flow_graph_adj(flow_graph, use_flow_props=False, file_path=flow_path)
-                    plot_flow_graph_adj(flow_graph, use_flow_props=True, file_path=prop_path)
+                    plot_flow_graph_adj(flow_graph, use_flow_props=False, use_node_weights=False, file_path=flow_path)
+                    plot_flow_graph_adj(flow_graph, use_flow_props=True, use_node_weights=False, file_path=prop_path)
                     
                     num_nodes = batch[j].num_nodes
                     plot_weights(weight_matrix=attn_weights,

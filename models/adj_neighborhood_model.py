@@ -48,7 +48,7 @@ class AdjModel(Model):
         with self._sess.graph.as_default():
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
 
-                # Node encoding
+                # Node encoding, B x V x K
                 encoder = MLP(hidden_sizes=self.params['encoder_hidden'],
                               output_size=self.params['node_encoding'],
                               activation=tf.nn.tanh,
@@ -78,6 +78,23 @@ class AdjModel(Model):
                                              state=node_encoding,
                                              dropout_keep_prob=dropout_keep_prob)
 
+                # Neighbor States, B x V x D x K
+                neighbor_states, _ = masked_gather(values=node_encoding,
+                                                indices=adj_lst,
+                                                mask_index=num_nodes,
+                                                set_zero=True)
+
+                # Mask to remove nonexistent edges, B x V x D
+                mask_indices = tf.expand_dims(num_nodes, axis=-1)
+                mask = tf.cast(tf.equal(adj_lst, mask_indices), tf.float32)
+
+                # Current States tiled across neighbors, B x V x D x K
+                tiled_states = tf.tile(tf.expand_dims(node_encoding, axis=-2),
+                                       multiples=(1, 1, tf.shape(neighbor_states)[2], 1))
+                tiled_states = tf.expand_dims(1.0 - mask, axis=-1) * tiled_states
+
+                concat_states = tf.concat([tiled_states, neighbor_states], axis=-1)
+
                 # Compute flow proportions
                 decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
                               output_size=1,
@@ -85,22 +102,19 @@ class AdjModel(Model):
                               activate_final=False,
                               name='node-decoder')
 
-                # B x V x 1
-                node_weights = decoder(inputs=node_encoding)
+                # B x V x D x 1
+                node_weights = decoder(inputs=concat_states)
 
-                pred_weights, _ = masked_gather(values=node_weights,
-                                                indices=adj_lst,
-                                                mask_index=num_nodes)
-                pred_weights = tf.squeeze(pred_weights, axis=-1)
+                # B x V x D
+                node_weights = tf.squeeze(node_weights, axis=-1)
 
-                # Mask to remove nonexistent edges
-                mask_indices = tf.expand_dims(num_nodes, axis=-1)
-                mask = 1.0 - tf.cast(tf.equal(adj_lst, mask_indices), tf.float32)
+                # Mask out nonexistent neighbors for normalization, B x V x D
+                pred_weights = (-BIG_NUMBER * mask) + node_weights
 
                 # Normalize weights for outgoing neighbors
                 if self.params['use_sparsemax']:
                     sparsemax = SparseMax(epsilon=1e-5)
-                    normalized_weights = sparsemax(inputs=pred_weights, mask=mask)
+                    normalized_weights = sparsemax(inputs=pred_weights, mask=(1.0 - mask))
                 else:
                     normalized_weights = tf.nn.softmax(pred_weights, axis=-1)
 
@@ -151,5 +165,5 @@ class AdjModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, node_weights, attn_weights]
+                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, attn_weights, concat_states, pred_weights]
                 self.optimizer_op = self._build_optimizer_op()

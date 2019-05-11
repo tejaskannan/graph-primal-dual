@@ -78,7 +78,7 @@ class AdjRunner(ModelRunner):
             'rev_indices': rev_indices_ph,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes_ph,
-            'should_correct_flows': True
+            'should_correct_flows': False
         }
 
     def create_feed_dict(self, placeholders, batch, batch_size, data_series, **kwargs):
