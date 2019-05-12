@@ -110,3 +110,38 @@ def weighted_sum(values, indices, weights, name='weighted-sum'):
     weighted_values = gathered_values * tf.expand_dims(weights, axis=-1)
 
     return tf.reduce_sum(weighted_values, axis=-2)
+
+
+def rolling_sum(values, name='feature-sum'):
+    """
+    feature_values: B x V x D x F tensor of feature values
+
+    Returns: B x V x D x F tensor of summed feature vectors
+    """
+    d = tf.shape(values)[2]
+    index = tf.constant(0, dtype=tf.int32)
+    partial_sums = tf.TensorArray(dtype=tf.float32, size=d, name='{0}-partial-sums'.format(name))
+    indices = tf.reshape(tf.range(start=0, limit=d), [1, 1, d, 1])
+
+    def body(idx, sums_arr):
+        mask = 1.0 - tf.cast(tf.equal(indices, idx), tf.float32)
+        masked_values = mask * values
+
+        # B x V x F tensor
+        p_sum = tf.reduce_sum(masked_values, axis=-2)
+
+        sums_arr = sums_arr.write(idx, p_sum)
+        return [idx + 1, sums_arr]
+
+    _, partial_sums = tf.while_loop(cond=lambda idx, _: idx < d,
+                                    body=body,
+                                    loop_vars=[index, partial_sums],
+                                    parallel_iterations=1,
+                                    maximum_iterations=d,
+                                    name='{0}-while-loop'.format(name))
+
+    # D x B x V x F
+    summed_features = partial_sums.stack()
+
+    # B x V x D x F
+    return tf.transpose(summed_features, perm=[1, 2, 0, 3])
