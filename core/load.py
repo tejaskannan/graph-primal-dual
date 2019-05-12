@@ -1,7 +1,5 @@
 import networkx as nx
 import numpy as np
-import pickle
-import gzip
 import scipy.sparse as sp
 from os import path
 from utils.constants import SMALL_NUMBER
@@ -67,38 +65,6 @@ def load_to_networkx(path):
         pass
 
     return graph
-
-
-def write_dataset(dataset, output_path):
-    """
-    dataset is a list of dictionaries of the form { 'dem': [], 'cap': [] }
-    """
-    with gzip.GzipFile(output_path, 'ab') as output_file:
-        for data_point in dataset:
-
-            # Convert demands into node features
-            node_features = np.zeros(shape=(data_point['dem'].shape[0], 2))
-            for i, demand in enumerate(data_point['dem']):
-                if demand[0] > 0:
-                    node_features[i][0] = demand[0]
-                elif demand[0] < 0:
-                    node_features[i][1] = -demand[0]
-
-            compressed_demands = sp.csr_matrix(node_features)
-            pickle.dump({'dem': compressed_demands, 'cap': data_point['cap']}, output_file)
-
-
-def read_dataset(data_path):
-    dataset = []
-
-    with gzip.GzipFile(data_path, 'rb') as data_file:
-        try:
-            while True:
-                data_dict = pickle.load(data_file)
-                dataset.append({'dem': data_dict['dem'], 'cap': data_dict['cap']})
-        except EOFError:
-            pass
-    return dataset
 
 
 def write_sparse_npz(dataset, folder, index):

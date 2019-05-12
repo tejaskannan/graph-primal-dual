@@ -1,5 +1,6 @@
 import tensorflow as tf
 from utils.constants import BIG_NUMBER, FLOW_THRESHOLD
+from utils.tf_utils import masked_gather
 
 
 def mcf_solver(pred_weights, demand, in_indices, max_iters, name='mcf-solver'):
@@ -68,3 +69,29 @@ def dual_flow(dual_diff, adj_mask, cost_fn, step_size, momentum, max_iters, name
                                      name='{0}-while-loop'.format(name))
 
     return dual_flows
+
+
+def destination_attn(node_weights, in_indices, rev_indices, mask, name='dest-attn'):
+    """
+    node_weights: B x V x D tensor of outgoing node weights
+    in_indices: B*V*D x 3 tensor of indices marking incoming neighbors
+    mask_index: B x 1 tensor marking the index to mask out
+
+    Returns: B x V x D tensor of weighted node weights based on destination
+    """
+
+    # B x V x D tensor of node weights for incoming neighbors
+    node_shape = tf.shape(node_weights)
+
+    in_weights = tf.gather_nd(node_weights, in_indices)
+    in_weights = (-BIG_NUMBER * mask) + tf.reshape(in_weights, shape=[node_shape[0], node_shape[1], -1])
+
+    # Normalize scores, represents weights augmented by destination attention
+    normalized_weights = tf.nn.softmax(in_weights, axis=-1)
+
+    weighted_scores = normalized_weights * in_weights * (1.0 - mask)
+
+    gathered_scores = tf.gather_nd(weighted_scores, rev_indices)
+    gathered_scores = tf.reshape(gathered_scores, shape=[node_shape[0], node_shape[1], -1])
+
+    return weighted_scores, gathered_scores
