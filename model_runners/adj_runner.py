@@ -112,7 +112,7 @@ class AdjRunner(ModelRunner):
 
         # Add dummy embeddings, features and demands to account for added node
         demands = np.insert(demands, demands.shape[1], 0, axis=1)
-        node_features = np.insert(node_features, node_features.shape[1], 0, axis=1)        
+        node_features = np.insert(node_features, node_features.shape[1], 0, axis=1)
 
         feed_dict = {
             placeholders['node_features']: node_features,

@@ -93,9 +93,9 @@ class AdjModel(Model):
 
                 # Neighbor States, B x V x D x K
                 neighbor_states, _ = masked_gather(values=node_encoding,
-                                                indices=adj_lst,
-                                                mask_index=num_nodes,
-                                                set_zero=True)
+                                                   indices=adj_lst,
+                                                   mask_index=num_nodes,
+                                                   set_zero=True)
 
                 # Mask to remove nonexistent edges, B x V x D
                 mask_indices = tf.expand_dims(num_nodes, axis=-1)

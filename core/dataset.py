@@ -217,7 +217,6 @@ class DatasetManager:
                                 max_degree=self.max_degree,
                                 max_num_nodes=self.max_num_nodes)
 
-
             gd.adj_mat = expand_sparse_matrix(gd.adj_mat, n=self.max_num_nodes)
             gd.embeddings = expand_matrix(gd.embeddings, n=self.max_num_nodes,
                                           m=gd.embeddings.shape[1])
@@ -279,7 +278,7 @@ class DatasetManager:
                                 rev_indices=gd.rev_indices,
                                 in_indices=gd.in_indices)
                 batch.append(b)
-            
+
             yield batch
 
     def get_train_batch(self, batch_size):
