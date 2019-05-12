@@ -3,7 +3,7 @@ from models.base_model import Model
 from core.layers import MLP, AdjGAT, GRU, AttentionNeighborhood, SparseMax
 from utils.constants import BIG_NUMBER, SMALL_NUMBER
 from utils.tf_utils import masked_gather
-from utils.flow_utils import mcf_solver, dual_flow
+from utils.flow_utils import mcf_solver, dual_flow, destination_attn
 from cost_functions.cost_functions import get_cost_function
 
 
@@ -24,6 +24,9 @@ class AdjModel(Model):
         # B x V x D tensor containing the padded adjacency list
         adj_lst = kwargs['adj_lst']
 
+        # B x V x D tensor containing padded inverse adjacency list
+        inv_adj_lst = kwargs['inv_adj_lst']
+
         # List of B x V x D tensors containing padded adjacency lists for k neighborhood levels
         neighborhoods = kwargs['neighborhoods']
 
@@ -38,9 +41,6 @@ class AdjModel(Model):
 
         # Floating point number between 0 and 1
         dropout_keep_prob = kwargs['dropout_keep_prob']
-
-        # Boolean
-        should_correct_flows = kwargs['should_correct_flows']
 
         # Scalar Int
         max_num_nodes = kwargs['max_num_nodes']
@@ -121,7 +121,14 @@ class AdjModel(Model):
                 # B x V x D
                 node_weights = tf.squeeze(node_weights, axis=-1)
 
-                # Mask out nonexistent neighbors for normalization, B x V x D
+                # B x V x D, node weights augmented by destinations
+                inv_mask = tf.cast(tf.equal(inv_adj_lst, mask_indices), tf.float32)
+                node_weights = destination_attn(node_weights=node_weights,
+                                                in_indices=in_indices,
+                                                rev_indices=rev_indices,
+                                                mask=inv_mask)
+
+                # Mask out nonexistent neighbors before normalization, B x V x D
                 pred_weights = (-BIG_NUMBER * mask) + node_weights
 
                 # Normalize weights for outgoing neighbors
@@ -135,11 +142,6 @@ class AdjModel(Model):
                                          demand=demands,
                                          in_indices=in_indices,
                                          max_iters=self.params['flow_iters'])
-
-                if should_correct_flows:
-                    rev_flow = tf.reshape(tf.gather_nd(flow, rev_indices), tf.shape(pred_weights))
-                    flow_diff = tf.minimum(flow, rev_flow)
-                    flow = tf.nn.relu(flow - flow_diff)
 
                 flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 

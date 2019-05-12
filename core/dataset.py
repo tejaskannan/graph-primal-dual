@@ -37,13 +37,14 @@ class Sample:
 
 class BatchSample:
 
-    def __init__(self, node_features, demands, adj_lst, adj_mat,
+    def __init__(self, node_features, demands, adj_lst, adj_mat, inv_adj_lst,
                  neighborhoods, embeddings, num_nodes, graph_name,
                  rev_indices, in_indices):
         self.node_features = node_features
         self.demands = demands
         self.adj_lst = adj_lst
         self.adj_mat = adj_mat
+        self.inv_adj_lst = inv_adj_lst
         self.neighborhoods = neighborhoods
         self.embeddings = embeddings
         self.num_nodes = num_nodes
@@ -83,6 +84,8 @@ class GraphData:
         inv_adj_lst = adj_matrix_to_list(self.adj_mat, inverted=True)
         inv_adj_lst = pad_adj_list(inv_adj_lst, max_degree, max_num_nodes, self.num_nodes)
 
+        self.inv_adj_lst = inv_adj_lst
+
         index_a = 0
         index_b = 0
         for x in range(adj_lst.shape[0]):
@@ -94,20 +97,19 @@ class GraphData:
                     self.in_indices[index_a, 1] = indexof[0]
                 else:
                     self.in_indices[index_a, 0] = self.num_nodes
-                    self.in_indices[index_a, 1] = max_degree-1
+                    self.in_indices[index_a, 1] = max_degree - 1
 
                 index_a += 1
 
             for y in adj_lst[x]:
-                # Reverse Edge
-                indexof = np.where(adj_lst[y] == x)[0]
+                indexof = np.where(inv_adj_lst[y] == x)[0]
 
                 if len(indexof) > 0:
                     self.rev_indices[index_b, 0] = y
                     self.rev_indices[index_b, 1] = indexof[0]
                 else:
                     self.rev_indices[index_b, 0] = self.num_nodes
-                    self.rev_indices[index_b, 1] = max_degree-1
+                    self.rev_indices[index_b, 1] = max_degree - 1
 
                 index_b += 1
 
@@ -227,30 +229,25 @@ class DatasetManager:
     def load(self, series):
         assert series is not None
 
-        if not isinstance(series, Iterable):
-            series = [series]
+        if series not in self.dataset:
+            self.dataset[series] = []
 
-        for s in series:
+        for graph_name, folder in self.data_folders[series].items():
 
-            if s not in self.dataset:
-                self.dataset[s] = []
+            num_samples = self.num_samples[series][graph_name]
+            num_files = int(math.ceil(num_samples / WRITE_THRESHOLD))
 
-            for graph_name, folder in self.data_folders[s].items():
+            print('Started loading {0} {1} samples for graph {2}.'.format(num_samples, series.name, graph_name))
 
-                num_samples = self.num_samples[s][graph_name]
-                num_files = int(math.ceil(num_samples / WRITE_THRESHOLD))
+            for file_index in range(num_files):
+                # Load demands as Sparse CSR matrices to save memory.
+                demands = read_sparse_npz(folder=folder, file_index=file_index)
 
-                print('Started loading {0} {1} samples for graph {2}.'.format(num_samples, s.name, graph_name))
+                self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.max_num_nodes)
+                                         for demand in demands]
 
-                for file_index in range(num_files):
-                    # Load demands as Sparse CSR matrices to save memory.
-                    demands = read_sparse_npz(folder=folder, file_index=file_index)
-
-                    self.dataset[s] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.max_num_nodes)
-                                        for demand in demands]
-
-                assert len(self.dataset[s]) == num_samples
-                print('Completed loading graph {0} for {1}.'.format(graph_name, s.name))
+            assert len(self.dataset[series]) == num_samples
+            print('Completed loading graph {0} for {1}.'.format(graph_name, series.name))
 
     def create_batches(self, series, batch_size, shuffle):
         """
@@ -274,6 +271,7 @@ class DatasetManager:
                                 demands=demands,
                                 adj_lst=gd.adj_lst,
                                 adj_mat=gd.adj_mat,
+                                inv_adj_lst=gd.inv_adj_lst,
                                 neighborhoods=gd.neighborhoods,
                                 embeddings=gd.embeddings,
                                 num_nodes=gd.num_nodes,
@@ -342,6 +340,7 @@ class DatasetManager:
                             demands=demands,
                             adj_lst=gd.adj_lst,
                             adj_mat=gd.adj_mat,
+                            inv_adj_lst=gd.inv_adj_lst,
                             neighborhoods=gd.neighborhoods,
                             embeddings=gd.embeddings,
                             num_nodes=gd.num_nodes,

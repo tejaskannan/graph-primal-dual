@@ -91,7 +91,8 @@ def destination_attn(node_weights, in_indices, rev_indices, mask, name='dest-att
 
     weighted_scores = normalized_weights * in_weights * (1.0 - mask)
 
+    # Re-disribute scores back to the outgoing edges of the original vertices
     gathered_scores = tf.gather_nd(weighted_scores, rev_indices)
     gathered_scores = tf.reshape(gathered_scores, shape=[node_shape[0], node_shape[1], -1])
 
-    return weighted_scores, gathered_scores
+    return gathered_scores

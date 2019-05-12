@@ -7,7 +7,7 @@ from models.optimization_models import TrustConstr, SLSQP
 from utils.utils import features_to_demands, append_row_to_log
 from utils.constants import PARAMS_FILE
 from core.plot import plot_flow_graph
-from core.load import load_to_networkx, read_dataset
+from core.dataset import DatasetManager, Series
 from os import mkdir
 from os.path import exists
 
@@ -16,15 +16,14 @@ class OptimizationBaselineRunner:
 
     def __init__(self, params, optimizer_name):
         self.params = params
-        graph_names = '-'.join(params['test_graph_names'])
 
-        cost_fn_name = parmas['cost_fn']['name']
-        self.output_folder = '{0}/{1}-{2}-{3}/'.format(params['output_folder'], optimizer_name, graph_names, cost_fn_name)
+        self.graph_name = params['test_graph_names'][0]
 
-        self.file_paths = {}
-        dataset_path = 'datasets/{0}_{1}.txt'
-        for dataset_name, graph_name in zip(self.params['test_dataset_names'], self.params['test_graph_names']):
-            self.file_paths[graph_name] = dataset_path.format(dataset_name, 'test')
+        cost_fn_name = params['cost_fn']['name']
+        self.output_folder = '{0}/{1}-{2}-{3}/'.format(params['output_folder'], optimizer_name, self.graph_name, cost_fn_name)
+
+        self.dataset = DatasetManager(params=params)
+        self.dataset.load_graphs(normalize=False)
 
         assert optimizer_name == 'trust_constr' or optimizer_name == 'slsqp', 'Invalid Optimizer {0}'.format(optimizer_name)
         if optimizer_name == 'trust_constr':
@@ -33,15 +32,10 @@ class OptimizationBaselineRunner:
             self.optimizer = SLSQP(params=params)
 
     def optimize(self):
-        # Load Graphs
-        graph_path = 'graphs/{0}.tntp'
-        test_graphs = {}
-        for graph_name in self.params['test_graph_names']:
-            graph = load_to_networkx(path=graph_path.format(graph_name))
-            test_graphs[graph_name] = graph
-
         if not exists(self.output_folder):
             mkdir(self.output_folder)
+
+        test_graph = self.dataset.test_graphs[self.graph_name]
 
         cost_headers = ['Index', 'Graph', 'Cost', 'Time (sec)']
         costs_path = self.output_folder + 'costs.csv'
@@ -52,34 +46,36 @@ class OptimizationBaselineRunner:
         with gzip.GzipFile(params_path, 'wb') as out_file:
             pickle.dump(self.params, out_file)
 
-        index = 0
-        for graph_name, graph in test_graphs.items():
+        # Load test dataset
+        self.dataset.load(series=Series.TEST)
+        test_samples = [sample for sample in self.dataset.dataset[Series.TEST] if sample.graph_name == self.graph_name]
 
-            test_features = read_dataset(self.file_paths[graph_name], num_nodes=graph.number_of_nodes())
-            for features in test_features:
-                demands = features_to_demands(features)
-                demands = np.reshape(demands, newshape=(demands.shape[0],))
+        step = int(1.0 / self.params['plot_fraction'])
+        plot_indices = set(range(0, len(test_samples), step))
 
-                start = time()
-                flows_per_iter, result = self.optimizer.optimize(graph=graph, demands=demands)
-                end = time()
+        for index, sample in enumerate(test_samples):
+            demands = np.array(sample.demands.todense())
+            demands = np.reshape(demands, newshape=(demands.shape[0],))
 
-                flows = flows_per_iter[-1]
-                flow_mat = self._flow_matrix(graph, flows)
+            start = time()
+            flows_per_iter, result = self.optimizer.optimize(graph=test_graph, demands=demands)
+            end = time()
 
-                append_row_to_log([index, graph_name, result.fun, end - start], costs_path)
+            flows = flows_per_iter[-1]
+            flow_mat = self._flow_matrix(test_graph, flows)
 
-                # Add demands to graph
-                flow_graph = graph.copy()
-                for i, node in enumerate(graph.nodes()):
-                    flow_graph.add_node(node, demand=float(demands[i]))
+            append_row_to_log([index, self.graph_name, result.fun, end - start], costs_path)
 
-                plot_flow_graph(flow_graph, flow_mat, '{0}flows-{1}-{2}.png'.format(self.output_folder, graph_name, index),
+            # Add demands to graph
+            flow_graph = test_graph.copy()
+            for i, node in enumerate(test_graph.nodes()):
+                flow_graph.add_node(node, demand=float(demands[i]))
+
+            if self.params['plot_flows'] and index in plot_indices:
+                plot_flow_graph(flow_graph, flow_mat, '{0}flows-{1}-{2}.png'.format(self.output_folder, self.graph_name, index),
                                 use_node_weights=False)
 
-                nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, graph_name, index))
-
-                index += 1
+            nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, self.graph_name, index))
 
     def _flow_matrix(self, graph, flows):
         num_nodes = graph.number_of_nodes()

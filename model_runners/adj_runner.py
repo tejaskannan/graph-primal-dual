@@ -38,6 +38,10 @@ class AdjRunner(ModelRunner):
                                           shape=adj_shape,
                                           name='adj-ph',
                                           is_sparse=False)
+        inv_adj_ph = model.create_placeholder(dtype=tf.int32,
+                                              shape=adj_shape,
+                                              name='inv-adj-ph',
+                                              is_sparse=False)
         in_indices_ph = model.create_placeholder(dtype=tf.int32,
                                                  shape=[np.prod(adj_shape), 3],
                                                  name='in-indices-ph',
@@ -72,12 +76,12 @@ class AdjRunner(ModelRunner):
             'node_features': node_ph,
             'demands': demands_ph,
             'adj_lst': adj_ph,
+            'inv_adj_lst': inv_adj_ph,
             'neighborhoods': neighborhood_phs,
             'in_indices': in_indices_ph,
             'rev_indices': rev_indices_ph,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes_ph,
-            'should_correct_flows': False,
             'max_num_nodes': max_num_nodes
         }
 
@@ -92,6 +96,7 @@ class AdjRunner(ModelRunner):
         node_features = np.array([sample.node_features for sample in batch])
         demands = np.array([sample.demands for sample in batch])
         adj_lsts = np.array([sample.adj_lst for sample in batch])
+        inv_adj_lsts = np.array([sample.inv_adj_lst for sample in batch])
         num_nodes = np.array([sample.num_nodes for sample in batch])
         dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
 
@@ -113,6 +118,7 @@ class AdjRunner(ModelRunner):
             placeholders['node_features']: node_features,
             placeholders['demands']: demands,
             placeholders['adj_lst']: adj_lsts,
+            placeholders['inv_adj_lst']: inv_adj_lsts,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['in_indices']: in_indices,

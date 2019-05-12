@@ -3,8 +3,10 @@ import numpy as np
 import networkx as nx
 from core.load import load_to_networkx
 from utils.tf_utils import masked_gather, weighted_sum
-from utils.utils import neighborhood_adj_lists
+from utils.flow_utils import destination_attn
+from utils.graph_utils import pad_adj_list
 from core.layers import AdjGAT
+from core.dataset import GraphData
 
 
 def random_walks(adj_lst, num_paths, k):
@@ -65,22 +67,24 @@ def get_node_features(paths, node_features):
 
     return tf.reduce_sum(path_features, axis=-2)
 
-graph = load_to_networkx('graphs/berlin-tiergarten.tntp')
-adj_lst = list(map(list, iter(graph.adj.values())))
+graph = load_to_networkx('graphs/tiny.tntp')
 
-max_degree = max(map(lambda x: len(x), adj_lst))
+
+graph_data = GraphData(graph=graph, graph_name='tiny', k=1, unique_neighborhoods=False)
+
+max_in_degree = max(map(lambda t: t[1], graph.in_degree()))
+max_out_degree = max(map(lambda t: t[1], graph.out_degree()))
+max_degree = max(max_in_degree, max_out_degree)
+
 print('Max Degree: {0}'.format(max_degree))
 
-adj_lst_np = []
-for neighbors in adj_lst:
-    if len(neighbors) < max_degree:
-        #neighbors = np.random.choice(neighbors, size=max_degree, replace=True)
-        neighbors = np.pad(neighbors, pad_width=(0, max_degree-len(neighbors)), mode='constant',
-                           constant_values=graph.number_of_nodes())
-    adj_lst_np.append(neighbors)
-
-adj_lst_np.append(np.full(shape=(max_degree,), fill_value=graph.number_of_nodes()))
-adj_lst_np = np.array(adj_lst_np)
+graph_data.adj_lst = pad_adj_list(adj_lst=graph_data.adj_lst,
+                                  max_degree=max_degree,
+                                  max_num_nodes=graph_data.num_nodes,
+                                  mask_number=graph_data.num_nodes)
+graph_data.set_edge_indices(adj_lst=graph_data.adj_lst,
+                            max_degree=max_degree,
+                            max_num_nodes=graph_data.num_nodes)
 
 # Create node features
 eigen = nx.eigenvector_centrality(graph, max_iter=1000)
@@ -89,10 +93,6 @@ in_deg = nx.in_degree_centrality(graph)
 
 node_features = np.zeros(shape=(graph.number_of_nodes()+1, 3))
 for node in graph.nodes():
-    # node_features[node, 0] = eigen[node]
-    # node_features[node, 1] = out_deg[node]
-    # node_features[node, 2] = in_deg[node]
-
     node_features[node, 0] = node + 1
     node_features[node, 1] = node + 2
     node_features[node, 2] = node + 3
@@ -102,43 +102,82 @@ node_features[final_node, 0] = 0
 node_features[final_node, 1] = 0
 node_features[final_node, 2] = 0
 
-mask_index = [[4], [4]]
+b = 2
+
+mask_index = [[final_node] for _ in range(b)]
+
+mask = np.zeros_like(graph_data.adj_lst)
+for i in range(graph_data.adj_lst.shape[0]):
+    for j in range(graph_data.adj_lst.shape[1]):
+        index = graph_data.in_indices[i * max_degree + j]
+        x, y = int(index[0]), int(index[1])
+        mask[i, j] = int(graph_data.adj_lst[x, y] == final_node)
+
+mask = np.array([mask for _ in range(b)]).astype(float)
+
+inv_mask = np.equal(graph_data.inv_adj_lst, final_node).astype(int)
+print(inv_mask)
+print(mask)
 
 num_samples = 1
 path_length = 3
 
-b = 2
 weights = []
 for i in range(b):
     w = []
     for j in range(graph.number_of_nodes()+1):
-        index = i * graph.number_of_nodes() + j
+        index = i * graph.number_of_nodes() + j + 1
         w.append(np.arange(start=index, stop=max_degree+index))
     weights.append(w)
 weights = np.array(weights)
 
+
+rev_indices = np.zeros_like(graph_data.in_indices)
+index = 0
+for x in range(graph_data.adj_lst.shape[0]):
+    for y in graph_data.adj_lst[x]:
+
+        indexof = np.where(graph_data.inv_adj_lst[y] == x)[0]
+        if len(indexof) > 0:
+            rev_indices[index, 0] = y
+            rev_indices[index, 1] = indexof[0]
+        else:
+            rev_indices[index, 0] = graph.number_of_nodes()
+            rev_indices[index, 1] = max_degree - 1
+
+        index += 1
+
+print(graph_data.in_indices)
+print(rev_indices)
+
+
+# 3D indexing used for flow computation and correction
+batch_indices = np.arange(start=0, stop=b)
+batch_indices = np.repeat(batch_indices, graph_data.adj_lst.shape[0] * max_degree).reshape((-1, 1))
+
+in_indices = np.vstack([graph_data.in_indices for _ in range(b)])
+in_indices = np.concatenate([batch_indices, in_indices], axis=1)
+
+rev_indices = np.vstack([rev_indices for _ in range(b)])
+rev_indices = np.concatenate([batch_indices, rev_indices], axis=1)
+
 with tf.Session() as sess:
 
-    adj_ph = tf.placeholder(dtype=tf.int32, shape=(b,) + adj_lst_np.shape, name='adj-ph')
+    # adj_ph = tf.placeholder(dtype=tf.int32, shape=(b,) + adj_lst_np.shape, name='adj-ph')
+    in_indices_ph = tf.placeholder(dtype=tf.int32, shape=in_indices.shape, name='in-ph')
+    rev_indices_ph = tf.placeholder(dtype=tf.int32, shape=rev_indices.shape, name='rev-ph')
     node_ph = tf.placeholder(dtype=tf.float32, shape=(b,) + node_features.shape, name='node-ph')
-    mask_ph = tf.placeholder(dtype=tf.int32, shape=(2, 1), name='mask-ph')
+    mask_ph = tf.placeholder(dtype=tf.float32, shape=mask.shape, name='mask-ph')
     weights_ph = tf.placeholder(dtype=tf.float32, shape=weights.shape, name='weights-ph')
 
-    # paths = random_walks(adj_ph, num_samples, k=path_length)
-    # op = get_node_features(paths, node_ph)
-
-    # op = masked_gather(values=node_ph, indices=adj_ph, mask_index=mask_ph)
-    gat = AdjGAT(output_size=3, num_heads=1)
-    op = gat(inputs=node_ph, adj_lst=adj_ph, mask_index=mask_ph)
-    # op = weighted_sum(values=node_ph,
-    #                   indices=adj_ph,
-    #                   weights=weights_ph)
+    op = destination_attn(node_weights=weights_ph, in_indices=in_indices_ph, rev_indices=rev_indices_ph, mask=mask_ph)
 
     feed_dict = {
-        adj_ph: [adj_lst_np, adj_lst_np],
+        in_indices_ph: in_indices,
+        rev_indices_ph: rev_indices,
         node_ph: [node_features, node_features],
-        #weights_ph: weights
-        mask_ph: mask_index
+        weights_ph: weights,
+        mask_ph: mask
     }
 
     init_op = tf.global_variables_initializer()

@@ -1,15 +1,14 @@
 import numpy as np
-import math
 import networkx as nx
 import tensorflow as tf
 import os
+import math
 from datetime import datetime
 from time import time
 from utils.utils import append_row_to_log, delete_if_exists
 from utils.constants import BIG_NUMBER, LINE
 from utils.graph_utils import add_features
 from core.plot import plot_flow_graph_adj, plot_weights
-from core.load import load_to_networkx, read_dataset
 from core.dataset import DatasetManager, Series
 
 
@@ -201,11 +200,8 @@ class ModelRunner:
         # manner to make it easier to compare different runs.
         num_test_batches = self.dataset.num_batches(series=Series.TEST, batch_size=batch_size)
         num_test_samples = num_test_batches * batch_size
-        num_plot_samples = num_test_samples * self.params['plot_fraction']
 
-        print(num_plot_samples)
-
-        step = int(num_test_samples / num_plot_samples)
+        step = int(1.0 / self.params['plot_fraction'])
         plot_indices = set(range(0, num_test_samples, step))
 
         for i, batch in enumerate(test_batches):
@@ -280,38 +276,3 @@ class ModelRunner:
 
     def create_model(self, params):
         raise NotImplementedError()
-
-    def _num_neighborhoods(self, graph):
-        if 'num_neighborhoods' in self.params:
-            return self.params['num_neighborhoods']
-        return max(2, int(math.log(graph.number_of_nodes())))
-
-    def _load_graphs(self):
-        graph_path = 'graphs/{0}.tntp'
-
-        train_graphs = {}
-        for graph_name in self.params['train_graph_names']:
-            graph = load_to_networkx(path=graph_path.format(graph_name))
-            train_graphs[graph_name] = graph
-
-        test_graphs = {}
-        for graph_name in self.params['test_graph_names']:
-            graph = load_to_networkx(path=graph_path.format(graph_name))
-            test_graphs[graph_name] = graph
-
-        num_train_nodes = np.max([g.number_of_nodes() for g in train_graphs.values()])
-        num_test_nodes = np.max([g.number_of_nodes() for g in test_graphs.values()])
-        num_nodes = max(num_train_nodes, num_test_nodes)
-
-        graphs = list(train_graphs.values()) + list(test_graphs.values())
-        degrees = max_degrees(graphs, k=self.params['num_neighborhoods'],
-                              unique_neighborhoods=self.params['unique_neighborhoods'])
-
-        train_out_deg = np.max([max([d for _, d in g.out_degree()]) for g in train_graphs.values()])
-        train_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in train_graphs.values()])
-
-        test_out_deg = np.max([max([d for _, d in g.out_degree()]) for g in test_graphs.values()])
-        test_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in test_graphs.values()])
-        max_degree = max(max(train_out_deg, train_in_deg), max(test_out_deg, test_in_deg))
-
-        return train_graphs, test_graphs, num_nodes, max_degree, degrees

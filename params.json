@@ -4,7 +4,7 @@
 		"valid_samples": 100,
 		"test_samples": 100,
 		"graph_names": ["tiny"],
-		"dataset_names": ["tiny-1000"],
+		"dataset_names": ["tiny-test"],
 		"min_max_sources": [1, 2],
 		"min_max_sinks": [1, 2]
 	},
