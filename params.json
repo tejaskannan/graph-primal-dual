@@ -9,13 +9,13 @@
 		"min_max_sinks": [1, 2]
 	},
 	"model": {
-		"name": "direction",
+		"name": "adj",
 		"learning_rate": 0.001,
 		"dual_momentum": 0.9,
 		"dual_step_size": 0.01,
 		"gradient_clip": 5,
 		"batch_size": 10,
-		"epochs": 1,
+		"epochs": 2,
 		"patience": 5,
 		"early_stop_threshold": 1e-5,
 		"graph_layers": 10,

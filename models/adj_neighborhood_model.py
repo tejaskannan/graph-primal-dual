@@ -180,5 +180,13 @@ class AdjModel(Model):
 
                 self.loss = flow_cost - dual_cost
                 self.loss_op = tf.reduce_mean(self.loss)
-                self.output_ops += [flow, flow_cost, adj_lst, normalized_weights, dual_cost, attn_weights, concat_states, pred_weights]
+
+                # Named outputs
+                self.output_ops['flow'] = flow
+                self.output_ops['flow_cost'] = flow_cost
+                self.output_ops['normalized_weights'] = normalized_weights
+                self.output_ops['dual_cost'] = dual_cost
+                self.output_ops['pred_weights'] = pred_weights
+                self.output_ops['attn_weights'] = attn_weights
+
                 self.optimizer_op = self._build_optimizer_op()

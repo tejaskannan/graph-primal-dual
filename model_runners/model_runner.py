@@ -130,7 +130,7 @@ class ModelRunner:
                                                   max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
                 outputs = model.inference(feed_dict=feed_dict)
-                avg_loss = outputs[0]
+                avg_loss = outputs['loss']
                 valid_losses.append(avg_loss)
 
                 print('Average valid loss for batch {0}/{1}: {2}'.format(i+1, num_valid_batches, avg_loss))
@@ -227,12 +227,10 @@ class ModelRunner:
                 graph_name = batch[j].graph_name
                 graph = graphs[graph_name]
 
-                flow = outputs[1][j]
-                flow_cost = outputs[2][j]
-                adj_lst = outputs[3][j]
-                pred_weights = outputs[4][j]
-                dual_cost = outputs[5][j]
-                attn_weights = outputs[6][j]
+                flow = outputs['flow'][j]
+                flow_cost = outputs['flow_cost'][j]
+                pred_weights = outputs['normalized_weights'][j]
+                dual_cost = outputs['dual_cost'][j]
 
                 demands = np.array(batch[j].demands)
 
@@ -256,11 +254,13 @@ class ModelRunner:
                     plot_flow_graph_adj(flow_graph, use_flow_props=False, use_node_weights=False, file_path=flow_path)
                     plot_flow_graph_adj(flow_graph, use_flow_props=True, use_node_weights=False, file_path=prop_path)
                     
-                    num_nodes = batch[j].num_nodes
-                    plot_weights(weight_matrix=attn_weights,
-                                 file_path=attn_weight_path,
-                                 num_samples=self.params['plot_weight_samples'],
-                                 num_nodes=num_nodes)
+                    if 'attn_weights' in outputs:
+                        attn_weights = outputs['attn_weights'][j]
+                        num_nodes = batch[j].num_nodes
+                        plot_weights(weight_matrix=attn_weights,
+                                     file_path=attn_weight_path,
+                                     num_samples=self.params['plot_weight_samples'],
+                                     num_nodes=num_nodes)
 
                 # Log Outputs
                 append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)

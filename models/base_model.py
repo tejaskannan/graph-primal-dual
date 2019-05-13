@@ -19,7 +19,7 @@ class Model:
         self.loss_op = None
         self.loss = None
         self.optimizer_op = None
-        self.output_ops = []
+        self.output_ops = {}
 
     def init(self):
         with self._sess.graph.as_default():
@@ -37,8 +37,8 @@ class Model:
 
     def inference(self, feed_dict):
         with self._sess.graph.as_default():
-            ops = [self.loss_op] + self.output_ops
-            op_results = self._sess.run(ops, feed_dict=feed_dict)
+            self.output_ops['loss'] = self.loss_op
+            op_results = self._sess.run(self.output_ops, feed_dict=feed_dict)
             return op_results
 
     def _build_optimizer_op(self):
