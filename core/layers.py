@@ -280,7 +280,7 @@ class DirectionalGAT(Layer):
         weight_dropout_keep = kwargs['weight_dropout_keep'] if 'weight_dropout_keep' in kwargs else 1.0
         attn_dropout_keep = kwargs['attn_dropout_keep'] if 'attn_dropout_keep' in kwargs else 1.0
 
-        # B x V x F tensor
+        # B x V x D x F tensor
         initial_states = kwargs['initial_states']
 
         # B x 1 tensor
@@ -302,17 +302,13 @@ class DirectionalGAT(Layer):
             softmax_mask = -BIG_NUMBER * mask
 
             # Include initial states
-            init_features, _ = masked_gather(values=initial_states,
-                                             indices=adj_lst,
-                                             mask_index=mask_index,
-                                             set_zero=True)
-            gathered_inputs = zero_mask * (gathered_inputs + init_features)
+            gathered_inputs = zero_mask * (gathered_inputs + initial_states)
 
             # Apply weight matrix to the set of inputs, B x V x D x F Tensor
             input_mlp = MLP(hidden_sizes=[],
                             output_size=self.output_size,
                             bias_final=True,
-                            activation=None,
+                            activation=self.activation,
                             name='{0}-W'.format(self.name))
             transformed_inputs = input_mlp(inputs=gathered_inputs, dropout_keep_prob=weight_dropout_keep)
 
@@ -334,7 +330,7 @@ class DirectionalGAT(Layer):
             # Apply attention weights, B x V x D x F
             weighted_features = attn_coefs * transformed_inputs
 
-            return self.activation(weighted_features)
+            return weighted_features
 
 
 class Gate(Layer):

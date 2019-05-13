@@ -2,10 +2,10 @@ import tensorflow as tf
 import numpy as np
 import networkx as nx
 from core.load import load_to_networkx
-from utils.tf_utils import masked_gather, weighted_sum
+from utils.tf_utils import masked_gather, weighted_sum, rolling_sum, gathered_sum
 from utils.flow_utils import destination_attn
 from utils.graph_utils import pad_adj_list
-from core.layers import AdjGAT
+from core.layers import AdjGAT, DirectionalGAT
 from core.dataset import GraphData
 
 
@@ -104,7 +104,7 @@ node_features[final_node, 2] = 0
 
 b = 2
 
-mask_index = [[final_node] for _ in range(b)]
+mask_index = np.array([[final_node] for _ in range(b)])
 
 mask = np.zeros_like(graph_data.adj_lst)
 for i in range(graph_data.adj_lst.shape[0]):
@@ -116,8 +116,6 @@ for i in range(graph_data.adj_lst.shape[0]):
 mask = np.array([mask for _ in range(b)]).astype(float)
 
 inv_mask = np.equal(graph_data.inv_adj_lst, final_node).astype(int)
-print(inv_mask)
-print(mask)
 
 num_samples = 1
 path_length = 3
@@ -147,10 +145,6 @@ for x in range(graph_data.adj_lst.shape[0]):
 
         index += 1
 
-print(graph_data.in_indices)
-print(rev_indices)
-
-
 # 3D indexing used for flow computation and correction
 batch_indices = np.arange(start=0, stop=b)
 batch_indices = np.repeat(batch_indices, graph_data.adj_lst.shape[0] * max_degree).reshape((-1, 1))
@@ -161,24 +155,65 @@ in_indices = np.concatenate([batch_indices, in_indices], axis=1)
 rev_indices = np.vstack([rev_indices for _ in range(b)])
 rev_indices = np.concatenate([batch_indices, rev_indices], axis=1)
 
+v = graph_data.adj_lst.shape[0]
+d = graph_data.adj_lst.shape[1]
+f = 4
+
+initial_states = np.zeros(shape=(v, f))
+for i in range(v):
+    for j in range(f):
+        initial_states[i, j] = i + j + 1
+
+features = np.zeros(shape=(v, d, f))
+for i in range(v):
+    for j in range(d):
+        node = graph_data.adj_lst[i, j]
+        for k in range(f):
+            features[i, j, k] = initial_states[node, k]
+
+initial_states = np.array([initial_states + i*10 for i in range(b)])
+features = np.array([features + i*10 for i in range(b)])
+
+print('Features')
+print(features)
+
+print('Init States')
+print(initial_states)
+
 with tf.Session() as sess:
 
-    # adj_ph = tf.placeholder(dtype=tf.int32, shape=(b,) + adj_lst_np.shape, name='adj-ph')
-    in_indices_ph = tf.placeholder(dtype=tf.int32, shape=in_indices.shape, name='in-ph')
-    rev_indices_ph = tf.placeholder(dtype=tf.int32, shape=rev_indices.shape, name='rev-ph')
-    node_ph = tf.placeholder(dtype=tf.float32, shape=(b,) + node_features.shape, name='node-ph')
+    adj_ph = tf.placeholder(dtype=tf.int32, shape=(b,) + graph_data.adj_lst.shape, name='adj-ph')
+    # in_indices_ph = tf.placeholder(dtype=tf.int32, shape=in_indices.shape, name='in-ph')
+    # rev_indices_ph = tf.placeholder(dtype=tf.int32, shape=rev_indices.shape, name='rev-ph')
+    # node_ph = tf.placeholder(dtype=tf.float32, shape=(b,) + node_features.shape, name='node-ph')
     mask_ph = tf.placeholder(dtype=tf.float32, shape=mask.shape, name='mask-ph')
-    weights_ph = tf.placeholder(dtype=tf.float32, shape=weights.shape, name='weights-ph')
+    # weights_ph = tf.placeholder(dtype=tf.float32, shape=weights.shape, name='weights-ph')
 
-    op = destination_attn(node_weights=weights_ph, in_indices=in_indices_ph, rev_indices=rev_indices_ph, mask=mask_ph)
+    # op = destination_attn(node_weights=weights_ph, in_indices=in_indices_ph, rev_indices=rev_indices_ph, mask=mask_ph)
+
+    # feed_dict = {
+    #     in_indices_ph: in_indices,
+    #     rev_indices_ph: rev_indices,
+    #     node_ph: [node_features, node_features],
+    #     weights_ph: weights,
+    #     mask_ph: mask
+    # }
+
+    features_ph = tf.placeholder(dtype=tf.float32, shape=features.shape, name='features-ph')
+    mask_index_ph = tf.placeholder(dtype=tf.int32, shape=mask_index.shape, name='mask-index-ph')
+    initial_states_ph = tf.placeholder(dtype=tf.float32, shape=initial_states.shape, name='init-states-ph')
 
     feed_dict = {
-        in_indices_ph: in_indices,
-        rev_indices_ph: rev_indices,
-        node_ph: [node_features, node_features],
-        weights_ph: weights,
+        adj_ph: [graph_data.adj_lst for _ in range(b)],
+        features_ph: features,
+        mask_index_ph: mask_index,
+        initial_states_ph: initial_states,
         mask_ph: mask
     }
+
+    dir_gat = DirectionalGAT(output_size=f, activation=tf.nn.tanh)
+    op = dir_gat(inputs=features_ph, adj_lst=adj_ph, mask_index=mask_index_ph, initial_states=initial_states_ph,
+                 mask=mask_ph)
 
     init_op = tf.global_variables_initializer()
     sess.run(init_op)
