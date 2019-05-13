@@ -48,7 +48,7 @@ def gather_rows(values, indices, name='gather-rows'):
     row_indices = tf.expand_dims(tf.range(start=0, limit=tf.shape(values)[0]), axis=-1)
 
     index_shape = tf.shape(indices)
-    times = index_shape[1] * index_shape[2]
+    times = tf.reduce_prod(index_shape[1:])
     row_indices = tf.reshape(tf.tile(row_indices, multiples=(1, times)), [-1, 1])
 
     value_indices = tf.concat([row_indices, tf.reshape(indices, [-1, 1])], axis=-1)
@@ -76,7 +76,7 @@ def masked_gather(values, indices, mask_index, set_zero=False, name='masked-gath
 
     indices_y = tf.reshape(value_indices[:, 1], [index_shape[0], -1])
 
-    mask = tf.cast(tf.equal(indices_y, mask_index), tf.float32)
+    mask = tf.cast(tf.equal(indices_y, mask_index), values.dtype)
     mask = tf.reshape(mask, new_shape[0:3] + [-1])
 
     if set_zero:
@@ -110,6 +110,48 @@ def weighted_sum(values, indices, weights, name='weighted-sum'):
     weighted_values = gathered_values * tf.expand_dims(weights, axis=-1)
 
     return tf.reduce_sum(weighted_values, axis=-2)
+
+
+def gathered_sum(values, indices, mask_index, name='gathered-sum'):
+    """
+    This function sums the rows of 'values' specified by 'indices'. Any value
+    corresponding to the index of the target row is masked to zero. For example,
+    let indices[0, 0] = [1, 2, 3], indices[0, 1] = [0, 2, 3], values[0, 1] = [[1, 2], [3, 4], [5, 6]].
+    Then, the new value for values[0, 0] will be [3, 4] + [5, 6] = [8, 10]. In essence, the [1, 2]
+    is masked out because it corresponds to 0 itself.
+
+    values: B x V x D x F tensor
+    indices: B x V x D tensor
+    mask_index: B x 1 tensor
+
+    Returns: B x V x D x F tensor
+    """
+    gathered_values, value_indices = gather_rows(values=values, indices=indices)
+
+    # Reshape to B x V x D x D x F tensor
+    values_shape = tf.shape(values)
+    index_shape = tf.shape(indices)
+    new_shape = [values_shape[0], values_shape[1], values_shape[2], index_shape[2], values_shape[3]]
+    gathered_values = tf.reshape(gathered_values, new_shape)
+
+    # Get indices of fetched values in 'gathered_values' tensor. Reshape to B x V x D x D x 1.
+    gathered_indices, _ = gather_rows(values=indices, indices=indices)
+    new_shape = [values_shape[0], values_shape[1], values_shape[2], index_shape[2], 1]
+    gathered_indices = tf.reshape(gathered_indices, new_shape)
+
+    row_indices = tf.reshape(tf.range(start=0, limit=values_shape[1]), [1, -1, 1, 1, 1])
+    row_indices = tf.tile(row_indices, multiples=(values_shape[0], 1, values_shape[2], index_shape[2], 1))
+
+    # Mask to remove values obtained from the target row
+    row_mask = 1.0 - tf.cast(tf.equal(gathered_indices, row_indices), tf.float32)
+
+    mask_index = tf.reshape(mask_index, [-1, 1, 1, 1, 1])
+    null_mask = 1.0 - tf.cast(tf.equal(gathered_indices, mask_index), tf.float32)
+
+    masked_values = gathered_values * row_mask * null_mask
+    masked_sum = tf.reduce_sum(masked_values, axis=-2)
+
+    return masked_sum
 
 
 def rolling_sum(values, name='feature-sum'):

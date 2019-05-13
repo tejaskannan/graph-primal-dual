@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from utils.constants import BIG_NUMBER, SMALL_NUMBER, FLOW_THRESHOLD
-from utils.tf_utils import masked_gather, weighted_sum
+from utils.tf_utils import masked_gather, weighted_sum, gathered_sum
 
 
 class Layer:
@@ -264,6 +264,77 @@ class AdjGAT(Layer):
             attn_heads = (1.0 / self.num_heads) * tf.add_n(heads)
             return self.activation(attn_heads)
 
+
+class DirectionalGAT(Layer):
+    """
+    Version of a graph attention network which maintains directional state.
+    """
+    def __init__(self, output_size, activation=tf.nn.relu, name='directiona-gat'):
+        super(DirectionalGAT, self).__init__(output_size, activation, name)
+
+    def __call__(self, inputs, **kwargs):
+        """
+        inputs: B x V x D x F tensor
+        """
+
+        weight_dropout_keep = kwargs['weight_dropout_keep'] if 'weight_dropout_keep' in kwargs else 1.0
+        attn_dropout_keep = kwargs['attn_dropout_keep'] if 'attn_dropout_keep' in kwargs else 1.0
+
+        # B x V x F tensor
+        initial_states = kwargs['initial_states']
+
+        # B x 1 tensor
+        mask_index = kwargs['mask_index']
+
+        # B x V x D tensor
+        adj_lst = kwargs['adj_lst']
+
+        # B x V x D tensor
+        mask = kwargs['mask']
+
+        with tf.name_scope(self.name):
+
+            # B x V x D x F tensor of features obtained from neighbors
+            gathered_inputs = gathered_sum(values=inputs, indices=adj_lst, mask_index=mask_index)
+
+            mask = tf.expand_dims(mask, axis=-1)
+            zero_mask = 1.0 - mask
+            softmax_mask = -BIG_NUMBER * mask
+
+            # Include initial states
+            init_features, _ = masked_gather(values=initial_states,
+                                             indices=adj_lst,
+                                             mask_index=mask_index,
+                                             set_zero=True)
+            gathered_inputs = zero_mask * (gathered_inputs + init_features)
+
+            # Apply weight matrix to the set of inputs, B x V x D x F Tensor
+            input_mlp = MLP(hidden_sizes=[],
+                            output_size=self.output_size,
+                            bias_final=True,
+                            activation=None,
+                            name='{0}-W'.format(self.name))
+            transformed_inputs = input_mlp(inputs=gathered_inputs, dropout_keep_prob=weight_dropout_keep)
+
+            transformed_inputs = zero_mask * transformed_inputs
+
+            # Create unnormalized attention weights, B x V x D x 1
+            attn_mlp = MLP(hidden_sizes=[],
+                           output_size=1,
+                           bias_final=False,
+                           activation=None,
+                           name='{0}-a'.format(self.name))
+            attn_weights = attn_mlp(inputs=transformed_inputs, dropout_keep_prob=attn_dropout_keep)
+
+            masked_weights = softmax_mask + attn_weights
+
+            # Compute normalized attention weights, B x V x D x 1
+            attn_coefs = tf.nn.softmax(masked_weights, axis=-2)
+
+            # Apply attention weights, B x V x D x F
+            weighted_features = attn_coefs * transformed_inputs
+
+            return self.activation(weighted_features)
 
 
 class Gate(Layer):
