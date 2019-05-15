@@ -96,3 +96,79 @@ def destination_attn(node_weights, in_indices, rev_indices, mask, name='dest-att
     gathered_scores = tf.reshape(gathered_scores, shape=[node_shape[0], node_shape[1], -1])
 
     return gathered_scores
+
+
+def correct_proportions(source_demands, sink_demands, proportions, source_dest_mat, source_index_mat, max_iters):
+    """
+    source_demands: B x K_1 x 1 tensor of source demands
+    sink_demands: B x K_2 x 1 tensor of sink demands
+    proportions: B x K_2 x K_1 tensor of flow proportions
+    source_dest_mat: B x K_2 x K_1*K_2 tensor of source demands for each sink
+    source_index_mat: B x K_1 x K_1*K_2 tensor of source indices
+    """
+    batch_size = tf.shape(source_demands)[0]
+
+    # B x (K1 + K2) x (K1 * K2) tensor
+    A = tf.concat([source_dest_mat, source_index_mat], axis=1)
+
+    # B x (K1 + K2) x 1 tensor
+    b = tf.concat([sink_demands, tf.ones_like(source_demands)], axis=1)
+
+    # B x (K1 + K2) x 1 tensor
+    p = tf.reshape(proportions, [batch_size, -1, 1])
+
+    n, m = tf.shape(source_demands)[1], tf.shape(sink_demands)[1]
+    dim = (n * m) + (n + m)
+
+    # B x (K1 * K2) x (K1 * K2) identity matrix
+    I = tf.tile(tf.expand_dims(tf.eye(n * m), axis=0), multiples=(batch_size, 1, 1))
+
+    # B x (K1 + K2) x (K1 + K2) zero matrix
+    zero = tf.zeros(shape=(batch_size, n + m, n + m))
+
+    # B x (K1 * K2 + K1 + K2) x (K1 * K2)
+    lhs = tf.concat([I, A], axis=1)
+
+    # B x (K1 * K2 + K1 + K2) x (K1 + K2)
+    A_T = tf.transpose(A, perm=[0, 2, 1])
+    rhs = tf.concat([A_T, zero], axis=1)
+    
+    # B x (K1 * K2 + K1 + K2) x (K1 * K2 + K1 + K2)
+    mat = tf.concat([lhs, rhs], axis=2)
+
+    # B x (K1 + K2) x 1
+    zero_pad = tf.zeros(shape=(batch_size, n + m, 1))
+
+    # B x (K1 * K2) x 1 tensor
+    v = tf.linalg.lstsq(matrix=A, rhs=b, fast=False, name='v-init')
+    v_prev = v + BIG_NUMBER
+
+    # Newton's method step size
+    step_size = tf.constant(1.0, dtype=tf.float32)
+
+    # Dampening factor
+    beta = 0.99
+    def body(v, v_prev, step_size):
+        # B x (K1 * K2 + K1 + K2) x 1
+        target = tf.concat([p - v, zero_pad], axis=1)
+
+        # B x (K1 * K2 + K1 + K2) x 1
+        sol = tf.linalg.lstsq(matrix=mat, rhs=target, fast=False, name='v-step')
+
+        # B x (K1 * K2) x 1
+        delta_v = sol[:,:n*m,:]
+
+        next_v = v + step_size * delta_v
+        return [next_v, v, step_size * beta]
+
+    def cond(v, v_prev, step_size):
+        return tf.reduce_any(tf.square(tf.norm(v - v_prev, axis=1)) > FLOW_THRESHOLD)
+
+    props, _, _ = tf.while_loop(cond, body,
+                                loop_vars=[v, v_prev, step_size],
+                                shape_invariants=[v.get_shape(), v_prev.get_shape(), step_size.get_shape()],
+                                parallel_iterations=1,
+                                name='newton-correction',
+                                maximum_iterations=max_iters)
+
+    return tf.reshape(props, [batch_size, n, m])

@@ -39,7 +39,7 @@ class BatchSample:
 
     def __init__(self, node_features, demands, adj_lst, adj_mat, inv_adj_lst,
                  neighborhoods, embeddings, num_nodes, graph_name,
-                 rev_indices, in_indices):
+                 rev_indices, in_indices, opp_indices):
         self.node_features = node_features
         self.demands = demands
         self.adj_lst = adj_lst
@@ -51,6 +51,7 @@ class BatchSample:
         self.graph_name = graph_name
         self.rev_indices = rev_indices
         self.in_indices = in_indices
+        self.opp_indices = opp_indices
 
 
 class GraphData:
@@ -80,6 +81,7 @@ class GraphData:
         # These arrays hold 2D coordinates
         self.in_indices = np.zeros(shape=(dim0, 2))
         self.rev_indices = np.zeros(shape=(dim0, 2))
+        self.opp_indices = np.zeros(shape=(dim0, 2))
 
         inv_adj_lst = adj_matrix_to_list(self.adj_mat, inverted=True)
         inv_adj_lst = pad_adj_list(inv_adj_lst, max_degree, max_num_nodes, self.num_nodes)
@@ -110,6 +112,16 @@ class GraphData:
                 else:
                     self.rev_indices[index_b, 0] = self.num_nodes
                     self.rev_indices[index_b, 1] = max_degree - 1
+
+                # Reverse Edge
+                indexof = np.where(adj_lst[y] == x)[0]
+
+                if len(indexof) > 0:
+                    self.opp_indices[index_b, 0] = y
+                    self.opp_indices[index_b, 1] = indexof[0]
+                else:
+                    self.opp_indices[index_b, 0] = self.num_nodes
+                    self.opp_indices[index_b, 1] = max_degree - 1
 
                 index_b += 1
 
@@ -276,7 +288,8 @@ class DatasetManager:
                                 num_nodes=gd.num_nodes,
                                 graph_name=gd.graph_name,
                                 rev_indices=gd.rev_indices,
-                                in_indices=gd.in_indices)
+                                in_indices=gd.in_indices,
+                                opp_indices=gd.opp_indices)
                 batch.append(b)
 
             yield batch
@@ -345,7 +358,8 @@ class DatasetManager:
                             num_nodes=gd.num_nodes,
                             graph_name=gd.graph_name,
                             rev_indices=gd.rev_indices,
-                            in_indices=gd.in_indices)
+                            in_indices=gd.in_indices,
+                            opp_indices=gd.opp_indices)
             batch.append(b)
             indices.append(index)
 

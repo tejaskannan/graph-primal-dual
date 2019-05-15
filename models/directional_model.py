@@ -30,8 +30,11 @@ class DirectionalModel(Model):
         # B*V*D x 3 tensor containing 3D indices used to compute inflow
         in_indices = kwargs['in_indices']
 
-        # B*V*D x 3 tensor containing 2D indices of outgoing neighbors
+        # B*V*D x 3 tensor containing 3D indices of outgoing neighbors
         rev_indices = kwargs['rev_indices']
+
+        # B*V*D x 3 tensor containing 3D indices of opposite edges
+        opp_indices = kwargs['opp_indices']
 
         # B x 1
         num_nodes = kwargs['num_nodes']
@@ -57,6 +60,7 @@ class DirectionalModel(Model):
                                                          ids=node_indices,
                                                          max_norm=1,
                                                          name='node-embedding-lookup')
+                init_features = tf.concat([node_embeddings, node_features], axis=-1)
 
                 # Node encoding, B x V x D
                 encoder = MLP(hidden_sizes=[],
@@ -64,8 +68,7 @@ class DirectionalModel(Model):
                               activation=None,
                               activate_final=True,
                               name='node-encoder')
-                node_encoding = encoder(inputs=tf.concat([node_embeddings, node_features], axis=-1),
-                                        dropout_keep_prob=dropout_keep_prob)
+                node_encoding = encoder(inputs=init_features, dropout_keep_prob=dropout_keep_prob)
 
                 # Initial node encodings for each neighbor, B x V x D x F tensor
                 initial_encoding, _ = masked_gather(values=node_encoding,
@@ -111,7 +114,10 @@ class DirectionalModel(Model):
                               name='node-decoder')
 
                 # B x V x D x 1
-                node_weights = decoder(inputs=node_encoding)
+                opp_encoding = tf.reshape(tf.gather_nd(node_encoding, opp_indices),
+                                          tf.shape(node_encoding))
+                comb_encoding = node_encoding + opp_encoding
+                node_weights = decoder(inputs=tf.concat([node_encoding, comb_encoding], axis=-1))
 
                 # B x V x D
                 node_weights = tf.squeeze(node_weights, axis=-1)
@@ -150,7 +156,9 @@ class DirectionalModel(Model):
                                    activation=tf.nn.tanh,
                                    activate_final=False,
                                    name='dual-decoder')
-                dual_vars = dual_decoder(inputs=node_states)
+
+                # Apply a ReLU because we know the cost is always nonnegative
+                dual_vars = tf.nn.relu(dual_decoder(inputs=node_states))
 
                 # B x (V + 1) x D tensor of repeated dual variables
                 dual = mask * dual_vars

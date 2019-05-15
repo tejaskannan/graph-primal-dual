@@ -48,6 +48,9 @@ class DirectionalRunner(ModelRunner):
                                                   shape=[np.prod(adj_shape), 3],
                                                   name='rev-indices-ph',
                                                   is_sparse=False)
+        opp_indices_ph = model.create_placeholder(dtype=tf.int32,
+                                                  shape=[np.prod(adj_shape), 3],
+                                                  name='opp-indices-ph')
         node_embedding_ph = model.create_placeholder(dtype=tf.float32,
                                                      shape=embedding_shape,
                                                      name='node-embedding-ph',
@@ -68,6 +71,7 @@ class DirectionalRunner(ModelRunner):
             'inv_adj_lst': inv_adj_ph,
             'in_indices': in_indices_ph,
             'rev_indices': rev_indices_ph,
+            'opp_indices': opp_indices_ph,
             'dropout_keep_prob': dropout_keep_ph,
             'num_nodes': num_nodes_ph,
             'max_num_nodes': max_num_nodes
@@ -97,6 +101,9 @@ class DirectionalRunner(ModelRunner):
         in_indices = np.vstack([sample.in_indices for sample in batch])
         in_indices = np.concatenate([batch_indices, in_indices], axis=1)
 
+        opp_indices = np.vstack([sample.opp_indices for sample in batch])
+        opp_indices = np.concatenate([batch_indices, opp_indices], axis=1)
+
         # Add dummy embeddings, features and demands to account for added node
         demands = np.insert(demands, demands.shape[1], 0, axis=1)
         node_features = np.insert(node_features, node_features.shape[1], 0, axis=1)
@@ -109,7 +116,8 @@ class DirectionalRunner(ModelRunner):
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['in_indices']: in_indices,
-            placeholders['rev_indices']: rev_indices
+            placeholders['rev_indices']: rev_indices,
+            placeholders['opp_indices']: opp_indices
         }
 
         return feed_dict
