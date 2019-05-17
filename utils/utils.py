@@ -102,27 +102,14 @@ def demands_to_features(demands):
     return features
 
 
-def create_demands(graph, num_sources, num_sinks):
-    # Randomly select sources and sinks
-    source_sink_nodes = np.random.choice(graph.nodes(),
-                                         size=num_sources + num_sinks,
-                                         replace=False)
-
-    sources = source_sink_nodes[:num_sources]
-    sinks = source_sink_nodes[num_sources:]
+def create_demands(sources, sinks):
+    num_sources = len(sources)
+    num_sinks = len(sinks)
 
     source_demands = -softmax(np.random.normal(size=num_sources))
     sink_demands = softmax(np.random.normal(size=num_sinks))
 
-    # Create labels tensor
-    demands = np.zeros(shape=(graph.number_of_nodes(), 1), dtype=float)
-    for i, node in enumerate(sources):
-        demands[node][0] = source_demands[i]
-
-    for i, node in enumerate(sinks):
-        demands[node][0] = sink_demands[i]
-
-    return demands
+    return source_demands, sink_demands
 
 
 def create_capacities(graph, demands):

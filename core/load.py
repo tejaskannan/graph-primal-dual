@@ -97,49 +97,48 @@ def load_trips(path, num_nodes):
     return trips
 
 
-def write_sparse_npz(dataset, folder, index):
+def write_npz(dataset, folder, index):
     """
     Serializes the given matrices  as sparse matrices in a set of files. We use a custom function
     here because the scipy.sparse.save_npz function only allows for a single sparse matrix.
     """
-    data = {str(i): sp_mat.data for i, sp_mat in enumerate(dataset)}
-    indices = {str(i): sp_mat.indices for i, sp_mat in enumerate(dataset)}
-    ind_ptrs = {str(i): sp_mat.indptr for i, sp_mat in enumerate(dataset)}
-    shape = {str(i): sp_mat.shape for i, sp_mat in enumerate(dataset)}
+    source_data = {str(i): data[0] for i, data in enumerate(dataset)}
+    sink_data = {str(i): data[1] for i, data in enumerate(dataset)}
 
-    labels = np.arange(start=0, stop=len(dataset))
+    source_file_path = path.join(folder, 'source-demands-{0}.npz'.format(index))
+    with open(source_file_path, 'wb') as file:
+        np.savez_compressed(file, **source_data)
 
-    file_names = ['data-{0}.npz', 'indices-{0}.npz', 'indptr-{0}.npz', 'shape-{0}.npz']
-    matrices = [data, indices, ind_ptrs, shape]
-
-    for name, mat in zip(file_names, matrices):
-        file_path = path.join(folder, name.format(index))
-        with open(file_path, 'wb') as file:
-            np.savez_compressed(file, **mat)
+    sink_file_path = path.join(folder, 'sink-demands-{0}.npz'.format(index))
+    with open(sink_file_path, 'wb') as file:
+        np.savez_compressed(file, **sink_data)
 
 
-def read_sparse_npz(folder, file_index):
+def read_npz(folder, file_index, sources, sinks, num_nodes):
 
     def read(folder, name):
         file_path = path.join(folder, name)
         return np.load(file=file_path, mmap_mode='r')
 
-    data = read(folder, 'data-{0}.npz'.format(file_index))
-    indices = read(folder, 'indices-{0}.npz'.format(file_index))
-    indptr = read(folder, 'indptr-{0}.npz'.format(file_index))
-    shape = read(folder, 'shape-{0}.npz'.format(file_index))
+    source_data = read(folder, 'source-demands-{0}.npz'.format(file_index))
+    sink_data = read(folder, 'sink-demands-{0}.npz'.format(file_index))
 
     dataset = []
-    for i in range(len(data)):
+    for i in range(len(source_data)):
         index = str(i)
-        mat = sp.csr_matrix((data[index], indices[index], indptr[index]), shape=shape[index])
-        dataset.append(mat)
+        source_demands = source_data[index]
+        sink_demands = sink_data[index]
+
+        demands = np.zeros(shape=(num_nodes, 1))
+        demands[sources, 0] = source_demands
+        demands[sinks, 0] = sink_demands
+
+        sp_mat = sp.csr_matrix(demands)
+        dataset.append(sp_mat)
 
     # Close NPZ File objects to avoid leaking file descriptors
-    data.close()
-    indices.close()
-    indptr.close()
-    shape.close()
+    source_data.close()
+    sink_data.close()
 
     return dataset
 

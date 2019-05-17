@@ -4,7 +4,7 @@ import networkx as nx
 from enum import Enum
 from bisect import bisect_right
 from collections.abc import Iterable
-from core.load import read_sparse_npz, load_to_networkx
+from core.load import read_npz, load_to_networkx
 from utils.constants import BIG_NUMBER, WRITE_THRESHOLD
 from utils.utils import expand_sparse_matrix, deserialize_dict
 from utils.utils import create_node_embeddings, sparse_matrix_to_tensor
@@ -157,6 +157,10 @@ class DatasetManager:
             self.num_samples[Series.VALID][graph_name] = dataset_params['valid_samples']
             self.num_samples[Series.TEST][graph_name] = dataset_params['test_samples']
 
+        source_sink_dict = deserialize_dict(dataset_folder + 'sources_sinks.pkl.gz')
+        self.sources = source_sink_dict['sources']
+        self.sinks = source_sink_dict['sinks']
+
         self.params = params
         self.dataset = {}
         self.graph_data = {}
@@ -251,8 +255,14 @@ class DatasetManager:
             print('Started loading {0} {1} samples for graph {2}.'.format(num_samples, series.name, graph_name))
 
             for file_index in range(num_files):
+                num_nodes = self.graph_data[graph_name].num_nodes
+
                 # Load demands as Sparse CSR matrices to save memory.
-                demands = read_sparse_npz(folder=folder, file_index=file_index)
+                demands = read_npz(folder=folder,
+                                   file_index=file_index,
+                                   sources=self.sources,
+                                   sinks=self.sinks,
+                                   num_nodes=num_nodes)
 
                 self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.max_num_nodes)
                                          for demand in demands]
