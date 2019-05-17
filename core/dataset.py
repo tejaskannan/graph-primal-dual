@@ -38,8 +38,8 @@ class Sample:
 class BatchSample:
 
     def __init__(self, node_features, demands, adj_lst, adj_mat, inv_adj_lst,
-                 neighborhoods, embeddings, num_nodes, graph_name,
-                 rev_indices, in_indices, opp_indices):
+                 common_out_neighbors, neighborhoods, embeddings, num_nodes,
+                 graph_name, rev_indices, in_indices, opp_indices):
         self.node_features = node_features
         self.demands = demands
         self.adj_lst = adj_lst
@@ -52,6 +52,7 @@ class BatchSample:
         self.rev_indices = rev_indices
         self.in_indices = in_indices
         self.opp_indices = opp_indices
+        self.common_out_neighbors = common_out_neighbors
 
 
 class GraphData:
@@ -74,6 +75,20 @@ class GraphData:
 
         # Save the true number of nodes in this graph
         self.num_nodes = graph.number_of_nodes()
+
+        # Compute neighbors which have common outgoing neighbors
+        self.common_out_neighbors = self.common_outgoing_neighbors(graph=graph)
+
+    def common_outgoing_neighbors(self, graph):
+        common_out_neighbors = []
+
+        for node in graph.nodes():
+            common = []
+            for neighbor in graph[node]:
+                common += [n for n in graph.predecessors(neighbor) if n != node]
+            common_out_neighbors.append(list(set(common)))
+
+        return common_out_neighbors
 
     def set_edge_indices(self, adj_lst, max_degree, max_num_nodes):
         dim0 = np.prod(adj_lst.shape)
@@ -233,6 +248,11 @@ class DatasetManager:
                                 max_degree=self.max_degree,
                                 max_num_nodes=self.max_num_nodes)
 
+            gd.common_out_neighbors = pad_adj_list(adj_lst=gd.common_out_neighbors,
+                                                   max_degree=2 * self.max_degree,
+                                                   max_num_nodes=self.max_num_nodes,
+                                                   mask_number=gd.num_nodes)
+
             gd.adj_mat = expand_sparse_matrix(gd.adj_mat, n=self.max_num_nodes)
             gd.embeddings = expand_matrix(gd.embeddings, n=self.max_num_nodes,
                                           m=gd.embeddings.shape[1])
@@ -299,7 +319,8 @@ class DatasetManager:
                                 graph_name=gd.graph_name,
                                 rev_indices=gd.rev_indices,
                                 in_indices=gd.in_indices,
-                                opp_indices=gd.opp_indices)
+                                opp_indices=gd.opp_indices,
+                                common_out_neighbors=gd.common_out_neighbors)
                 batch.append(b)
 
             yield batch
@@ -369,7 +390,8 @@ class DatasetManager:
                             graph_name=gd.graph_name,
                             rev_indices=gd.rev_indices,
                             in_indices=gd.in_indices,
-                            opp_indices=gd.opp_indices)
+                            opp_indices=gd.opp_indices,
+                            common_out_neighbors=gd.common_out_neighbors)
             batch.append(b)
             indices.append(index)
 

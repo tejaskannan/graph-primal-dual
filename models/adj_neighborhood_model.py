@@ -27,6 +27,9 @@ class AdjModel(Model):
         # B x V x D tensor containing padded inverse adjacency list
         inv_adj_lst = kwargs['inv_adj_lst']
 
+        # B x V x 2D tensor of commmon outgoing neighbors
+        common_neighbors = kwargs['common_neighbors']
+
         # List of B x V x D tensors containing padded adjacency lists for k neighborhood levels
         neighborhoods = kwargs['neighborhoods']
 
@@ -81,13 +84,26 @@ class AdjModel(Model):
                                activation=tf.nn.tanh,
                                name='node-gru')
 
+                common_gat = AdjGAT(output_size=self.params['node_encoding'],
+                                    num_heads=self.params['num_heads'],
+                                    activation=tf.nn.tanh,
+                                    name='common-GAT')
+
                 # Combine message passing steps
                 for _ in range(self.params['graph_layers']):
                     next_encoding, attn_weights = node_neighborhood(inputs=node_encoding,
                                                                     neighborhoods=neighborhoods,
                                                                     mask_index=num_nodes,
                                                                     dropout_keep_prob=dropout_keep_prob)
-                    node_encoding = node_gru(inputs=next_encoding,
+
+                    # B x V x K
+                    common_neighbor_features = common_gat(inputs=node_encoding,
+                                                          adj_lst=common_neighbors,
+                                                          mask_index=num_nodes,
+                                                          weight_dropout_keep=dropout_keep_prob,
+                                                          attn_dropout_keep=dropout_keep_prob)
+
+                    node_encoding = node_gru(inputs=tf.nn.tanh(next_encoding + common_neighbor_features),
                                              state=node_encoding,
                                              dropout_keep_prob=dropout_keep_prob)
 

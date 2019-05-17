@@ -23,6 +23,7 @@ class AdjRunner(ModelRunner):
         node_shape = [b, max_num_nodes, self.num_node_features]
         demands_shape = [b, max_num_nodes, 1]
         adj_shape = [b, max_num_nodes, max_degree]
+        common_neighbors_shape = [b, max_num_nodes, 2 * max_degree]
         embedding_shape = [b, max_num_nodes, embedding_size]
         num_nodes_shape = [b, 1]
 
@@ -62,6 +63,10 @@ class AdjRunner(ModelRunner):
                                                 shape=num_nodes_shape,
                                                 name='num-nodes-ph',
                                                 is_sparse=False)
+        common_out_neighbors_ph = model.create_placeholder(dtype=tf.int32,
+                                                           shape=common_neighbors_shape,
+                                                           name='common-neighbors-ph',
+                                                           is_sparse=False)
 
         neighborhood_phs = []
         for i in range(num_neighborhoods + 1):
@@ -77,6 +82,7 @@ class AdjRunner(ModelRunner):
             'demands': demands_ph,
             'adj_lst': adj_ph,
             'inv_adj_lst': inv_adj_ph,
+            'common_neighbors': common_out_neighbors_ph,
             'neighborhoods': neighborhood_phs,
             'in_indices': in_indices_ph,
             'rev_indices': rev_indices_ph,
@@ -96,6 +102,7 @@ class AdjRunner(ModelRunner):
         node_features = np.array([sample.node_features for sample in batch])
         demands = np.array([sample.demands for sample in batch])
         adj_lsts = np.array([sample.adj_lst for sample in batch])
+        common_neighbors = np.array([sample.common_out_neighbors for sample in batch])
         inv_adj_lsts = np.array([sample.inv_adj_lst for sample in batch])
         num_nodes = np.array([sample.num_nodes for sample in batch])
         dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
@@ -119,6 +126,7 @@ class AdjRunner(ModelRunner):
             placeholders['demands']: demands,
             placeholders['adj_lst']: adj_lsts,
             placeholders['inv_adj_lst']: inv_adj_lsts,
+            placeholders['common_neighbors']: common_neighbors,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['in_indices']: in_indices,
