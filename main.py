@@ -9,7 +9,7 @@ from utils.utils import append_row_to_log, create_demands, file_index, find_max_
 from utils.utils import create_capacities, delete_if_exists, serialize_dict
 from utils.graph_utils import random_walk_neighborhoods, simple_paths
 from utils.constants import *
-from core.load import load_to_networkx, load_embeddings, write_npz, load_trips
+from core.load import load_to_networkx, load_embeddings, write, load_trips
 from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
@@ -130,13 +130,13 @@ def generate(params):
 
                 if (i+1) % WRITE_THRESHOLD == 0:
                     index, _ = file_index(i)
-                    write_npz(dataset=dataset, folder=series_folder, index=index)
+                    write(dataset=dataset, folder=series_folder, index=index)
                     print('Completed {0}/{1} samples for {2}.'.format(i+1, num_samples, file_path))
                     dataset = []
 
             if len(dataset) > 0:
                 index, _ = file_index(i)
-                write_npz(dataset=dataset, folder=series_folder, index=index)
+                write(dataset=dataset, folder=series_folder, index=index)
             print('Completed {0}.'.format(file_path))
 
 

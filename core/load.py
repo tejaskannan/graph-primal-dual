@@ -3,6 +3,7 @@ import numpy as np
 import scipy.sparse as sp
 from os import path
 from utils.constants import SMALL_NUMBER
+from utils.utils import serialize_dict, deserialize_dict
 from annoy import AnnoyIndex
 
 
@@ -97,7 +98,7 @@ def load_trips(path, num_nodes):
     return trips
 
 
-def write_npz(dataset, folder, index):
+def write(dataset, folder, index):
     """
     Serializes the given matrices  as sparse matrices in a set of files. We use a custom function
     here because the scipy.sparse.save_npz function only allows for a single sparse matrix.
@@ -105,23 +106,21 @@ def write_npz(dataset, folder, index):
     source_data = {str(i): data[0] for i, data in enumerate(dataset)}
     sink_data = {str(i): data[1] for i, data in enumerate(dataset)}
 
-    source_file_path = path.join(folder, 'source-demands-{0}.npz'.format(index))
-    with open(source_file_path, 'wb') as file:
-        np.savez_compressed(file, **source_data)
+    source_file_path = path.join(folder, 'source-demands-{0}.pkl.gz'.format(index))
+    serialize_dict(dictionary=source_data, file_path=source_file_path)
 
-    sink_file_path = path.join(folder, 'sink-demands-{0}.npz'.format(index))
-    with open(sink_file_path, 'wb') as file:
-        np.savez_compressed(file, **sink_data)
+    sink_file_path = path.join(folder, 'sink-demands-{0}.pkl.gz'.format(index))
+    serialize_dict(dictionary=sink_data, file_path=sink_file_path)
 
 
-def read_npz(folder, file_index, sources, sinks, num_nodes):
+def read(folder, file_index, sources, sinks, num_nodes):
 
-    def read(folder, name):
+    def read_dict(folder, name):
         file_path = path.join(folder, name)
-        return np.load(file=file_path, mmap_mode='r')
+        return deserialize_dict(file_path=file_path)
 
-    source_data = read(folder, 'source-demands-{0}.npz'.format(file_index))
-    sink_data = read(folder, 'sink-demands-{0}.npz'.format(file_index))
+    source_data = read_dict(folder, 'source-demands-{0}.pkl.gz'.format(file_index))
+    sink_data = read_dict(folder, 'sink-demands-{0}.pkl.gz'.format(file_index))
 
     dataset = []
     for i in range(len(source_data)):
@@ -136,9 +135,6 @@ def read_npz(folder, file_index, sources, sinks, num_nodes):
         sp_mat = sp.csr_matrix(demands)
         dataset.append(sp_mat)
 
-    # Close NPZ File objects to avoid leaking file descriptors
-    source_data.close()
-    sink_data.close()
 
     return dataset
 
