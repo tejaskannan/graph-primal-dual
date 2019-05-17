@@ -1,6 +1,8 @@
 import numpy as np
 import networkx as nx
 import scipy.sparse as sp
+import itertools
+from joblib import Parallel, delayed
 
 
 def add_features(graph, node_features, edge_features):
@@ -124,3 +126,23 @@ def adjacency_list(graph):
     adj_lst = list(map(list, iter(graph.adj.values())))
     max_degree = max(map(lambda x: len(x), adj_lst))
     return adj_lst, max_degree
+
+
+def simple_paths(graph, sources, sinks, max_num_paths):
+    cutoff = nx.diameter(graph)
+
+    # Dictionary from (source, sink) to list of paths
+    all_paths = {}
+
+
+    def compute_paths(source, sink, cutoff, max_num_paths):
+        paths = list(nx.all_simple_paths(graph, source, sink, cutoff=cutoff))
+        paths = sorted(paths, key=len)[:max_num_paths]
+        return {(source, sink): paths}
+
+    result = Parallel(n_jobs=-1)(delayed(compute_paths)(source, sink, cutoff, max_num_paths) for source, sink in itertools.product(sources, sinks))
+
+    for paths in result:
+        all_paths.update(paths)
+
+    return all_paths

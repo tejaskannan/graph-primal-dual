@@ -5,11 +5,11 @@ import numpy as np
 import json
 import scipy.sparse as sp
 from utils.utils import load_params, restore_params, create_node_embeddings
-from utils.utils import append_row_to_log, create_demands, file_index
+from utils.utils import append_row_to_log, create_demands, file_index, find_max_sources_sinks
 from utils.utils import create_capacities, delete_if_exists, serialize_dict
-from utils.graph_utils import random_walk_neighborhoods
+from utils.graph_utils import random_walk_neighborhoods, simple_paths
 from utils.constants import *
-from core.load import load_to_networkx, load_embeddings, write_sparse_npz
+from core.load import load_to_networkx, load_embeddings, write_sparse_npz, load_trips
 from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
@@ -91,6 +91,23 @@ def generate(params):
         # Save parameters
         serialize_dict(dictionary=params, file_path=dataset_folder + 'params.pkl.gz')
 
+        # Find and save paths between sources and sinks
+        trips_path = 'graphs/trips/{0}_trips.tntp'.format(graph_name)
+        trips = load_trips(path=trips_path, num_nodes=graph.number_of_nodes())
+        sources, sinks = find_max_sources_sinks(trips=trips,
+                                                num_sources=params['num_sources'],
+                                                num_sinks=params['num_sinks'])
+        source_sink_dict = {
+            'sources': sources,
+            'sinks': sinks
+        }
+        serialize_dict(dictionary=source_sink_dict, file_path=dataset_folder + 'sources_sinks.pkl.gz')
+
+        paths_file = dataset_folder + 'paths.pkl.gz'
+        if not os.path.exists(paths_file):
+            paths = simple_paths(graph=graph, sources=sources, sinks=sinks, max_num_paths=params['max_num_paths'])
+            serialize_dict(dictionary=paths, file_path=paths_file)
+
         file_paths = ['train', 'valid', 'test']
         samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
         for file_path, num_samples in zip(file_paths, samples):
@@ -106,8 +123,8 @@ def generate(params):
             dataset = []
             for i in range(num_samples):
                 d = create_demands(graph=graph,
-                                   min_max_sources=params['min_max_sources'],
-                                   min_max_sinks=params['min_max_sinks'])
+                                   num_sources=params['num_sources'],
+                                   num_sinks=params['num_sinks'])
 
                 # cap = create_capacities(graph=graph, demands=d)
 

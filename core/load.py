@@ -67,6 +67,36 @@ def load_to_networkx(path):
     return graph
 
 
+def load_trips(path, num_nodes):
+    curr_origin = 0
+    trips = np.zeros(shape=(num_nodes, num_nodes), dtype=np.float32)
+    with open(path, 'r') as trips_file:
+        metadata = True
+        for line in trips_file:
+
+            # Handle metadata at the beginning of the file
+            if len(line) == 0:
+                continue
+
+            if line.startswith('Origin'):
+                metadata = False
+                tokens = list(filter(lambda x: len(x) > 0 and x != '\n', line.split(' ')))
+                curr_origin = int(tokens[1]) - 1
+                continue
+
+            if metadata:
+                continue
+
+            tokens = list(filter(lambda x: len(x) > 0 and x != '\n' and x != ':', line.split(' ')))
+            
+            for i in range(0, len(tokens), 2):
+                dest = int(tokens[i]) - 1
+                amount = float(tokens[i+1].replace(';', ''))
+                trips[curr_origin, dest] = amount
+
+    return trips
+
+
 def write_sparse_npz(dataset, folder, index):
     """
     Serializes the given matrices  as sparse matrices in a set of files. We use a custom function

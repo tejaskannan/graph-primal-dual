@@ -102,11 +102,7 @@ def demands_to_features(demands):
     return features
 
 
-def create_demands(graph, min_max_sources, min_max_sinks):
-    # Randomly select the number of sources and sinks
-    num_sources = np.random.randint(low=min_max_sources[0], high=min_max_sources[1]+1)
-    num_sinks = np.random.randint(low=min_max_sinks[0], high=min_max_sinks[1]+1)
-
+def create_demands(graph, num_sources, num_sinks):
     # Randomly select sources and sinks
     source_sink_nodes = np.random.choice(graph.nodes(),
                                          size=num_sources + num_sinks,
@@ -302,6 +298,18 @@ def expand_matrix(mat, n, m):
     new_mat = np.zeros(shape=(n, m))
     new_mat[:mat.shape[0], :mat.shape[1]] = mat
     return new_mat
+
+
+def find_max_sources_sinks(trips, num_sources, num_sinks):
+    production = np.sum(trips, axis=1)
+    sources = np.argsort(a=-production)[:num_sources]
+
+    # For now, we prevent sources from also being sinks
+    consumption = np.sum(trips, axis=0)    
+    consumption[sources] = 0
+    sinks = np.argsort(a=-consumption)[:num_sinks]
+
+    return sources, sinks
 
 
 def delete_if_exists(file_path):

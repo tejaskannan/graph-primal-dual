@@ -143,11 +143,9 @@ def correct_proportions(source_demands, sink_demands, proportions, source_dest_m
     v = tf.linalg.lstsq(matrix=A, rhs=b, fast=False, name='v-init')
     v_prev = v + BIG_NUMBER
 
-    # Newton's method step size
+    # Use constant step size for simplicity
     step_size = tf.constant(1.0, dtype=tf.float32)
 
-    # Dampening factor
-    beta = 0.99
     def body(v, v_prev, step_size):
         # B x (K1 * K2 + K1 + K2) x 1
         target = tf.concat([p - v, zero_pad], axis=1)
