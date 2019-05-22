@@ -1,10 +1,65 @@
+import osmnx as ox
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 from os import path
+from os import mkdir
 from utils.constants import SMALL_NUMBER
-from utils.utils import serialize_dict, deserialize_dict
+from utils.utils import serialize_dict, deserialize_dict, append_row_to_log
 from annoy import AnnoyIndex
+
+
+def save_graph(place_name, graph_name):
+    graph = ox.graph_from_place(place_name, network_type='drive')
+    graph_proj = ox.project_graph(graph)
+
+    folder_path = path.join('graphs', graph_name)
+    if not path.exists(folder_path):
+        mkdir(folder_path)
+
+    graph_data = graph_proj.graph
+    serialize_dict(dictionary=graph_data, file_path=path.join(folder_path, 'graph_data.pkl.gz'))
+
+    ox.save_graphml(graph_proj, filename='graph.graphml', folder=folder_path, gephi=True)
+
+    # Save a selection of graph-wide stats.
+    stats_file = path.join(folder_path, 'stats.csv')
+    if path.exists(stats_file):
+        return
+
+    graph_component = ox.get_largest_component(graph, strongly=True).to_directed()
+
+    n_nodes = graph_component.number_of_nodes()
+    n_edges = graph_component.number_of_edges()
+    avg_in_deg = np.average([d for _, d in graph_component.in_degree()])
+    avg_out_deg = np.average([d for _, d in graph_component.out_degree()])
+    diam = nx.diameter(graph_component)
+
+    append_row_to_log(['Number of Nodes', n_nodes], stats_file)
+    append_row_to_log(['Number of Edges', n_edges], stats_file)
+    append_row_to_log(['Average In Degree', avg_in_deg], stats_file)
+    append_row_to_log(['Average Out Degree', avg_out_deg], stats_file)
+    append_row_to_log(['Diameter', diam], stats_file)
+
+
+def load_graph(graph_name):
+    folder_path = path.join('graphs', graph_name)
+
+    graph_data = deserialize_dict(file_path=path.join(folder_path, 'graph_data.pkl.gz'))
+    graph = ox.load_graphml(filename='graph.graphml', folder=folder_path)
+    graph.graph['crs'] = graph_data['crs']
+    graph.graph['name'] = graph_data['name']
+
+    graph = ox.project_graph(graph, to_crs=graph_data['crs'])
+
+    # We make the graph strongly connected to ensure that any combination of source / sink
+    # constitutes a valid problem
+    graph = ox.get_largest_component(graph, strongly=True)
+
+    node_mapping = {node: i for i, node in enumerate(graph.nodes())}
+    graph = nx.relabel_nodes(graph, node_mapping)
+
+    return graph.to_directed()
 
 
 def load_to_networkx(path):

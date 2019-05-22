@@ -1,9 +1,46 @@
 import matplotlib.pyplot as plt
+import osmnx as ox
 from matplotlib import cm
 from matplotlib import colors
 import numpy as np
 import networkx as nx
 from utils.constants import *
+
+
+def plot_road_graph(graph, file_path):
+    n_nodes = graph.number_of_nodes()
+
+    edge_cmap = cm.get_cmap(name='inferno')
+
+    node_sizes = np.full(shape=(n_nodes,), fill_value=1)
+    node_colors = ['gray' for _ in range(n_nodes)]
+
+    for i, (node, demand) in enumerate(graph.nodes.data('demand')):
+        if demand > 0:
+            node_sizes[i] = 20
+            node_colors[i] = 'red'
+        elif demand < 0:
+            node_sizes[i] = 20
+            node_colors[i] = 'blue'
+
+    flows = np.array([v for (src, dst, v) in graph.edges.data('flow')])
+    min_flow, max_flow = np.min(flows), np.max(flows)
+    normalized_flows = (flows - min_flow) / max_flow
+
+    edge_colors = [edge_cmap(x) for x in normalized_flows]
+
+    fig, ax = ox.plot_graph(graph,
+                            node_size=node_sizes,
+                            node_color=node_colors,
+                            node_edgecolor=node_colors,
+                            node_zorder=3,
+                            edge_color=edge_colors,
+                            show=False,
+                            save=True,
+                            filename=file_path,
+                            file_format='png')
+
+
 
 
 def plot_costs(costs_lst, out_path):
