@@ -4,7 +4,7 @@ import networkx as nx
 import scipy.sparse as sp
 import os
 from time import time
-from core.load import load_to_networkx
+from core.load import load_graph
 from core.dataset import DatasetManager, Series
 from core.layers import SparseMinCostFlow
 from core.plot import plot_flow_graph_sparse

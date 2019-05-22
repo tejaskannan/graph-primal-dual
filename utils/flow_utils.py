@@ -44,12 +44,17 @@ def mcf_solver(pred_weights, demand, in_indices, max_iters, name='mcf-solver'):
     return flow, pflow
 
 
-def dual_flow(dual_diff, adj_mask, cost_fn, step_size, momentum, max_iters, name='dual-flow'):
+def dual_flow(dual_diff, adj_mask, cost_fn, edge_lengths, should_use_edges, step_size, momentum, max_iters, name='dual-flow'):
 
     def body(flow, acc, prev_flow):
         momentum_acc = momentum * acc
         predicted = tf.nn.relu(adj_mask * (flow - momentum_acc))
-        derivative = cost_fn.derivative(predicted) + dual_diff
+
+        if should_use_edges:
+            derivative = cost_fn.derivative(predicted, edge_lengths) + dual_diff
+        else:
+            derivative = cost_fn.derivative(predicted) + dual_diff
+
         next_acc = momentum_acc + step_size * derivative
         next_flow = tf.nn.relu(adj_mask * (flow - next_acc))
         return [next_flow, next_acc, flow]

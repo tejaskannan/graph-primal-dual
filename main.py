@@ -10,7 +10,7 @@ from utils.utils import create_capacities, delete_if_exists, serialize_dict
 from utils.graph_utils import random_walk_neighborhoods, simple_paths
 from utils.graph_utils import random_sources_sinks, farthest_nodes, farthest_sink_nodes
 from utils.constants import *
-from core.load import load_to_networkx, load_embeddings, write, load_trips, save_graph, load_graph
+from core.load import load_embeddings, write, save_graph, load_graph
 from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner

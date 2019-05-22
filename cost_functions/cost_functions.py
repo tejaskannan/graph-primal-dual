@@ -18,6 +18,18 @@ class CostFunction:
         return tf.clip_by_value(x, -COST_MAX, COST_MAX)
 
 
+class CostFunctionWithEdges:
+
+    def __init__(self, cost_fn):
+        self.cost_fn = cost_fn
+
+    def apply(self, x, edges):
+        return self.cost_fn.apply(x) + edges * x
+
+    def derivative(self, x, edges):
+        return self.cost_fn.derivative(x) + edges
+
+
 class Linear(CostFunction):
     """
     f(x) = ax + b
@@ -197,17 +209,22 @@ def get_cost_function(cost_fn):
     options = cost_fn['options']
 
     if name == 'linear':
-        return Linear(options=options)
-    if name == 'quadratic':
-        return Quadratic(options=options)
-    if name == 'exp':
-        return Exp(options=options)
-    if name == 'cubic':
-        return Cubic(options=options)
-    if name == 'quartic':
-        return Quartic(options=options)
-    if name == 'linear_sin':
-        return LinearSin(options=options)
-    if name == 'log':
-        return Log(options=options)
-    return None
+        fn = Linear(options=options)
+    elif name == 'quadratic':
+        fn = Quadratic(options=options)
+    elif name == 'exp':
+        fn = Exp(options=options)
+    elif name == 'cubic':
+        fn = Cubic(options=options)
+    elif name == 'quartic':
+        fn = Quartic(options=options)
+    elif name == 'linear_sin':
+        fn = LinearSin(options=options)
+    elif name == 'log':
+        fn = Log(options=options)
+    else:
+        return None
+
+    if cost_fn['use_edges']:
+        return CostFunctionWithEdges(cost_fn=fn)
+    return fn

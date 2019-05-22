@@ -245,8 +245,8 @@ class ModelRunner:
                     prop_path = '{0}flow-prop-{1}-{2}'.format(model_path, graph_name, index)
                     attn_weight_path = '{0}attn-weights-{1}-{2}'.format(model_path, graph_name, index)
 
-                    plot_road_flow_graph(graph=flow_graph, field='flow', graph_name=self.params['graph_name'], file_path=flow_path)
-                    plot_road_flow_graph(graph=flow_graph, field='flow_proportion', graph_name=self.params['graph_name'], file_path=prop_path)
+                    plot_road_flow_graph(graph=flow_graph, field='flow', graph_name=self.params['graph_title'], file_path=flow_path)
+                    plot_road_flow_graph(graph=flow_graph, field='flow_proportion', graph_name=self.params['graph_title'], file_path=prop_path)
 
                     if 'attn_weights' in outputs:
                         attn_weights = outputs['attn_weights'][j]

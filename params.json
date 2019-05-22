@@ -37,6 +37,7 @@
 		"output_folder": "trained_models",
 		"cost_fn": {
 			"name": "cubic",
+			"use_edges": true,
 			"options": {
 				"a": 8.0,
 				"b": -6.0,

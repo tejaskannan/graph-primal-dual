@@ -7,7 +7,6 @@ from utils.utils import add_features, append_row_to_log
 from utils.constants import BIG_NUMBER, FLOW_THRESHOLD, LINE
 from core.plot import plot_flow_graph, plot_costs
 from core.dataset import DatasetManager, Series
-from core.load import load_to_networkx
 from os import mkdir
 from os.path import exists
 from datetime import datetime

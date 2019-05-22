@@ -12,6 +12,7 @@ class AdjModel(Model):
     def __init__(self, params, name='neighborhood-model'):
         super(AdjModel, self).__init__(params, name)
         self.cost_fn = get_cost_function(cost_fn=params['cost_fn'])
+        self.should_use_edges = params['cost_fn']['use_edges']
 
     def build(self, **kwargs):
 
@@ -26,6 +27,12 @@ class AdjModel(Model):
 
         # B x V x D tensor containing padded inverse adjacency list
         inv_adj_lst = kwargs['inv_adj_lst']
+
+        # B x V x D tensor of edge lengths
+        edge_lengths = kwargs['edge_lengths']
+
+        # B x V x D tensor of normalized edge lengths
+        norm_edge_lengths = kwargs['norm_edge_lengths']
 
         # B x V x 2D tensor of commmon outgoing neighbors
         common_neighbors = kwargs['common_neighbors']
@@ -159,7 +166,10 @@ class AdjModel(Model):
                                          in_indices=in_indices,
                                          max_iters=self.params['flow_iters'])
 
-                flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
+                if self.should_use_edges:
+                    flow_cost = tf.reduce_sum(self.cost_fn.apply(flow, edge_lengths), axis=[1, 2])
+                else:
+                    flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
                 # Compute Dual Problem and associated cost
                 dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
@@ -186,12 +196,20 @@ class AdjModel(Model):
                 dual_flows = dual_flow(dual_diff=dual_diff,
                                        adj_mask=mask,
                                        cost_fn=self.cost_fn,
+                                       edge_lengths=edge_lengths,
+                                       should_use_edges=self.should_use_edges,
                                        step_size=self.params['dual_step_size'],
                                        momentum=self.params['dual_momentum'],
                                        max_iters=self.params['dual_iters'])
 
                 dual_demand = tf.reduce_sum(dual_vars * demands, axis=[1, 2])
-                dual_flow_cost = self.cost_fn.apply(dual_flows) + dual_diff * dual_flows
+
+                if self.should_use_edges:
+                    dual_flow_cost = self.cost_fn.apply(dual_flows, edge_lengths)
+                else:
+                    dual_flow_cost = self.cost_fn.apply(dual_flows)
+
+                dual_flow_cost += dual_diff * dual_flows
                 dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
                 self.loss = flow_cost - dual_cost

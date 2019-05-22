@@ -67,6 +67,14 @@ class AdjRunner(ModelRunner):
                                                            shape=common_neighbors_shape,
                                                            name='common-neighbors-ph',
                                                            is_sparse=False)
+        edge_lengths_ph = model.create_placeholder(dtype=tf.float32,
+                                                   shape=adj_shape,
+                                                   name='edge-lengths-ph',
+                                                   is_sparse=False)
+        normalized_edge_lengths_ph = model.create_placeholder(dtype=tf.float32,
+                                                              shape=adj_shape,
+                                                              name='norm-edge-lengths-ph',
+                                                              is_sparse=False)
 
         neighborhood_phs = []
         for i in range(num_neighborhoods + 1):
@@ -87,6 +95,8 @@ class AdjRunner(ModelRunner):
             'in_indices': in_indices_ph,
             'rev_indices': rev_indices_ph,
             'dropout_keep_prob': dropout_keep_ph,
+            'edge_lengths': edge_lengths_ph,
+            'norm_edge_lengths': normalized_edge_lengths_ph,
             'num_nodes': num_nodes_ph,
             'max_num_nodes': max_num_nodes
         }
@@ -105,6 +115,8 @@ class AdjRunner(ModelRunner):
         common_neighbors = np.array([sample.common_out_neighbors for sample in batch])
         inv_adj_lsts = np.array([sample.inv_adj_lst for sample in batch])
         num_nodes = np.array([sample.num_nodes for sample in batch])
+        edge_lengths = np.array([sample.edge_lengths for sample in batch])
+        norm_edge_lengths = np.array([sample.normalized_edge_lengths for sample in batch])
         dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
 
         # 3D indexing used for flow computation and correction
@@ -127,6 +139,8 @@ class AdjRunner(ModelRunner):
             placeholders['adj_lst']: adj_lsts,
             placeholders['inv_adj_lst']: inv_adj_lsts,
             placeholders['common_neighbors']: common_neighbors,
+            placeholders['edge_lengths']: edge_lengths,
+            placeholders['norm_edge_lengths']: norm_edge_lengths,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['in_indices']: in_indices,

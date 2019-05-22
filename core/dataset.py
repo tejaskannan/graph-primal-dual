@@ -5,7 +5,7 @@ from enum import Enum
 from os import path
 from bisect import bisect_right
 from collections.abc import Iterable
-from core.load import read, load_to_networkx, load_graph
+from core.load import read, load_graph
 from utils.constants import BIG_NUMBER, WRITE_THRESHOLD
 from utils.utils import expand_sparse_matrix, deserialize_dict
 from utils.utils import create_node_embeddings, sparse_matrix_to_tensor
@@ -52,6 +52,8 @@ class BatchSample:
         self.in_indices = graph_data.in_indices
         self.opp_indices = graph_data.opp_indices
         self.common_out_neighbors = graph_data.common_out_neighbors
+        self.edge_lengths = graph_data.edge_lengths
+        self.normalized_edge_lengths = graph_data.normalized_edge_lengths
 
 
 class GraphData:
@@ -89,6 +91,29 @@ class GraphData:
             common_out_neighbors.append(list(set(common)))
 
         return common_out_neighbors
+
+    def fetch_edge_lengths(self):
+        # Fetch and normalize edge lengths from underlying graph
+        self.scaler = StandardScaler()
+        edge_lengths = np.array([length for (_, _, length) in self.graph.edges.data('length')])
+        normalized_lengths = self.scaler.fit_transform(edge_lengths.reshape(-1, 1)).reshape(-1)
+
+        edge_len_dict = {}
+        norm_edge_len_dict = {}
+        for i, (src, dst) in enumerate(self.graph.edges(keys=False, data=False)):
+            edge_len_dict[(src, dst)] = edge_lengths[i]
+            norm_edge_len_dict[(src, dst)] = normalized_lengths[i]
+
+        self.edge_lengths = np.zeros_like(self.adj_lst, dtype=float)
+        self.normalized_edge_lengths = np.zeros_like(self.adj_lst, dtype=float)
+        for node, _ in enumerate(self.adj_lst):
+            for j, v in enumerate(self.adj_lst[node]):
+
+                if (node, v) not in edge_len_dict:
+                    continue
+
+                self.edge_lengths[node, j] = edge_len_dict[(node, v)]
+                self.normalized_edge_lengths[node, j] = norm_edge_len_dict[(node, v)]
 
     def set_edge_indices(self, adj_lst, max_degree, max_num_nodes):
         dim0 = np.prod(adj_lst.shape)
@@ -167,7 +192,6 @@ class DatasetManager:
         self.params = params
         self.dataset = {}
         self.graph_data = None
-        self.scaler = StandardScaler()
 
     def load_graphs(self):
         num_neighborhoods = self.params['num_neighborhoods']
@@ -215,6 +239,8 @@ class DatasetManager:
                                                   max_degrees=self.max_neighborhood_degrees,
                                                   max_num_nodes=self.num_nodes,
                                                   mask_number=self.graph_data.num_nodes)
+
+        self.graph_data.fetch_edge_lengths()
 
     def load(self, series):
         assert series is not None
@@ -360,20 +386,6 @@ class DatasetManager:
             self.cumulative_probs[i] = self.cumulative_probs[i-1] + self.probs[i]
 
         self.is_train_initialized = True
-
-    def normalize_embeddings(self):
-        embeddings_lst = []
-        for graph_name in self.data_folders[Series.TRAIN].keys():
-            graph_embeddings = self.graph_data[graph_name].embeddings
-            embeddings_lst.append(graph_embeddings)
-        embeddings = np.concatenate(embeddings_lst, axis=0)
-
-        self.scaler.fit(embeddings)
-
-        for graph_name in self.graph_data.keys():
-            embeddings = self.graph_data[graph_name].embeddings
-            transformed_embeddings = self.scaler.transform(embeddings)
-            self.graph_data[graph_name].embeddings = transformed_embeddings
 
     def num_batches(self, series, batch_size):
         return int(self.num_samples[series] / batch_size)
