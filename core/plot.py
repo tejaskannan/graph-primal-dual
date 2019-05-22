@@ -5,7 +5,8 @@ pgf_with_pdflatex = {
     'pgf.rcfonts': False
 }
 mpl.rcParams.update(pgf_with_pdflatex)
-
+import os
+import os.path
 import matplotlib.pyplot as plt
 import osmnx as ox
 from matplotlib import cm
@@ -28,7 +29,7 @@ def plot_road_graph(graph, graph_name, file_path):
     plt.savefig(file_path + '.pgf')
 
 
-def plot_road_flow_graph(graph, field, graph_name, file_path):
+def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False):
     n_nodes = graph.number_of_nodes()
 
     edge_cmap = cm.get_cmap(name='YlOrBr')
@@ -59,6 +60,7 @@ def plot_road_flow_graph(graph, field, graph_name, file_path):
                             node_edgecolor=node_colors,
                             node_zorder=3,
                             edge_color=edge_colors,
+                            edge_linewidth=0.7,
                             show=False,
                             save=False,
                             close=False)
@@ -68,7 +70,7 @@ def plot_road_flow_graph(graph, field, graph_name, file_path):
 
     cax = fig.add_axes([0.05, 0.08, 0.4, 0.02])
     edge_cbar = fig.colorbar(edge_scalar_map, cax=cax, orientation='horizontal')
-    edge_cbar.set_label('Flow')
+    edge_cbar.set_label(field)
 
     demands_scalar_map = cm.ScalarMappable(norm=node_normalizer, cmap=node_cmap)
     demands_scalar_map.set_array(demands)
@@ -77,9 +79,47 @@ def plot_road_flow_graph(graph, field, graph_name, file_path):
     demand_cbar = fig.colorbar(demands_scalar_map, cax=cax, orientation='horizontal')
     demand_cbar.set_label('Demand')
 
+    # Annotate nodes with demand
+    for node, data in graph.nodes(data=True):
+        if abs(data['demand']) > SMALL_NUMBER:
+            dem = round(data['demand'], 2)
+            ax.annotate(s=str(dem),
+                        xy=(data['x'], data['y']),
+                        xytext=(data['x'] + 0.02, data['y'] + 0.02),
+                        fontsize=10)
+
+    # Annotate edges with the given field value
+    if label_edges:
+        xs = nx.get_node_attributes(graph, 'x')
+        ys = nx.get_node_attributes(graph, 'y')
+        for src, dst, data in graph.edges(keys=False, data=True):
+            if abs(data[field]) > SMALL_NUMBER:
+                val = round(data[field], 2)
+
+                if 'geometry' in data:
+                    x_coo, y_coo = data['geometry'].xy
+                    x = x_coo[int(len(x_coo) / 2.0)]
+                    y = y_coo[int(len(y_coo) / 2.0)]
+
+                    x += 0.03 if x_coo[0] > x_coo[-1] else -0.03
+                    y += 0.03 if y_coo[0] > y_coo[-1] else -0.03
+                else:
+                    x = 0.5 * (xs[src] + xs[dst])
+                    y = 0.5 * (ys[src] + ys[dst])
+
+                ax.annotate(s=str(val),
+                            xy=(x, y),
+                            fontsize=8,
+                            color='gray')
+
     fig.suptitle('Computed Flows for ' + graph_name, fontsize=12)
     plt.savefig(file_path + '.pdf', bbox='tight')
-    plt.savefig(file_path + '.pgf')
+
+    pgf_folder = file_path + '-pgf'
+    if not os.path.exists(pgf_folder):
+        os.mkdir(pgf_folder)
+
+    plt.savefig(os.path.join(pgf_folder, 'graph.pgf'))
 
 
 def plot_costs(costs_lst, out_path):
@@ -283,6 +323,9 @@ def plot_weights(weight_matrix, file_path, num_nodes, num_samples=-1):
     ax.set_xlabel('Neighborhood Layer')
     ax.set_ylabel('Node Index')
     ax.set_title('Node-Specific Attention Weights for each Neighborhood Layer')
+
+    if not file_path.endswith('.png'):
+        file_path += '.png'
 
     plt.savefig(file_path)
     plt.close(fig)

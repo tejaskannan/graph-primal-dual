@@ -241,9 +241,9 @@ class ModelRunner:
                                           edge_features=edge_features)
 
                 if self.params['plot_flows'] and index in plot_indices:
-                    flow_path = '{0}flows-{1}-{2}.png'.format(model_path, graph_name, index)
-                    prop_path = '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index)
-                    attn_weight_path = '{0}attn-weights-{1}-{2}.png'.format(model_path, graph_name, index)
+                    flow_path = '{0}flows-{1}-{2}'.format(model_path, graph_name, index)
+                    prop_path = '{0}flow-prop-{1}-{2}'.format(model_path, graph_name, index)
+                    attn_weight_path = '{0}attn-weights-{1}-{2}'.format(model_path, graph_name, index)
 
                     plot_road_flow_graph(graph=flow_graph, field='flow', graph_name=self.params['graph_name'], file_path=flow_path)
                     plot_road_flow_graph(graph=flow_graph, field='flow_proportion', graph_name=self.params['graph_name'], file_path=prop_path)
