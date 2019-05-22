@@ -2,10 +2,12 @@ import osmnx as ox
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
+import matplotlib as plt
 from os import path
 from os import mkdir
 from utils.constants import SMALL_NUMBER
 from utils.utils import serialize_dict, deserialize_dict, append_row_to_log
+from core.plot import plot_road_graph
 from annoy import AnnoyIndex
 
 
@@ -22,12 +24,15 @@ def save_graph(place_name, graph_name):
 
     ox.save_graphml(graph_proj, filename='graph.graphml', folder=folder_path, gephi=True)
 
+    graph_component = ox.get_largest_component(graph_proj, strongly=True).to_directed()
+
+    # Save pictures of the graph
+    plot_road_graph(graph_component, graph_name=graph_name, file_path=path.join(folder_path, 'graph'))
+
     # Save a selection of graph-wide stats.
     stats_file = path.join(folder_path, 'stats.csv')
     if path.exists(stats_file):
         return
-
-    graph_component = ox.get_largest_component(graph, strongly=True).to_directed()
 
     n_nodes = graph_component.number_of_nodes()
     n_edges = graph_component.number_of_edges()

@@ -1,3 +1,11 @@
+import matplotlib as mpl
+mpl.use('pgf')
+pgf_with_pdflatex = {
+    'pgf.texsystem': 'lualatex',
+    'pgf.rcfonts': False
+}
+mpl.rcParams.update(pgf_with_pdflatex)
+
 import matplotlib.pyplot as plt
 import osmnx as ox
 from matplotlib import cm
@@ -7,27 +15,43 @@ import networkx as nx
 from utils.constants import *
 
 
-def plot_road_graph(graph, file_path):
+def plot_road_graph(graph, graph_name, file_path):
+    fig, ax = ox.plot_graph(graph,
+                            node_size=1,
+                            node_color='blue',
+                            node_edgecolor='blue',
+                            node_zorder=3,
+                            show=False,
+                            save=False,
+                            close=False)
+    plt.savefig(file_path + '.pdf', bbox='tight')
+    plt.savefig(file_path + '.pgf')
+
+
+def plot_road_flow_graph(graph, graph_name, file_path):
     n_nodes = graph.number_of_nodes()
 
-    edge_cmap = cm.get_cmap(name='inferno')
+    edge_cmap = cm.get_cmap(name='YlOrBr')
+    node_cmap = cm.get_cmap(name='viridis')
 
     node_sizes = np.full(shape=(n_nodes,), fill_value=1)
     node_colors = ['gray' for _ in range(n_nodes)]
 
+    demands = [v for (node, v) in graph.nodes.data('demand')]
+    node_normalizer = colors.Normalize(vmin=np.min(demands), vmax=np.max(demands))
+
     for i, (node, demand) in enumerate(graph.nodes.data('demand')):
         if demand > 0:
             node_sizes[i] = 20
-            node_colors[i] = 'red'
+            node_colors[i] = node_cmap(node_normalizer(demand))
         elif demand < 0:
             node_sizes[i] = 20
-            node_colors[i] = 'blue'
+            node_colors[i] = node_cmap(node_normalizer(demand))
 
-    flows = np.array([v for (src, dst, v) in graph.edges.data('flow')])
-    min_flow, max_flow = np.min(flows), np.max(flows)
-    normalized_flows = (flows - min_flow) / max_flow
+    flows = [v for (src, dst, v) in graph.edges.data('flow')]
+    flow_normalizer = colors.Normalize(vmin=np.min(flows), vmax=np.max(flows))
 
-    edge_colors = [edge_cmap(x) for x in normalized_flows]
+    edge_colors = [edge_cmap(flow_normalizer(x)) for x in flows]
 
     fig, ax = ox.plot_graph(graph,
                             node_size=node_sizes,
@@ -36,11 +60,26 @@ def plot_road_graph(graph, file_path):
                             node_zorder=3,
                             edge_color=edge_colors,
                             show=False,
-                            save=True,
-                            filename=file_path,
-                            file_format='png')
+                            save=False,
+                            close=False)
 
+    flow_scalar_map = cm.ScalarMappable(norm=flow_normalizer, cmap=edge_cmap)
+    flow_scalar_map.set_array(flows)
 
+    cax = fig.add_axes([0.05, 0.08, 0.4, 0.02])
+    flow_cbar = fig.colorbar(flow_scalar_map, cax=cax, orientation='horizontal')
+    flow_cbar.set_label('Flow')
+
+    demands_scalar_map = cm.ScalarMappable(norm=node_normalizer, cmap=node_cmap)
+    demands_scalar_map.set_array(demands)
+
+    cax = fig.add_axes([0.55, 0.08, 0.4, 0.02])
+    demand_cbar = fig.colorbar(demands_scalar_map, cax=cax, orientation='horizontal')
+    demand_cbar.set_label('Demand')
+
+    fig.suptitle('Computed Flows for ' + graph_name, fontsize=12)
+    plt.savefig(file_path + '.pdf', bbox='tight')
+    plt.savefig(file_path + '.pgf')
 
 
 def plot_costs(costs_lst, out_path):
