@@ -28,7 +28,7 @@ def plot_road_graph(graph, graph_name, file_path):
     plt.savefig(file_path + '.pgf')
 
 
-def plot_road_flow_graph(graph, graph_name, file_path):
+def plot_road_flow_graph(graph, field, graph_name, file_path):
     n_nodes = graph.number_of_nodes()
 
     edge_cmap = cm.get_cmap(name='YlOrBr')
@@ -48,10 +48,10 @@ def plot_road_flow_graph(graph, graph_name, file_path):
             node_sizes[i] = 20
             node_colors[i] = node_cmap(node_normalizer(demand))
 
-    flows = [v for (src, dst, v) in graph.edges.data('flow')]
-    flow_normalizer = colors.Normalize(vmin=np.min(flows), vmax=np.max(flows))
+    values = [v for (src, dst, v) in graph.edges.data(field)]
+    edge_normalizer = colors.Normalize(vmin=np.min(values), vmax=np.max(values))
 
-    edge_colors = [edge_cmap(flow_normalizer(x)) for x in flows]
+    edge_colors = [edge_cmap(edge_normalizer(x)) for x in values]
 
     fig, ax = ox.plot_graph(graph,
                             node_size=node_sizes,
@@ -63,12 +63,12 @@ def plot_road_flow_graph(graph, graph_name, file_path):
                             save=False,
                             close=False)
 
-    flow_scalar_map = cm.ScalarMappable(norm=flow_normalizer, cmap=edge_cmap)
-    flow_scalar_map.set_array(flows)
+    edge_scalar_map = cm.ScalarMappable(norm=edge_normalizer, cmap=edge_cmap)
+    edge_scalar_map.set_array(values)
 
     cax = fig.add_axes([0.05, 0.08, 0.4, 0.02])
-    flow_cbar = fig.colorbar(flow_scalar_map, cax=cax, orientation='horizontal')
-    flow_cbar.set_label('Flow')
+    edge_cbar = fig.colorbar(edge_scalar_map, cax=cax, orientation='horizontal')
+    edge_cbar.set_label('Flow')
 
     demands_scalar_map = cm.ScalarMappable(norm=node_normalizer, cmap=node_cmap)
     demands_scalar_map.set_array(demands)

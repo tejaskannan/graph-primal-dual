@@ -35,7 +35,7 @@ def add_features(graph, node_features, edge_features):
         for node, lst in enumerate(adj_lst):
             for i, neighbor in enumerate(lst):
                 v = {name: float(values[node, i])}
-                graph.add_edge(node, neighbor, **v)
+                graph.add_edge(node, neighbor, key=0, **v)
 
     return graph
 

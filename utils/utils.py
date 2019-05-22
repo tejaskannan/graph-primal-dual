@@ -29,11 +29,13 @@ def add_features(graph, demands, flows, proportions, node_weights):
         graph.add_node(node, demand=float(demands[node, 0] - demands[node, 1]),
                        node_weight=float(node_weights[node][0]))
 
-    for src, dest in graph.edges():
+    edge_dict = {}
+    for src, dest, key in graph.edges(keys=True):
         flow = float(flows[src, dest])
         prop = float(proportions[src, dest])
-        graph.add_edge(src, dest, flow=flow, proportion=prop)
+        edge_dict[src, dest, key] = {'flow': flow, 'flow_proportion': prop}
 
+    nx.set_edge_attributes(graph, edge_dict)
     return graph
 
 

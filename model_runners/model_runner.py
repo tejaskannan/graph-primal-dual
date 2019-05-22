@@ -8,7 +8,7 @@ from time import time
 from utils.utils import append_row_to_log, delete_if_exists
 from utils.constants import BIG_NUMBER, LINE
 from utils.graph_utils import add_features
-from core.plot import plot_flow_graph_adj, plot_weights
+from core.plot import plot_flow_graph_adj, plot_weights, plot_road_flow_graph
 from core.dataset import DatasetManager, Series
 
 
@@ -20,25 +20,20 @@ class ModelRunner:
     def __init__(self, params):
         self.params = params
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
-        graph_names = '-'.join(params['train_graph_names'])
         cost_fn_name = params['cost_fn']['name']
         self.output_folder = '{0}/{1}-{2}-{3}-{4}/'.format(params['output_folder'],
                                                            params['name'],
-                                                           graph_names,
+                                                           params['graph_name'],
                                                            cost_fn_name,
                                                            self.timestamp)
         
         self.num_node_features = 2
-        self.embedding_size = 2 * self.params['num_neighborhoods'] + 2
+        self.embedding_size = 2*self.params['num_neighborhoods'] + 2
 
         self.dataset = DatasetManager(params=self.params)
-        self.dataset.load_graphs(normalize=True)
+        self.dataset.load_graphs()
 
     def train(self):
-
-        # Load Graphs
-        graphs = self.dataset.train_graphs
-
         num_neighborhoods = self.params['num_neighborhoods']
 
         # Initialize model
@@ -46,7 +41,7 @@ class ModelRunner:
 
         # Model placeholders
         ph_dict = self.create_placeholders(model=model,
-                                           max_num_nodes=self.dataset.max_num_nodes,
+                                           max_num_nodes=self.dataset.num_nodes,
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
                                            max_degree=self.dataset.max_degree,
@@ -99,7 +94,7 @@ class ModelRunner:
                                                   batch_size=batch_size,
                                                   data_series=Series.TRAIN,
                                                   max_degree=self.dataset.max_degree,
-                                                  max_num_nodes=self.dataset.max_num_nodes,
+                                                  max_num_nodes=self.dataset.num_nodes,
                                                   max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
                 outputs = model.run_train_step(feed_dict=feed_dict)
@@ -126,7 +121,7 @@ class ModelRunner:
                                                   batch_size=batch_size,
                                                   data_series=Series.VALID,
                                                   max_degree=self.dataset.max_degree,
-                                                  max_num_nodes=self.dataset.max_num_nodes,
+                                                  max_num_nodes=self.dataset.num_nodes,
                                                   max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
                 outputs = model.inference(feed_dict=feed_dict)
@@ -163,7 +158,7 @@ class ModelRunner:
 
     def test(self, model_path):
         # Load Graphs
-        graphs = self.dataset.test_graphs
+        graph = self.dataset.graph_data.graph
 
         num_neighborhoods = self.params['num_neighborhoods']
 
@@ -172,7 +167,7 @@ class ModelRunner:
 
         # Model placeholders
         ph_dict = self.create_placeholders(model=model,
-                                           max_num_nodes=self.dataset.max_num_nodes,
+                                           max_num_nodes=self.dataset.num_nodes,
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
                                            max_degree=self.dataset.max_degree,
@@ -211,7 +206,7 @@ class ModelRunner:
                                               batch_size=batch_size,
                                               data_series=Series.VALID,
                                               max_degree=self.dataset.max_degree,
-                                              max_num_nodes=self.dataset.max_num_nodes,
+                                              max_num_nodes=self.dataset.num_nodes,
                                               max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
 
             start = time()
@@ -225,7 +220,6 @@ class ModelRunner:
                 index = i * batch_size + j
 
                 graph_name = batch[j].graph_name
-                graph = graphs[graph_name]
 
                 flow = outputs['flow'][j]
                 flow_cost = outputs['flow_cost'][j]
@@ -251,9 +245,9 @@ class ModelRunner:
                     prop_path = '{0}flow-prop-{1}-{2}.png'.format(model_path, graph_name, index)
                     attn_weight_path = '{0}attn-weights-{1}-{2}.png'.format(model_path, graph_name, index)
 
-                    plot_flow_graph_adj(flow_graph, use_flow_props=False, use_node_weights=False, file_path=flow_path)
-                    plot_flow_graph_adj(flow_graph, use_flow_props=True, use_node_weights=False, file_path=prop_path)
-                    
+                    plot_road_flow_graph(graph=flow_graph, field='flow', graph_name=self.params['graph_name'], file_path=flow_path)
+                    plot_road_flow_graph(graph=flow_graph, field='flow_proportion', graph_name=self.params['graph_name'], file_path=prop_path)
+
                     if 'attn_weights' in outputs:
                         attn_weights = outputs['attn_weights'][j]
                         num_nodes = batch[j].num_nodes
@@ -264,9 +258,6 @@ class ModelRunner:
 
                 # Log Outputs
                 append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
-
-                # Write output graph to Graph XML
-                nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(model_path, graph_name, index))
 
     def create_placeholders(self, model, **kwargs):
         raise NotImplementedError()

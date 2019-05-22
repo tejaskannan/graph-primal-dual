@@ -2,9 +2,10 @@ import numpy as np
 import math
 import networkx as nx
 from enum import Enum
+from os import path
 from bisect import bisect_right
 from collections.abc import Iterable
-from core.load import read, load_to_networkx
+from core.load import read, load_to_networkx, load_graph
 from utils.constants import BIG_NUMBER, WRITE_THRESHOLD
 from utils.utils import expand_sparse_matrix, deserialize_dict
 from utils.utils import create_node_embeddings, sparse_matrix_to_tensor
@@ -37,22 +38,20 @@ class Sample:
 
 class BatchSample:
 
-    def __init__(self, node_features, demands, adj_lst, adj_mat, inv_adj_lst,
-                 common_out_neighbors, neighborhoods, embeddings, num_nodes,
-                 graph_name, rev_indices, in_indices, opp_indices):
+    def __init__(self, node_features, demands, graph_data):
         self.node_features = node_features
         self.demands = demands
-        self.adj_lst = adj_lst
-        self.adj_mat = adj_mat
-        self.inv_adj_lst = inv_adj_lst
-        self.neighborhoods = neighborhoods
-        self.embeddings = embeddings
-        self.num_nodes = num_nodes
-        self.graph_name = graph_name
-        self.rev_indices = rev_indices
-        self.in_indices = in_indices
-        self.opp_indices = opp_indices
-        self.common_out_neighbors = common_out_neighbors
+        self.adj_lst = graph_data.adj_lst
+        self.adj_mat = graph_data.adj_mat
+        self.inv_adj_lst = graph_data.inv_adj_lst
+        self.neighborhoods = graph_data.neighborhoods
+        self.embeddings = graph_data.embeddings
+        self.num_nodes = graph_data.num_nodes
+        self.graph_name = graph_data.graph_name
+        self.rev_indices = graph_data.rev_indices
+        self.in_indices = graph_data.in_indices
+        self.opp_indices = graph_data.opp_indices
+        self.common_out_neighbors = graph_data.common_out_neighbors
 
 
 class GraphData:
@@ -60,6 +59,7 @@ class GraphData:
     def __init__(self, graph, graph_name, k, unique_neighborhoods):
 
         self.graph_name = graph_name
+        self.graph = graph
 
         # Fetch expanded adjacency matrix
         self.adj_mat = nx.adjacency_matrix(graph)
@@ -145,121 +145,76 @@ class DatasetManager:
 
     def __init__(self, params):
 
-        self.data_folders = {
-            Series.TRAIN: {},
-            Series.VALID: {},
-            Series.TEST: {}
-        }
-        self.num_samples = {
-            Series.TRAIN: {},
-            Series.VALID: {},
-            Series.TEST: {}
-        }
-        dataset_folder_base = 'datasets/{0}/'
-        for dataset_name, graph_name in zip(params['train_dataset_names'], params['train_graph_names']):
-            dataset_folder = dataset_folder_base.format(dataset_name)
-            self.data_folders[Series.TRAIN][graph_name] = dataset_folder + 'train'
+        self.data_folders = {}
+        self.num_samples = {}
 
-            dataset_params = deserialize_dict(dataset_folder + 'params.pkl.gz')
-            self.num_samples[Series.TRAIN][graph_name] = dataset_params['train_samples']
+        dataset_folder_base = path.join('datasets', params['dataset_name'])
+        dataset_params = deserialize_dict(path.join(dataset_folder_base, 'params.pkl.gz'))
 
-        for dataset_name, graph_name in zip(params['test_dataset_names'], params['test_graph_names']):
-            dataset_folder = dataset_folder_base.format(dataset_name)
-            self.data_folders[Series.VALID][graph_name] = dataset_folder + 'valid'
-            self.data_folders[Series.TEST][graph_name] = dataset_folder + 'test'
+        self.data_folders[Series.TRAIN] = path.join(dataset_folder_base, 'train')
+        self.num_samples[Series.TRAIN] = dataset_params['train_samples']
 
-            dataset_params = deserialize_dict(dataset_folder + 'params.pkl.gz')
-            self.num_samples[Series.VALID][graph_name] = dataset_params['valid_samples']
-            self.num_samples[Series.TEST][graph_name] = dataset_params['test_samples']
+        self.data_folders[Series.VALID] = path.join(dataset_folder_base, 'valid')
+        self.num_samples[Series.VALID] = dataset_params['valid_samples']
 
-        source_sink_dict = deserialize_dict(dataset_folder + 'sources_sinks.pkl.gz')
+        self.data_folders[Series.TEST] = path.join(dataset_folder_base, 'test')
+        self.num_samples[Series.TEST] = dataset_params['test_samples']
+
+        source_sink_dict = deserialize_dict(path.join(dataset_folder_base, 'sources_sinks.pkl.gz'))
         self.sources = source_sink_dict['sources']
         self.sinks = source_sink_dict['sinks']
 
         self.params = params
         self.dataset = {}
-        self.graph_data = {}
+        self.graph_data = None
         self.scaler = StandardScaler()
 
-    def load_graphs(self, normalize):
-        graph_path = 'graphs/{0}.tntp'
-
-        self.graph_data = {}
-
+    def load_graphs(self):
         num_neighborhoods = self.params['num_neighborhoods']
         unique_neighborhoods = self.params['unique_neighborhoods']
 
-        # Load training and test graphs from TNTP files into networkx
-        self.train_graphs = {}
-        for graph_name in self.params['train_graph_names']:
-            graph = load_to_networkx(path=graph_path.format(graph_name))
-            self.train_graphs[graph_name] = graph
+        graph = load_graph(graph_name=self.params['graph_name'])
+        self.graph_data = GraphData(graph=graph,
+                                    graph_name=self.params['graph_name'],
+                                    k=num_neighborhoods,
+                                    unique_neighborhoods=unique_neighborhoods)
 
-            if graph_name in self.graph_data:
-                continue
-            self.graph_data[graph_name] = GraphData(graph=graph,
-                                                    graph_name=graph_name,
-                                                    k=num_neighborhoods,
-                                                    unique_neighborhoods=unique_neighborhoods)
-
-        self.test_graphs = {}
-        for graph_name in self.params['test_graph_names']:
-            graph = load_to_networkx(path=graph_path.format(graph_name))
-            self.test_graphs[graph_name] = graph
-
-            if graph_name in self.graph_data:
-                continue
-            self.graph_data[graph_name] = GraphData(graph=graph,
-                                                    graph_name=graph_name,
-                                                    k=num_neighborhoods,
-                                                    unique_neighborhoods=unique_neighborhoods)
-
-        # Normalize embeddings with respect to training data
-        if normalize:
-            self.normalize_embeddings()
-
-        # Find the maximum number of nodes in all graphs
-        num_train_nodes = np.max([g.number_of_nodes() for g in self.train_graphs.values()])
-        num_test_nodes = np.max([g.number_of_nodes() for g in self.test_graphs.values()])
-        self.max_num_nodes = int(max(num_train_nodes, num_test_nodes))
+        self.num_nodes = graph.number_of_nodes()
 
         # Find the maximum outgoing degrees for each neighborhood level
-        max_degrees = np.zeros(shape=(unique_neighborhoods+1,))
-        for gd in self.graph_data.values():
-            degrees = [np.max(mat.sum(axis=-1)) for mat in gd.neighborhoods]
-            max_degrees = np.maximum(max_degrees, degrees)
-        self.max_neighborhood_degrees = max_degrees.astype(int)
+        self.max_neighborhood_degrees = [np.max(mat.sum(axis=-1)) for mat in self.graph_data.neighborhoods]
+        self.max_neighborhood_degrees = np.array(self.max_neighborhood_degrees).astype(int)
 
         # Find the maximum outgoing or incoming degree for a single vertex
-        train_out_deg = np.max([max([d for _, d in g.out_degree()]) for g in self.train_graphs.values()])
-        train_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in self.train_graphs.values()])
-
-        test_out_deg = np.max([max([d for _, d in g.out_degree()]) for g in self.test_graphs.values()])
-        test_in_deg = np.max([max([d for _, d in g.in_degree()]) for g in self.test_graphs.values()])
-        self.max_degree = int(max(max(train_out_deg, train_in_deg), max(test_out_deg, test_in_deg)))
+        max_out_deg = np.max([d for _, d in graph.out_degree()])
+        max_in_deg = np.max([d for _, d in graph.in_degree()])
+        self.max_degree = int(max(max_out_deg, max_in_deg))
 
         # Expand graph data to ensure consistent sizing
-        for gd in self.graph_data.values():
-            gd.adj_lst = pad_adj_list(adj_lst=gd.adj_lst,
-                                      max_degree=self.max_degree,
-                                      max_num_nodes=self.max_num_nodes,
-                                      mask_number=gd.num_nodes)
-            gd.set_edge_indices(adj_lst=gd.adj_lst,
-                                max_degree=self.max_degree,
-                                max_num_nodes=self.max_num_nodes)
+        self.graph_data.adj_lst = pad_adj_list(adj_lst=self.graph_data.adj_lst,
+                                               max_degree=self.max_degree,
+                                               max_num_nodes=self.num_nodes,
+                                               mask_number=self.graph_data.num_nodes)
 
-            gd.common_out_neighbors = pad_adj_list(adj_lst=gd.common_out_neighbors,
-                                                   max_degree=2 * self.max_degree,
-                                                   max_num_nodes=self.max_num_nodes,
-                                                   mask_number=gd.num_nodes)
+        self.graph_data.set_edge_indices(adj_lst=self.graph_data.adj_lst,
+                                         max_degree=self.max_degree,
+                                         max_num_nodes=self.num_nodes)
 
-            gd.adj_mat = expand_sparse_matrix(gd.adj_mat, n=self.max_num_nodes)
-            gd.embeddings = expand_matrix(gd.embeddings, n=self.max_num_nodes,
-                                          m=gd.embeddings.shape[1])
-            gd.neighborhoods = neighborhood_adj_lists(neighborhoods=gd.neighborhoods,
-                                                      max_degrees=self.max_neighborhood_degrees,
-                                                      max_num_nodes=self.max_num_nodes,
-                                                      mask_number=gd.num_nodes)
+        self.graph_data.common_out_neighbors = pad_adj_list(adj_lst=self.graph_data.common_out_neighbors,
+                                                            max_degree=2*self.max_degree,
+                                                            max_num_nodes=self.num_nodes,
+                                                            mask_number=self.graph_data.num_nodes)
+
+        self.graph_data.adj_mat = expand_sparse_matrix(self.graph_data.adj_mat, n=self.num_nodes)
+
+        self.graph_data.embeddings = expand_matrix(self.graph_data.embeddings,
+                                                   n=self.num_nodes,
+                                                   m=self.graph_data.embeddings.shape[1])
+
+        self.graph_data.neighborhoods = neighborhood_adj_lists(neighborhoods=self.graph_data.neighborhoods,
+                                                  max_degrees=self.max_neighborhood_degrees,
+                                                  max_num_nodes=self.num_nodes,
+                                                  mask_number=self.graph_data.num_nodes)
 
     def load(self, series):
         assert series is not None
@@ -267,28 +222,26 @@ class DatasetManager:
         if series not in self.dataset:
             self.dataset[series] = []
 
-        for graph_name, folder in self.data_folders[series].items():
+        graph_name = self.params['graph_name']
+        folder = self.data_folders[series]
+        num_samples = self.num_samples[series]
+        num_files = int(math.ceil(num_samples / WRITE_THRESHOLD))
 
-            num_samples = self.num_samples[series][graph_name]
-            num_files = int(math.ceil(num_samples / WRITE_THRESHOLD))
+        print('Started loading {0} {1} samples for graph {2}.'.format(num_samples, series.name, graph_name))
 
-            print('Started loading {0} {1} samples for graph {2}.'.format(num_samples, series.name, graph_name))
+        for file_index in range(num_files):
+            # Load demands as Sparse CSR matrices to save memory.
+            demands = read(folder=folder,
+                           file_index=file_index,
+                           sources=self.sources,
+                           sinks=self.sinks,
+                           num_nodes=self.num_nodes)
 
-            for file_index in range(num_files):
-                num_nodes = self.graph_data[graph_name].num_nodes
+            self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.num_nodes)
+                                     for demand in demands]
 
-                # Load demands as Sparse CSR matrices to save memory.
-                demands = read(folder=folder,
-                               file_index=file_index,
-                               sources=self.sources,
-                               sinks=self.sinks,
-                               num_nodes=num_nodes)
-
-                self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.max_num_nodes)
-                                         for demand in demands]
-
-            assert len(self.dataset[series]) == num_samples
-            print('Completed loading graph {0} for {1}.'.format(graph_name, series.name))
+        assert len(self.dataset[series]) == num_samples
+        print('Completed loading graph {0} for {1}.'.format(graph_name, series.name))
 
     def create_batches(self, series, batch_size, shuffle):
         """
@@ -304,23 +257,11 @@ class DatasetManager:
 
             batch = []
             for sample in batch_data:
-                gd = self.graph_data[sample.graph_name]
-
                 demands = sample.demands.todense()
                 node_features = demands_to_features(demands)
                 b = BatchSample(node_features=node_features,
                                 demands=demands,
-                                adj_lst=gd.adj_lst,
-                                adj_mat=gd.adj_mat,
-                                inv_adj_lst=gd.inv_adj_lst,
-                                neighborhoods=gd.neighborhoods,
-                                embeddings=gd.embeddings,
-                                num_nodes=gd.num_nodes,
-                                graph_name=gd.graph_name,
-                                rev_indices=gd.rev_indices,
-                                in_indices=gd.in_indices,
-                                opp_indices=gd.opp_indices,
-                                common_out_neighbors=gd.common_out_neighbors)
+                                graph_data=self.graph_data)
                 batch.append(b)
 
             yield batch
@@ -375,23 +316,11 @@ class DatasetManager:
 
             sample = self.dataset[Series.TRAIN][data_index]
 
-            gd = self.graph_data[sample.graph_name]
-
             demands = sample.demands.todense()
             node_features = demands_to_features(demands)
             b = BatchSample(node_features=node_features,
                             demands=demands,
-                            adj_lst=gd.adj_lst,
-                            adj_mat=gd.adj_mat,
-                            inv_adj_lst=gd.inv_adj_lst,
-                            neighborhoods=gd.neighborhoods,
-                            embeddings=gd.embeddings,
-                            num_nodes=gd.num_nodes,
-                            graph_name=gd.graph_name,
-                            rev_indices=gd.rev_indices,
-                            in_indices=gd.in_indices,
-                            opp_indices=gd.opp_indices,
-                            common_out_neighbors=gd.common_out_neighbors)
+                            graph_data=self.graph_data)
             batch.append(b)
             indices.append(index)
 
@@ -447,4 +376,4 @@ class DatasetManager:
             self.graph_data[graph_name].embeddings = transformed_embeddings
 
     def num_batches(self, series, batch_size):
-        return int(sum(self.num_samples[series].values()) / batch_size)
+        return int(self.num_samples[series] / batch_size)
