@@ -7,12 +7,20 @@ from os import path
 from os import mkdir
 from utils.constants import SMALL_NUMBER
 from utils.utils import serialize_dict, deserialize_dict, append_row_to_log
+from utils.utils import delete_if_exists
 from core.plot import plot_road_graph
 from annoy import AnnoyIndex
 
 
-def save_graph(place_name, graph_name):
-    graph = ox.graph_from_place(place_name, network_type='drive')
+def save_graph(target, graph_name, distance=1000, is_address=True):
+
+    # Load graph from OSM
+    if is_address:
+        graph = ox.graph_from_address(address=target, distance=distance, network_type='drive')
+    else:
+        graph = ox.graph_from_place(query=target, network_type='drive')
+    
+    # Project graph
     graph_proj = ox.project_graph(graph)
 
     folder_path = path.join('graphs', graph_name)
@@ -31,8 +39,7 @@ def save_graph(place_name, graph_name):
 
     # Save a selection of graph-wide stats.
     stats_file = path.join(folder_path, 'stats.csv')
-    if path.exists(stats_file):
-        return
+    delete_if_exists(stats_file)
 
     n_nodes = graph_component.number_of_nodes()
     n_edges = graph_component.number_of_edges()
@@ -45,6 +52,8 @@ def save_graph(place_name, graph_name):
     append_row_to_log(['Average In Degree', avg_in_deg], stats_file)
     append_row_to_log(['Average Out Degree', avg_out_deg], stats_file)
     append_row_to_log(['Diameter', diam], stats_file)
+
+    return graph_component
 
 
 def load_graph(graph_name):

@@ -8,8 +8,9 @@ from utils.utils import load_params, restore_params, create_node_embeddings
 from utils.utils import append_row_to_log, create_demands, file_index, find_max_sources_sinks
 from utils.utils import create_capacities, delete_if_exists, serialize_dict
 from utils.graph_utils import random_walk_neighborhoods, simple_paths
+from utils.graph_utils import random_sources_sinks, farthest_nodes, farthest_sink_nodes
 from utils.constants import *
-from core.load import load_to_networkx, load_embeddings, write, load_trips
+from core.load import load_to_networkx, load_embeddings, write, load_trips, save_graph, load_graph
 from core.plot import plot_graph
 from model_runners.dense_baseline import DenseBaseline
 from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
@@ -76,68 +77,71 @@ def main():
 
 
 def generate(params):
-    assert len(params['graph_names']) == len(params['dataset_names'])
 
-    for graph_name, dataset_name in zip(params['graph_names'], params['dataset_names']):
-        # Load graph
-        graph_path = 'graphs/{0}.tntp'.format(graph_name)
-        graph = load_to_networkx(path=graph_path)
+    graph_name = params['graph_name']
+    graph_folder = os.path.join('graphs', graph_name)
 
-        dataset_folder = 'datasets/{0}/'.format(dataset_name)
+    # Fetch graph for the given query and save it if necessary
+    if not os.path.exists(graph_folder):
+        target = params['osm_query']
+        distance = params.get('distance', 1000)
+        is_address = params['is_address']
+        graph = save_graph(target=target, graph_name=graph_name, distance=distance, is_address=is_address)
+    else:
+        graph = load_graph(graph_name=graph_name)
 
-        if not os.path.exists(dataset_folder):
-            os.mkdir(dataset_folder)
+    dataset_name = params['dataset_name']
+    dataset_folder = os.path.join('datasets', dataset_name)
 
-        # Save parameters
-        serialize_dict(dictionary=params, file_path=dataset_folder + 'params.pkl.gz')
+    if not os.path.exists(dataset_folder):
+        os.mkdir(dataset_folder)
 
-        # Find and save paths between sources and sinks
-        trips_path = 'graphs/trips/{0}_trips.tntp'.format(graph_name)
-        trips = load_trips(path=trips_path, num_nodes=graph.number_of_nodes())
-        sources, sinks = find_max_sources_sinks(trips=trips,
-                                                num_sources=params['num_sources'],
-                                                num_sinks=params['num_sinks'])
-        source_sink_dict = {
-            'sources': sources,
-            'sinks': sinks
-        }
-        serialize_dict(dictionary=source_sink_dict, file_path=dataset_folder + 'sources_sinks.pkl.gz')
+    # Save parameters
+    serialize_dict(dictionary=params, file_path=os.path.join(dataset_folder, 'params.pkl.gz'))
 
-        paths_file = dataset_folder + 'paths.pkl.gz'
-        if not os.path.exists(paths_file):
-            paths = simple_paths(graph=graph, sources=sources, sinks=sinks, max_num_paths=params['max_num_paths'])
-            serialize_dict(dictionary=paths, file_path=paths_file)
+    # Generate and save sources and sinks
+    if params['source_sink_strategy'] == 'random':
+        sources, sinks = random_sources_sinks(graph, num_sources=params['num_sources'], num_sinks=params['num_sinks'])
+    elif params['source_sink_strategy'] == 'farthest_sink':
+        sources, sinks = farthest_sink_nodes(graph, num_sources=params['num_sources'], num_sinks=params['num_sinks'])
+    else:
+        sources, sinks = farthest_nodes(graph, num_sources=params['num_sources'], num_sinks=params['num_sinks'])
+    
+    source_sink_dict = {
+        'sources': sources,
+        'sinks': sinks
+    }
+    serialize_dict(dictionary=source_sink_dict, file_path=os.path.join(dataset_folder, 'sources_sinks.pkl.gz'))
 
-        file_paths = ['train', 'valid', 'test']
-        samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
-        for file_path, num_samples in zip(file_paths, samples):
+    # Generate and save paths between sources and sinks
+    paths = simple_paths(graph=graph, sources=sources, sinks=sinks, max_num_paths=params['max_num_paths'])
+    serialize_dict(dictionary=paths, file_path=os.path.join(dataset_folder, 'paths.pkl.gz'))
 
-            # Create folder to put this data series in
-            series_folder = dataset_folder + file_path
-            if not os.path.exists(series_folder):
-                os.mkdir(series_folder)
-            
-            # Create new file if there is an existing dataset with this name
-            delete_if_exists(file_path)
-            
-            dataset = []
-            for i in range(num_samples):
-                source_demands, sink_demands = create_demands(sources=sources, sinks=sinks)
+    file_paths = ['train', 'valid', 'test']
+    samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
+    for file_path, num_samples in zip(file_paths, samples):
 
-                # cap = create_capacities(graph=graph, demands=d)
+        # Create folder to put this data series in
+        series_folder = os.path.join(dataset_folder, file_path)
+        if not os.path.exists(series_folder):
+            os.mkdir(series_folder)
+        
+        dataset = []
+        for i in range(num_samples):
+            source_demands, sink_demands = create_demands(sources=sources, sinks=sinks)
 
-                dataset.append((source_demands, sink_demands))
+            dataset.append((source_demands, sink_demands))
 
-                if (i+1) % WRITE_THRESHOLD == 0:
-                    index, _ = file_index(i)
-                    write(dataset=dataset, folder=series_folder, index=index)
-                    print('Completed {0}/{1} samples for {2}.'.format(i+1, num_samples, file_path))
-                    dataset = []
-
-            if len(dataset) > 0:
+            if (i+1) % WRITE_THRESHOLD == 0:
                 index, _ = file_index(i)
                 write(dataset=dataset, folder=series_folder, index=index)
-            print('Completed {0}.'.format(file_path))
+                print('Completed {0}/{1} samples for {2}.'.format(i+1, num_samples, file_path))
+                dataset = []
+
+        if len(dataset) > 0:
+            index, _ = file_index(i)
+            write(dataset=dataset, folder=series_folder, index=index)
+        print('Completed {0}.'.format(file_path))
 
 
 def get_model_runner(params):

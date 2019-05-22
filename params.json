@@ -1,12 +1,16 @@
 {
 	"generate": {
-		"train_samples": 25000,
+		"train_samples": 1000,
 		"valid_samples": 1000,
 		"test_samples": 1000,
-		"graph_names": ["sioux-falls"],
-		"dataset_names": ["sioux-falls-25000"],
+		"graph_name": "cambridge-pembroke",
+		"osm_query":  "Pembroke College, Cambridge, United Kingdom",
+		"distance": 500,
+		"is_address": true,
+		"dataset_name": "cambridge-pembroke-dist-500-samples-1000",
 		"num_sources": 5,
 		"num_sinks": 5,
+		"source_sink_strategy": "farthest_sink",
 		"max_num_paths": 10
 	},
 	"model": {

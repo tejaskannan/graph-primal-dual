@@ -3,6 +3,7 @@ import networkx as nx
 import scipy.sparse as sp
 import itertools
 from joblib import Parallel, delayed
+from utils.constants import BIG_NUMBER
 
 
 def add_features(graph, node_features, edge_features):
@@ -146,3 +147,66 @@ def simple_paths(graph, sources, sinks, max_num_paths):
         all_paths.update(paths)
 
     return all_paths
+
+
+def random_sources_sinks(graph, num_sources, num_sinks):
+    nodes = np.random.choice(a=list(graph.nodes()), size=num_sources+num_sinks, replace=False)
+    return nodes[:num_sources], nodes[num_sources:]
+
+
+def farthest_nodes(graph, num_sources, num_sinks):
+    """
+    Returns a list of sources and sinks in which the total distance between all nodes
+    is maximizes. Distance refers to unweighted shortest path length.
+    """
+    n_nodes = graph.number_of_nodes()
+    start = np.random.randint(low=0, high=n_nodes)
+    nodes = [start]
+
+    lengths = {}
+    threshold = min(n_nodes, num_sources + num_sinks)
+    while len(nodes) < threshold:
+
+        max_node = None
+        max_len = -BIG_NUMBER
+        for u in graph.nodes():
+
+            min_len = BIG_NUMBER
+            for v in nodes:
+                if (u, v) in lengths:
+                    length = lengths[(u, v)]
+                elif (v, u) in lengths:
+                    length = lengths[(v, u)]
+                else:
+                    path_length = nx.shortest_path_length(graph, source=u, target=v)
+                    lengths[(u, v)] = path_length
+                    length = path_length
+                min_len = min(min_len, length)
+                
+            if min_len > max_len:
+                max_len = min_len
+                max_node = u
+
+        nodes.append(max_node)
+
+    return nodes[:num_sources], nodes[num_sources:]
+
+
+def farthest_sink_nodes(graph, num_sources, num_sinks):
+    """
+    Generates sources and sinks such that the sinks are as far as possible from the randomly
+    generated source nodes. Differs from the function 'farthest nodes' by not enforcing
+    a large pairwise distance between sources (or sinks) themselves.
+    """
+
+    sources = np.random.choice(a=list(graph.nodes()), replace=False, size=num_sources)
+    
+    node_distances = []
+    for u in graph.nodes():
+        distances = [nx.shortest_path_length(graph, source=u, target=v) for v in sources]
+        node_distances.append(distances)
+
+    min_distances = np.amin(a=node_distances, axis=-1)
+    sinks = np.argsort(-min_distances)[:num_sinks]
+
+    return sources, sinks
