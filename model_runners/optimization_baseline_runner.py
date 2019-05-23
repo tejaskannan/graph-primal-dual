@@ -5,8 +5,8 @@ import networkx as nx
 from time import time
 from models.optimization_models import TrustConstr, SLSQP
 from utils.utils import features_to_demands, append_row_to_log
-from utils.constants import PARAMS_FILE
-from core.plot import plot_flow_graph
+from utils.constants import PARAMS_FILE, WRITE_THRESHOLD
+from core.plot import plot_road_flow_graph
 from core.dataset import DatasetManager, Series
 from os import mkdir
 from os.path import exists
@@ -17,13 +17,13 @@ class OptimizationBaselineRunner:
     def __init__(self, params, optimizer_name):
         self.params = params
 
-        self.graph_name = params['test_graph_names'][0]
+        self.graph_name = params['graph_name']
 
         cost_fn_name = params['cost_fn']['name']
         self.output_folder = '{0}/{1}-{2}-{3}/'.format(params['output_folder'], optimizer_name, self.graph_name, cost_fn_name)
 
         self.dataset = DatasetManager(params=params)
-        self.dataset.load_graphs(normalize=False)
+        self.dataset.load_graphs()
 
         assert optimizer_name == 'trust_constr' or optimizer_name == 'slsqp', 'Invalid Optimizer {0}'.format(optimizer_name)
         if optimizer_name == 'trust_constr':
@@ -35,7 +35,7 @@ class OptimizationBaselineRunner:
         if not exists(self.output_folder):
             mkdir(self.output_folder)
 
-        test_graph = self.dataset.test_graphs[self.graph_name]
+        test_graph = self.dataset.graph_data.graph
 
         cost_headers = ['Index', 'Graph', 'Cost', 'Time (sec)']
         costs_path = self.output_folder + 'costs.csv'
@@ -71,11 +71,17 @@ class OptimizationBaselineRunner:
             for i, node in enumerate(test_graph.nodes()):
                 flow_graph.add_node(node, demand=float(demands[i]))
 
-            if self.params['plot_flows'] and index in plot_indices:
-                plot_flow_graph(flow_graph, flow_mat, '{0}flows-{1}-{2}.png'.format(self.output_folder, self.graph_name, index),
-                                use_node_weights=False)
+            for src, dst, key in flow_graph.edges(keys=True, data=False):
+                flow_graph.add_edge(src, dst, key=key, flow=flow_mat[src, dst])
 
-            nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, self.graph_name, index))
+            if self.params['plot_flows'] and index in plot_indices:
+                file_path = '{0}flows-{1}-{2}.png'.format(self.output_folder, self.graph_name, index)
+                plot_road_flow_graph(flow_graph, graph_name=self.params['graph_title'], field='flow', file_path=file_path)
+
+            if (index + 1) % WRITE_THRESHOLD == 0:
+                print('Completed {0} instances.'.format(index + 1))
+
+            # nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, self.graph_name, index))
 
     def _flow_matrix(self, graph, flows):
         num_nodes = graph.number_of_nodes()
