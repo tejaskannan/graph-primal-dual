@@ -302,7 +302,15 @@ class DirectionalGAT(Layer):
             softmax_mask = -BIG_NUMBER * mask
 
             # Include initial states
-            gathered_inputs = zero_mask * (gathered_inputs + initial_states)
+            combined_states = gathered_inputs + initial_states
+
+            edge_lengths = kwargs.get('edge_lengths', None)
+            if edge_lengths is not None:
+                # B x V x D x 1
+                edge_lengths = tf.expand_dims(edge_lengths, axis=-1)
+                combined_states = tf.concat([combined_states, edge_lengths], axis=-1)
+
+            gathered_inputs = zero_mask * combined_states
 
             # Apply weight matrix to the set of inputs, B x V x D x F Tensor
             input_mlp = MLP(hidden_sizes=[],

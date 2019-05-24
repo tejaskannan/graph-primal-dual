@@ -99,12 +99,15 @@ class DirectionalModel(Model):
                 # B x V x D x F tensor containing directional state representations
                 node_encoding = initial_encoding
 
+                edge_features = norm_edge_lengths if self.use_edge_lengths else None
+
                 # Combine message passing steps
                 for _ in range(self.params['graph_layers']):
                     next_encoding = node_agg(inputs=node_encoding,
                                              adj_lst=adj_lst,
                                              mask_index=num_nodes,
                                              mask=mask,
+                                             edge_lengths=edge_features,
                                              initial_states=initial_encoding,
                                              weight_dropout_keep=dropout_keep_prob,
                                              attn_dropout_keep=dropout_keep_prob)

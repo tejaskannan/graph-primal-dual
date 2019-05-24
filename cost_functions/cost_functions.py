@@ -20,14 +20,15 @@ class CostFunction:
 
 class CostFunctionWithEdges:
 
-    def __init__(self, cost_fn):
+    def __init__(self, cost_fn, factor):
         self.cost_fn = cost_fn
+        self.factor = factor
 
     def apply(self, x, edges):
-        return self.cost_fn.apply(x) + edges * x
+        return self.cost_fn.apply(x) + self.factor * edges * x
 
     def derivative(self, x, edges):
-        return self.cost_fn.derivative(x) + edges
+        return self.cost_fn.derivative(x) + self.factor * edges
 
 
 class Linear(CostFunction):
@@ -226,5 +227,5 @@ def get_cost_function(cost_fn):
         return None
 
     if cost_fn['use_edges']:
-        return CostFunctionWithEdges(cost_fn=fn)
+        return CostFunctionWithEdges(cost_fn=fn, factor=cost_fn['edge_factor'])
     return fn
