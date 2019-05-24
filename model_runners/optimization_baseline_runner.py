@@ -53,16 +53,19 @@ class OptimizationBaselineRunner:
         step = int(1.0 / self.params['plot_fraction'])
         plot_indices = set(range(0, len(test_samples), step))
 
+        initial = None
+
         for index, sample in enumerate(test_samples):
             demands = np.array(sample.demands.todense())
             demands = np.reshape(demands, newshape=(demands.shape[0],))
 
             start = time()
-            flows_per_iter, result = self.optimizer.optimize(graph=test_graph, demands=demands)
+            flows_per_iter, result = self.optimizer.optimize(graph=test_graph, demands=demands, initial=initial)
             end = time()
 
             flows = flows_per_iter[-1]
             flow_mat = self._flow_matrix(test_graph, flows)
+            initial = flows
 
             append_row_to_log([index, self.graph_name, result.fun, end - start], costs_path)
 
@@ -75,7 +78,7 @@ class OptimizationBaselineRunner:
                 flow_graph.add_edge(src, dst, key=key, flow=flow_mat[src, dst])
 
             if self.params['plot_flows'] and index in plot_indices:
-                file_path = '{0}flows-{1}-{2}.png'.format(self.output_folder, self.graph_name, index)
+                file_path = '{0}flows-{1}-{2}'.format(self.output_folder, self.graph_name, index)
                 plot_road_flow_graph(flow_graph, graph_name=self.params['graph_title'], field='flow', file_path=file_path)
 
             if (index + 1) % WRITE_THRESHOLD == 0:

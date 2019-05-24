@@ -10,7 +10,7 @@ class OptimizeBaseline:
         self.threshold = params['early_stop_threshold']
         self.cost_fn = get_cost_function(params['cost_fn'])
 
-    def optimize(self, graph):
+    def optimize(self, graph, demands, initial):
         raise NotImplementedError()
 
     # Returns the constraint which enforces that solutions are flow
@@ -37,13 +37,13 @@ class OptimizeBaseline:
 
 class TrustConstr(OptimizeBaseline):
 
-    def optimize(self, graph, demands):
+    def optimize(self, graph, demands, initial=None):
         options = {
             'maxiter': self.max_iters,
             'factorization_method': 'SVDFactorization'
         }
 
-        initial = np.zeros(shape=(graph.number_of_edges(),), dtype=float)
+        initial = initial if initial is not None else np.zeros(shape=(graph.number_of_edges(),), dtype=float)
         bounds = optimize.Bounds(lb=0, ub=np.inf)
         constraint = self._constraint(graph, demands)
 
@@ -69,13 +69,13 @@ class TrustConstr(OptimizeBaseline):
 
 class SLSQP(OptimizeBaseline):
 
-    def optimize(self, graph, demands):
+    def optimize(self, graph, demands, initial):
         options = {
             'maxiter': self.max_iters,
             'ftol': self.threshold
         }
 
-        initial = np.zeros(shape=(graph.number_of_edges(),), dtype=float)
+        initial = initial if initial is not None else np.zeros(shape=(graph.number_of_edges(),), dtype=float)
         bounds = optimize.Bounds(lb=0, ub=np.inf)
         constraint = self._constraint(graph, demands, as_dict=True)
 
