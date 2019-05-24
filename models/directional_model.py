@@ -12,6 +12,7 @@ class DirectionalModel(Model):
     def __init__(self, params, name='directional-model'):
         super(DirectionalModel, self).__init__(params, name)
         self.cost_fn = get_cost_function(cost_fn=params['cost_fn'])
+        self.use_edge_lengths = params['cost_fn']['use_edges']
 
     def build(self, **kwargs):
 
@@ -26,6 +27,12 @@ class DirectionalModel(Model):
 
         # B x V x D tensor containing padded inverse adjacency list
         inv_adj_lst = kwargs['inv_adj_lst']
+
+        # B x V x D tensor with edge lengths
+        edge_lengths = kwargs['edge_lengths']
+
+        # B x V x D tensor with normalized edge lengths
+        norm_edge_lengths = kwargs['norm_edge_lengths']
 
         # B*V*D x 3 tensor containing 3D indices used to compute inflow
         in_indices = kwargs['in_indices']
@@ -144,7 +151,8 @@ class DirectionalModel(Model):
                                          in_indices=in_indices,
                                          max_iters=self.params['flow_iters'])
 
-                flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
+                cost_tensor = self.cost_fn.apply(flow, edge_lengths) if self.use_edge_lengths else self.cost_fn.apply(flow)
+                flow_cost = tf.reduce_sum(cost_tensor, axis=[1, 2])
 
                 # Sum all directional states to get the final node state to compute dual variables
                 # This tensor is B x V x F
@@ -177,12 +185,20 @@ class DirectionalModel(Model):
                 dual_flows = dual_flow(dual_diff=dual_diff,
                                        adj_mask=mask,
                                        cost_fn=self.cost_fn,
+                                       edge_lengths=edge_lengths,
+                                       should_use_edges=self.use_edge_lengths,
                                        step_size=self.params['dual_step_size'],
                                        momentum=self.params['dual_momentum'],
                                        max_iters=self.params['dual_iters'])
 
                 dual_demand = tf.reduce_sum(dual_vars * demands, axis=[1, 2])
-                dual_flow_cost = self.cost_fn.apply(dual_flows) + dual_diff * dual_flows
+
+                if self.use_edge_lengths:
+                    dual_flow_cost = self.cost_fn.apply(dual_flows, edge_lengths)
+                else:
+                    dual_flow_cost = self.cost_fn.apply(dual_flows)
+
+                dual_flow_cost += dual_diff * dual_flows
                 dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
                 self.loss = flow_cost - dual_cost

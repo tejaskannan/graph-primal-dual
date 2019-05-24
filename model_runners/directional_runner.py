@@ -63,12 +63,22 @@ class DirectionalRunner(ModelRunner):
                                                 shape=num_nodes_shape,
                                                 name='num-nodes-ph',
                                                 is_sparse=False)
+        edge_lengths_ph = model.create_placeholder(dtype=tf.float32,
+                                                   shape=adj_shape,
+                                                   name='edge-lengths-ph',
+                                                   is_sparse=False)
+        norm_edge_lengths_ph = model.create_placeholder(dtype=tf.float32,
+                                                        shape=adj_shape,
+                                                        name='norm-edge-lengths-ph',
+                                                        is_sparse=False)
 
         return {
             'node_features': node_ph,
             'demands': demands_ph,
             'adj_lst': adj_ph,
             'inv_adj_lst': inv_adj_ph,
+            'edge_lengths': edge_lengths_ph,
+            'norm_edge_lengths': norm_edge_lengths_ph,
             'in_indices': in_indices_ph,
             'rev_indices': rev_indices_ph,
             'opp_indices': opp_indices_ph,
@@ -89,6 +99,8 @@ class DirectionalRunner(ModelRunner):
         adj_lsts = np.array([sample.adj_lst for sample in batch])
         inv_adj_lsts = np.array([sample.inv_adj_lst for sample in batch])
         num_nodes = np.array([sample.num_nodes for sample in batch])
+        edge_lengths = np.array([sample.edge_lengths for sample in batch])
+        norm_edge_lengths = np.array([sample.normalized_edge_lengths for sample in batch])
         dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
 
         # 3D indexing used for flow computation and correction
@@ -113,6 +125,8 @@ class DirectionalRunner(ModelRunner):
             placeholders['demands']: demands,
             placeholders['adj_lst']: adj_lsts,
             placeholders['inv_adj_lst']: inv_adj_lsts,
+            placeholders['edge_lengths']: edge_lengths,
+            placeholders['norm_edge_lengths']: norm_edge_lengths,
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['in_indices']: in_indices,
