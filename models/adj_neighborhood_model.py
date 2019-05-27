@@ -1,7 +1,7 @@
 import tensorflow as tf
 from models.base_model import Model
 from core.layers import MLP, AdjGAT, GRU, AttentionNeighborhood, SparseMax
-from utils.constants import BIG_NUMBER, SMALL_NUMBER
+from utils.constants import BIG_NUMBER, SMALL_NUMBER, FLOW_THRESHOLD
 from utils.tf_utils import masked_gather
 from utils.flow_utils import mcf_solver, dual_flow, destination_attn
 from cost_functions.cost_functions import get_cost_function
@@ -215,7 +215,12 @@ class AdjModel(Model):
                 dual_flow_cost += dual_diff * dual_flows
                 dual_cost = tf.reduce_sum(dual_flow_cost, axis=[1, 2]) - dual_demand
 
-                self.loss = flow_cost - dual_cost
+                # Add a regularizer to penalize incentivize the model to produce a tree
+                nonzero_prop = tf.cast(normalized_weights > FLOW_THRESHOLD, dtype=tf.int32)
+                nonzero_reg = tf.expand_dims(tf.reduce_sum(nonzero_prop, axis=[1, 2]), axis=-1) / num_nodes
+                nonzero_reg = tf.cast(tf.squeeze(nonzero_reg, axis=-1), dtype=tf.float32)
+
+                self.loss = (flow_cost - dual_cost) + 0.1 * tf.square(nonzero_reg - 1)
                 self.loss_op = tf.reduce_mean(self.loss)
 
                 # Named outputs
@@ -225,5 +230,6 @@ class AdjModel(Model):
                 self.output_ops['dual_cost'] = dual_cost
                 self.output_ops['pred_weights'] = pred_weights
                 self.output_ops['attn_weights'] = attn_weights
+                self.output_ops['nonzero'] = nonzero_prop
 
                 self.optimizer_op = self._build_optimizer_op()

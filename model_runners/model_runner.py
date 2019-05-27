@@ -226,6 +226,9 @@ class ModelRunner:
                 pred_weights = outputs['normalized_weights'][j]
                 dual_cost = outputs['dual_cost'][j]
 
+                print(pred_weights)
+                print(outputs['nonzero'][j])
+
                 demands = np.array(batch[j].demands)
 
                 node_features = {
