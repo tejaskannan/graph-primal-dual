@@ -1,5 +1,5 @@
 import tensorflow as tf
-from utils.constants import BIG_NUMBER, FLOW_THRESHOLD
+from utils.constants import BIG_NUMBER, FLOW_THRESHOLD, SMALL_NUMBER
 from utils.tf_utils import masked_gather
 
 
@@ -32,6 +32,58 @@ def mcf_solver(pred_weights, demand, in_indices, max_iters, name='mcf-solver'):
 
     # Iteratively computes flows from flow proportions
     flow = tf.zeros_like(pred_weights, dtype=tf.float32)
+    prev_flow = flow + BIG_NUMBER
+    shape_invariants = [flow.get_shape(), prev_flow.get_shape()]
+    flow, pflow = tf.while_loop(cond=cond,
+                                body=body,
+                                loop_vars=[flow, prev_flow],
+                                parallel_iterations=1,
+                                shape_invariants=shape_invariants,
+                                maximum_iterations=max_iters,
+                                name='{0}-while-loop'.format(name))
+    return flow, pflow
+
+
+def directional_mcf_solver(pred_weights, demand, in_indices, num_in_neighbors, max_iters, name='dir-mcf-solver'):
+    """
+    pred_weights: B x V x D x D tensor
+    demand: B x V x 1 tensor
+    in_indices: B*V*D x 3 tensor
+    num_in_neighbors: B x V x 1 tensor
+
+    Returns: B x V x D tensor containing flow volumes
+    """
+    in_neighbors = tf.reciprocal(tf.expand_dims(num_in_neighbors, axis=-1) + SMALL_NUMBER)
+    demand_expanded = tf.expand_dims(demand, axis=-1)
+    demand_tiled = tf.tile(demand, multiples=(1, 1, tf.shape(pred_weights)[2]))
+
+    def body(flow, prev_flow):
+        # Get incoming flows, B * V * D x 1  tensor
+        inflow = tf.gather_nd(flow, in_indices)
+        inflow = tf.reshape(inflow, tf.shape(pred_weights)[0:3])
+
+        # B x V x D x 1
+        in_out_flow = tf.expand_dims(inflow, axis=-1)
+
+        # B x V x 1
+        total_inflow = tf.reduce_sum(inflow, axis=-1, keepdims=True)
+        inflow_tiled = tf.tile(total_inflow, multiples=(1, 1, tf.shape(demand_tiled)[-1]))
+
+        # Adjust flow by demand, B x V x D x D tensor
+        adjusted_flow = pred_weights * (in_out_flow - demand_expanded * in_neighbors)
+
+        # Determine outgoing flows using computed weights, B x V x D tensor
+        next_flow = tf.where(inflow_tiled > demand_tiled,
+                            x=tf.reduce_sum(adjusted_flow, axis=-2),
+                            y=tf.zeros_like(prev_flow))
+
+        return [next_flow, flow]
+
+    def cond(flow, prev_flow):
+        return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
+
+    # Iteratively computes flows from flow proportions
+    flow = tf.zeros(shape=tf.shape(pred_weights)[0:3], dtype=tf.float32)
     prev_flow = flow + BIG_NUMBER
     shape_invariants = [flow.get_shape(), prev_flow.get_shape()]
     flow, pflow = tf.while_loop(cond=cond,
