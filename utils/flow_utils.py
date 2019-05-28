@@ -98,34 +98,65 @@ def directional_mcf_solver(pred_weights, demand, in_indices, num_in_neighbors, m
 
 def dual_flow(dual_diff, adj_mask, cost_fn, edge_lengths, should_use_edges, step_size, momentum, max_iters, name='dual-flow'):
 
-    def body(flow, acc, prev_flow):
-        momentum_acc = momentum * acc
-        predicted = tf.nn.relu(adj_mask * (flow - momentum_acc))
-
+    def body(idx, flow, moving_avg, prev_flow):
+        # RMSProp Step
         if should_use_edges:
-            derivative = cost_fn.derivative(predicted, edge_lengths) + dual_diff
+            derivative = cost_fn.derivative(flow, edge_lengths) + dual_diff
         else:
-            derivative = cost_fn.derivative(predicted) + dual_diff
+            derivative = cost_fn.derivative(flow) + dual_diff
 
-        next_acc = momentum_acc + step_size * derivative
-        next_flow = tf.nn.relu(adj_mask * (flow - next_acc))
-        return [next_flow, next_acc, flow]
+        next_avg = momentum * moving_avg + (1.0 - momentum) * tf.square(derivative)
+        next_flow = flow - (step_size / (tf.sqrt(next_avg) + SMALL_NUMBER)) * derivative
+        next_flow = tf.nn.relu(adj_mask * next_flow)
+        return [idx + 1, next_flow, next_avg, flow]
 
-    def cond(flow, momentum, prev_flow):
+    def cond(idx, flow, moving_avg, prev_flow):
         return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
 
+    idx = tf.constant(0, dtype=tf.int32)
     dual_flows = tf.nn.relu(adj_mask * dual_diff)
-    acc = tf.zeros_like(dual_diff, dtype=tf.float32)
+    moving_avg = tf.fill(dims=tf.shape(dual_flows), value=0.1)
     prev_dual_flows = dual_flows + BIG_NUMBER
-    shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
-    dual_flows, _, pflow = tf.while_loop(cond, body,
-                                     loop_vars=[dual_flows, acc, prev_dual_flows],
+    shape_invariants = [idx.get_shape(), dual_flows.get_shape(), moving_avg.get_shape(), prev_dual_flows.get_shape()]
+    idx, dual_flows, _, pflow = tf.while_loop(cond, body,
+                                     loop_vars=[idx, dual_flows, moving_avg, prev_dual_flows],
                                      parallel_iterations=1,
                                      shape_invariants=shape_invariants,
                                      maximum_iterations=max_iters,
                                      name='{0}-while-loop'.format(name))
 
-    return dual_flows, pflow
+    return dual_flows, idx
+
+
+    # def body(idx, flow, acc, prev_flow):
+    #     momentum_acc = momentum * acc
+    #     predicted = tf.nn.relu(adj_mask * (flow - momentum_acc))
+
+    #     if should_use_edges:
+    #         derivative = cost_fn.derivative(predicted, edge_lengths) + dual_diff
+    #     else:
+    #         derivative = cost_fn.derivative(predicted) + dual_diff
+
+    #     next_acc = momentum_acc + step_size * derivative
+    #     next_flow = tf.nn.relu(adj_mask * (flow - next_acc))
+    #     return [idx + 1, next_flow, next_acc, flow]
+
+    # def cond(idx, flow, momentum, prev_flow):
+    #     return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
+
+    # idx = tf.constant(0, dtype=tf.int32)
+    # dual_flows = tf.nn.relu(adj_mask * dual_diff)
+    # acc = tf.zeros_like(dual_diff, dtype=tf.float32)
+    # prev_dual_flows = dual_flows + BIG_NUMBER
+    # shape_invariants = [idx.get_shape(), dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
+    # idx, dual_flows, _, pflow = tf.while_loop(cond, body,
+    #                                  loop_vars=[idx, dual_flows, acc, prev_dual_flows],
+    #                                  parallel_iterations=1,
+    #                                  shape_invariants=shape_invariants,
+    #                                  maximum_iterations=max_iters,
+    #                                  name='{0}-while-loop'.format(name))
+
+    # return dual_flows, idx
 
 
 def destination_attn(node_weights, in_indices, rev_indices, mask, name='dest-attn'):

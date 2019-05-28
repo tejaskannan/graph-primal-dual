@@ -197,7 +197,7 @@ class AdjModel(Model):
                 dual_diff = dual_tr - dual
 
                 # B x V x D
-                dual_flows, p_dual_flow = dual_flow(dual_diff=dual_diff,
+                dual_flows, dual_idx = dual_flow(dual_diff=dual_diff,
                                        adj_mask=adj_mask,
                                        cost_fn=self.cost_fn,
                                        edge_lengths=edge_lengths,
@@ -233,6 +233,6 @@ class AdjModel(Model):
                 self.output_ops['attn_weights'] = attn_weights
                 self.output_ops['nonzero'] = nonzero_prop
                 self.output_ops['dual_flow'] = dual_flows
-                self.output_ops['dual_diff'] = dual_diff
+                self.output_ops['dual_idx'] = dual_idx
 
                 self.optimizer_op = self._build_optimizer_op()
