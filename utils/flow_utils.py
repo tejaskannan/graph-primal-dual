@@ -114,18 +114,18 @@ def dual_flow(dual_diff, adj_mask, cost_fn, edge_lengths, should_use_edges, step
     def cond(flow, momentum, prev_flow):
         return tf.reduce_any(tf.abs(flow - prev_flow) > FLOW_THRESHOLD)
 
-    dual_flows = dual_diff
+    dual_flows = tf.nn.relu(adj_mask * dual_diff)
     acc = tf.zeros_like(dual_diff, dtype=tf.float32)
     prev_dual_flows = dual_flows + BIG_NUMBER
     shape_invariants = [dual_flows.get_shape(), acc.get_shape(), prev_dual_flows.get_shape()]
-    dual_flows, _, _ = tf.while_loop(cond, body,
+    dual_flows, _, pflow = tf.while_loop(cond, body,
                                      loop_vars=[dual_flows, acc, prev_dual_flows],
                                      parallel_iterations=1,
                                      shape_invariants=shape_invariants,
                                      maximum_iterations=max_iters,
                                      name='{0}-while-loop'.format(name))
 
-    return dual_flows
+    return dual_flows, pflow
 
 
 def destination_attn(node_weights, in_indices, rev_indices, mask, name='dest-attn'):

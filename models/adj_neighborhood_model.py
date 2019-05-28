@@ -126,11 +126,12 @@ class AdjModel(Model):
                 # Mask to remove nonexistent edges, B x V x D
                 mask_indices = tf.expand_dims(num_nodes, axis=-1)
                 mask = tf.cast(tf.equal(adj_lst, mask_indices), tf.float32)
+                adj_mask = 1.0 - mask
 
                 # Current States tiled across neighbors, B x V x D x K
                 tiled_states = tf.tile(tf.expand_dims(node_encoding, axis=-2),
                                        multiples=(1, 1, tf.shape(neighbor_states)[2], 1))
-                tiled_states = tf.expand_dims(1.0 - mask, axis=-1) * tiled_states
+                tiled_states = tf.expand_dims(adj_mask, axis=-1) * tiled_states
 
                 concat_states = tf.concat([tiled_states, neighbor_states], axis=-1)
 
@@ -160,7 +161,7 @@ class AdjModel(Model):
                 # Normalize weights for outgoing neighbors
                 if self.params['use_sparsemax']:
                     sparsemax = SparseMax(epsilon=1e-5)
-                    normalized_weights = sparsemax(inputs=pred_weights, mask=(1.0 - mask))
+                    normalized_weights = sparsemax(inputs=pred_weights, mask=adj_mask)
                 else:
                     normalized_weights = tf.nn.softmax(pred_weights, axis=-1)
 
@@ -183,7 +184,7 @@ class AdjModel(Model):
                 dual_vars = dual_decoder(inputs=node_encoding)
 
                 # B x (V + 1) x D tensor of repeated dual variables
-                dual = mask * dual_vars
+                dual = adj_mask * dual_vars
 
                 # Need to compute transpose (via a masked gather)
                 dual_tr, _ = masked_gather(values=dual_vars,
@@ -196,8 +197,8 @@ class AdjModel(Model):
                 dual_diff = dual_tr - dual
 
                 # B x V x D
-                dual_flows = dual_flow(dual_diff=dual_diff,
-                                       adj_mask=mask,
+                dual_flows, p_dual_flow = dual_flow(dual_diff=dual_diff,
+                                       adj_mask=adj_mask,
                                        cost_fn=self.cost_fn,
                                        edge_lengths=edge_lengths,
                                        should_use_edges=self.should_use_edges,
@@ -220,7 +221,7 @@ class AdjModel(Model):
                 nonzero_reg = tf.expand_dims(tf.reduce_sum(nonzero_prop, axis=[1, 2]), axis=-1) / num_nodes
                 nonzero_reg = tf.cast(tf.squeeze(nonzero_reg, axis=-1), dtype=tf.float32)
 
-                self.loss = (flow_cost - dual_cost) + 0.1 * tf.square(nonzero_reg - 1)
+                self.loss = (flow_cost - dual_cost)
                 self.loss_op = tf.reduce_mean(self.loss)
 
                 # Named outputs
@@ -231,5 +232,7 @@ class AdjModel(Model):
                 self.output_ops['pred_weights'] = pred_weights
                 self.output_ops['attn_weights'] = attn_weights
                 self.output_ops['nonzero'] = nonzero_prop
+                self.output_ops['dual_flow'] = dual_flows
+                self.output_ops['dual_diff'] = dual_diff
 
                 self.optimizer_op = self._build_optimizer_op()
