@@ -191,8 +191,6 @@ class FlowModel(Model):
 
                 dual_vars = dual_decoder(inputs=node_encoding)
 
-                # dual_vars = tf.debugging.check_numerics(dual_vars, 'Dual Variables have Inf or Nan.')
-
                 # B x (V + 1) x D tensor of repeated dual variables
                 dual = adj_mask * dual_vars
 

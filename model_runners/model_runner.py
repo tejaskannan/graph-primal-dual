@@ -8,7 +8,7 @@ from time import time
 from utils.utils import append_row_to_log, delete_if_exists
 from utils.constants import BIG_NUMBER, LINE
 from utils.graph_utils import add_features
-from core.plot import plot_flow_graph_adj, plot_weights, plot_road_flow_graph
+from core.plot import plot_road_flow_graph
 from core.dataset import DatasetManager, Series
 
 
@@ -159,7 +159,7 @@ class ModelRunner:
                 print('Early Stopping.')
                 break
 
-    def test(self, model_path):
+    def test(self, model_path=None):
         # Load Graphs
         graph = self.dataset.graph_data.graph
 
@@ -179,7 +179,13 @@ class ModelRunner:
         # Create model
         model.build(**ph_dict)
         model.init()
-        model.restore(model_path)
+
+        if model_path is not None:
+            model.restore(model_path)
+        else:
+            model_path = self.output_folder
+            if not os.path.exists(model_path):
+                os.mkdir(model_path)
 
         # Load test data
         self.dataset.load(series=Series.TEST)
@@ -210,7 +216,8 @@ class ModelRunner:
                                               data_series=Series.VALID,
                                               max_degree=self.dataset.max_degree,
                                               max_num_nodes=self.dataset.num_nodes,
-                                              max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
+                                              max_neighborhood_degrees=self.dataset.max_neighborhood_degrees,
+                                              name=self.params['name'])
 
             start = time()
             outputs = model.inference(feed_dict=feed_dict)

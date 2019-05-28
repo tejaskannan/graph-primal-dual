@@ -12,7 +12,7 @@ from os import mkdir
 from os.path import exists
 
 
-class OptimizationBaselineRunner:
+class OptimizationBaseline:
 
     def __init__(self, params, optimizer_name):
         self.params = params

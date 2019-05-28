@@ -12,8 +12,8 @@ from utils.graph_utils import random_sources_sinks, farthest_nodes, farthest_sin
 from utils.constants import *
 from core.load import load_embeddings, write, save_graph, load_graph
 from core.plot import plot_graph
-from model_runners.dense_baseline import DenseBaseline
-from model_runners.optimization_baseline_runner import OptimizationBaselineRunner
+from model_runners.fixed_baseline import FixedBaseline
+from model_runners.optimization_baseline import OptimizationBaseline
 from model_runners.flow_model_runner import FlowModelRunner
 
 
@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--random-walks', action='store_true')
     parser.add_argument('--slsqp', action='store_true', help='Flag to specify using SLSQP baseline.')
     parser.add_argument('--trust-constr', action='store_true', help='Flag to specify using Trust Constraint baseline.')
-    parser.add_argument('--uniform', action='store_true', help='Flag to specify using the Uniform Weights baseline.')
+    parser.add_argument('--fixed', action='store_true', help='Flag to specify using the Fixed Proportions baseline.')
     parser.add_argument('--view-params', action='store_true', help='Flag to specify viewing model parameters.')
     parser.add_argument('--graph-stats', action='store_true')
     parser.add_argument('--model', type=str, help='Path to trained model.')
@@ -55,14 +55,14 @@ def main():
     elif args.graph_stats:
         graph_stats(params['generate']['graph_names'][0])
     elif args.trust_constr:
-        baseline = OptimizationBaselineRunner(params=model_params, optimizer_name='trust_constr')
+        baseline = OptimizationBaseline(params=model_params, optimizer_name='trust_constr')
         baseline.optimize()
     elif args.slsqp:
-        baseline = OptimizationBaselineRunner(params=model_params, optimizer_name='slsqp')
+        baseline = OptimizationBaseline(params=model_params, optimizer_name='slsqp')
         baseline.optimize()
-    elif args.uniform:
-        baseline = UniformBaseline(params=model_params)
-        baseline.eval()
+    elif args.fixed:
+        baseline = FixedBaseline(params=model_params)
+        baseline.test(model_path=None)
     elif args.view_params:
         print(json.dumps(params, indent=2, sort_keys=True))
 
