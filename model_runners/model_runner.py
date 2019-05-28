@@ -101,6 +101,9 @@ class ModelRunner:
                 avg_loss = outputs[0]
                 loss = outputs[1]
 
+                # summary = outputs[2]
+                # model.train_writer.add_summary(summary, i)
+
                 train_losses.append(avg_loss)
                 self.dataset.report_losses(loss, indices)
 
@@ -225,9 +228,6 @@ class ModelRunner:
                 flow_cost = outputs['flow_cost'][j]
                 pred_weights = outputs['normalized_weights'][j]
                 dual_cost = outputs['dual_cost'][j]
-
-                print(pred_weights)
-                print(outputs['nonzero'][j])
 
                 demands = np.array(batch[j].demands)
 

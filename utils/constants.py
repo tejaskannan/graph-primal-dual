@@ -6,7 +6,7 @@ WRITE_THRESHOLD = 1000
 
 EXP_MIN = -20
 EXP_MAX = 5
-COST_MAX = 10000
+COST_MAX = 1000
 
 PARAMS_FILE = '{0}params.pkl.gz'
 MODEL_FILE = '{0}model.ckpt'

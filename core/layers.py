@@ -38,11 +38,11 @@ class MLP(Layer):
             # Hidden layers
             tensors = inputs
             for i, hidden_size in enumerate(self.hidden_sizes):
-                hidden = tf.layers.dense(inputs=tensors,
-                                         units=hidden_size,
-                                         kernel_initializer=self.initializer,
-                                         activation=self.activation,
-                                         name='{0}-layer-{1}'.format(self.name, i))
+                tensors = tf.layers.dense(inputs=tensors,
+                                          units=hidden_size,
+                                          kernel_initializer=self.initializer,
+                                          activation=self.activation,
+                                          name='{0}-layer-{1}'.format(self.name, i))
                 
                 # The 'keep_prob' parameter is deprecated in Tensorflow 1.13 in favor of 'rate'
                 # Azure Deep Learning VMs, however, are still using Tensorflow 1.12 and don't
@@ -59,9 +59,6 @@ class MLP(Layer):
                                      activation=final_activation,
                                      use_bias=self.bias_final,
                                      name='{0}-output'.format(self.name))
-            output = tf.nn.dropout(x=output,
-                                   keep_prob=dropout_keep_prob,
-                                   name='{0}-output-dropout'.format(self.name))
 
             return output
 

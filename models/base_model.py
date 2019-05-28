@@ -3,6 +3,7 @@ import numpy as np
 import gzip
 import pickle
 from os.path import exists
+from tensorflow.python import debug as tf_debug
 from os import mkdir
 from utils.constants import *
 
@@ -31,9 +32,10 @@ class Model:
 
     def run_train_step(self, feed_dict):
         with self._sess.graph.as_default():
+            # merge = tf.summary.merge_all()
             ops = [self.loss_op, self.loss, self.optimizer_op]
             op_result = self._sess.run(ops, feed_dict=feed_dict)
-            return op_result[0:2]
+            return op_result[0:3]
 
     def inference(self, feed_dict):
         with self._sess.graph.as_default():
@@ -44,6 +46,7 @@ class Model:
     def _build_optimizer_op(self):
         trainable_vars = self._sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         gradients = tf.gradients(self.loss_op, trainable_vars)
+
         clipped_grad, _ = tf.clip_by_global_norm(gradients, self.params['gradient_clip'])
         pruned_gradients = []
         for grad, var in zip(clipped_grad, trainable_vars):
