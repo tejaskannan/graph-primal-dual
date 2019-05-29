@@ -37,7 +37,7 @@ class OptimizationBaseline:
 
         test_graph = self.dataset.graph_data.graph
 
-        cost_headers = ['Index', 'Graph', 'Cost', 'Time (sec)']
+        cost_headers = ['Index', 'Graph', 'Flow Cost', 'Time (sec)']
         costs_path = self.output_folder + 'costs.csv'
         append_row_to_log(cost_headers, costs_path)
 

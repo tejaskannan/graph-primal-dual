@@ -1,0 +1,1 @@
+{"target_path": "neighborhood-cambridge-pembroke-quadratic-05-28-2019-22-31-41", "target_name": "neighborhood", "baselines": [{"path": "slsqp-cambridge-pembroke-quadratic", "name": "SLSQP"}, {"path": "slsqp-cambridge-pembroke-quadratic", "name": "SLSQP-2"}], "output_folder": "neighborhood-slsqp-cambridge-pembroke-quadratic", "fields": ["Flow Cost", "Time (sec)"]}

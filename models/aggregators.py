@@ -20,25 +20,49 @@ class Neighborhood(Aggregator):
         super(Neighborhood, self).__init__(output_size, activation, name)
         self.num_heads = num_heads
 
-        self.node_neighborhood = AttentionNeighborhood(output_size=output_size,
-                                                       num_heads=num_heads,
-                                                       activation=activation,
-                                                       is_sparse=False,
-                                                       use_adj_lists=True,
-                                                       name='{0}-node-neighborhood'.format(name))
+        self.out_neighborhood_agg = AttentionNeighborhood(output_size=output_size,
+                                                          num_heads=num_heads,
+                                                          activation=activation,
+                                                          is_sparse=False,
+                                                          use_adj_lists=True,
+                                                          name='{0}-node-out-neighborhood'.format(name))
+
+        self.in_neighborhood_agg = AttentionNeighborhood(output_size=output_size,
+                                                         num_heads=num_heads,
+                                                         activation=activation,
+                                                         is_sparse=False,
+                                                         use_adj_lists=True,
+                                                         name='{0}-node-in-neighborhood'.format(name))
+
+        self.combiner = MLP(hidden_sizes=[],
+                            output_size=output_size,
+                            activation=activation,
+                            activate_final=True,
+                            bias_final=True,
+                            name='{0}-combiner'.format(name))
 
         self.node_gru = GRU(output_size=output_size,
                             activation=activation,
                             name='{0}-node-gru'.format(name))
 
     def __call__(self, node_states, dropout_keep_prob, **kwargs):
-        neighborhoods = kwargs['neighborhoods']
+        out_neighborhoods = kwargs['out_neighborhoods']
+        in_neighborhoods = kwargs['in_neighborhoods']
         num_nodes = kwargs['num_nodes']
 
-        next_encoding, attn_weights = self.node_neighborhood(inputs=node_states,
-                                                             neighborhoods=neighborhoods,
-                                                             mask_index=num_nodes,
-                                                             dropout_keep_prob=dropout_keep_prob)
+        out_encoding, _ = self.out_neighborhood_agg(inputs=node_states,
+                                                    neighborhoods=out_neighborhoods,
+                                                    mask_index=num_nodes,
+                                                    dropout_keep_prob=dropout_keep_prob)
+
+        in_encoding, _ = self.in_neighborhood_agg(inputs=node_states,
+                                                  neighborhoods=in_neighborhoods,
+                                                  mask_index=num_nodes,
+                                                  dropout_keep_prob=dropout_keep_prob)
+
+        next_encoding = self.combiner(inputs=tf.concat([out_encoding, in_encoding], axis=-1),
+                                      dropout_keep_prob=dropout_keep_prob)
+
         node_encoding = self.node_gru(inputs=next_encoding,
                                       state=node_states,
                                       dropout_keep_prob=dropout_keep_prob)

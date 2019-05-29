@@ -45,7 +45,8 @@ class ModelRunner:
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
                                            max_degree=self.dataset.max_degree,
-                                           max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
+                                           max_out_neighborhood_degrees=self.dataset.max_out_neighborhood_degrees,
+                                           max_in_neighborhood_degrees=self.dataset.max_in_neighborhood_degrees)
 
         # Create model
         model.build(**ph_dict)
@@ -95,7 +96,8 @@ class ModelRunner:
                                                   data_series=Series.TRAIN,
                                                   max_degree=self.dataset.max_degree,
                                                   max_num_nodes=self.dataset.num_nodes,
-                                                  max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
+                                                  max_out_neighborhood_degrees=self.dataset.max_out_neighborhood_degrees,
+                                                  max_in_neighborhood_degrees=self.dataset.max_in_neighborhood_degrees)
 
                 outputs = model.run_train_step(feed_dict=feed_dict)
                 avg_loss = outputs[0]
@@ -125,7 +127,8 @@ class ModelRunner:
                                                   data_series=Series.VALID,
                                                   max_degree=self.dataset.max_degree,
                                                   max_num_nodes=self.dataset.num_nodes,
-                                                  max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
+                                                  max_out_neighborhood_degrees=self.dataset.max_out_neighborhood_degrees,
+                                                  max_in_neighborhood_degrees=self.dataset.max_in_neighborhood_degrees)
 
                 outputs = model.inference(feed_dict=feed_dict)
                 avg_loss = outputs['loss']
@@ -174,7 +177,8 @@ class ModelRunner:
                                            embedding_size=self.embedding_size,
                                            num_neighborhoods=num_neighborhoods,
                                            max_degree=self.dataset.max_degree,
-                                           max_neighborhood_degrees=self.dataset.max_neighborhood_degrees)
+                                           max_out_neighborhood_degrees=self.dataset.max_out_neighborhood_degrees,
+                                           max_in_neighborhood_degrees=self.dataset.max_in_neighborhood_degrees)
 
         # Create model
         model.build(**ph_dict)
@@ -216,7 +220,8 @@ class ModelRunner:
                                               data_series=Series.VALID,
                                               max_degree=self.dataset.max_degree,
                                               max_num_nodes=self.dataset.num_nodes,
-                                              max_neighborhood_degrees=self.dataset.max_neighborhood_degrees,
+                                              max_out_neighborhood_degrees=self.dataset.max_out_neighborhood_degrees,
+                                              max_in_neighborhood_degrees=self.dataset.max_in_neighborhood_degrees,
                                               name=self.params['name'])
 
             start = time()

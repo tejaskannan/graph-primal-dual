@@ -44,7 +44,8 @@ class BatchSample:
         self.adj_lst = graph_data.adj_lst
         self.adj_mat = graph_data.adj_mat
         self.inv_adj_lst = graph_data.inv_adj_lst
-        self.neighborhoods = graph_data.neighborhoods
+        self.out_neighborhoods = graph_data.out_neighborhoods
+        self.in_neighborhoods = graph_data.in_neighborhoods
         self.embeddings = graph_data.embeddings
         self.num_nodes = graph_data.num_nodes
         self.graph_name = graph_data.graph_name
@@ -66,14 +67,16 @@ class GraphData:
         # Fetch expanded adjacency matrix
         self.adj_mat = nx.adjacency_matrix(graph)
 
-        # Compute adjacency list and maximum outgoing degree
+        # Compute adjacency lists
         self.adj_lst, _ = adjacency_list(graph)
+        self.inv_adj_lst = adj_matrix_to_list(self.adj_mat, inverted=True)
 
         # Compute neighborhoods
-        self.neighborhoods = random_walk_neighborhoods(self.adj_mat, k, unique_neighborhoods)
+        self.out_neighborhoods = random_walk_neighborhoods(self.adj_mat, k, unique_neighborhoods)
+        self.in_neighborhoods = random_walk_neighborhoods(self.adj_mat.transpose(copy=True), k, unique_neighborhoods)
 
         # Compute embeddings
-        self.embeddings = create_node_embeddings(graph=graph, neighborhoods=self.neighborhoods)
+        self.embeddings = create_node_embeddings(graph=graph, neighborhoods=self.out_neighborhoods)
 
         # Save the true number of nodes in this graph
         self.num_nodes = graph.number_of_nodes()
@@ -115,18 +118,13 @@ class GraphData:
                 self.edge_lengths[node, j] = edge_len_dict[(node, v)]
                 self.normalized_edge_lengths[node, j] = norm_edge_len_dict[(node, v)]
 
-    def set_edge_indices(self, adj_lst, max_degree, max_num_nodes):
+    def set_edge_indices(self, adj_lst, inv_adj_lst, max_degree, max_num_nodes):
         dim0 = np.prod(adj_lst.shape)
 
         # These arrays hold 2D coordinates
         self.in_indices = np.zeros(shape=(dim0, 2))
         self.rev_indices = np.zeros(shape=(dim0, 2))
         self.opp_indices = np.zeros(shape=(dim0, 2))
-
-        inv_adj_lst = adj_matrix_to_list(self.adj_mat, inverted=True)
-        inv_adj_lst = pad_adj_list(inv_adj_lst, max_degree, max_num_nodes, self.num_nodes)
-
-        self.inv_adj_lst = inv_adj_lst
 
         index_a = 0
         index_b = 0
@@ -206,8 +204,11 @@ class DatasetManager:
         self.num_nodes = graph.number_of_nodes()
 
         # Find the maximum outgoing degrees for each neighborhood level
-        self.max_neighborhood_degrees = [np.max(mat.sum(axis=-1)) for mat in self.graph_data.neighborhoods]
-        self.max_neighborhood_degrees = np.array(self.max_neighborhood_degrees).astype(int)
+        self.max_out_neighborhood_degrees = [np.max(mat.sum(axis=-1)) for mat in self.graph_data.out_neighborhoods]
+        self.max_out_neighborhood_degrees = np.array(self.max_out_neighborhood_degrees).astype(int)
+
+        self.max_in_neighborhood_degrees = [np.max(mat.sum(axis=-1)) for mat in self.graph_data.in_neighborhoods]
+        self.max_in_neighborhood_degrees = np.array(self.max_in_neighborhood_degrees).astype(int)
 
         # Find the maximum outgoing or incoming degree for a single vertex
         max_out_deg = np.max([d for _, d in graph.out_degree()])
@@ -219,8 +220,13 @@ class DatasetManager:
                                                max_degree=self.max_degree,
                                                max_num_nodes=self.num_nodes,
                                                mask_number=self.graph_data.num_nodes)
+        self.graph_data.inv_adj_lst = pad_adj_list(adj_lst=self.graph_data.inv_adj_lst,
+                                                   max_degree=self.max_degree,
+                                                   max_num_nodes=self.num_nodes,
+                                                   mask_number=self.graph_data.num_nodes)
 
         self.graph_data.set_edge_indices(adj_lst=self.graph_data.adj_lst,
+                                         inv_adj_lst=self.graph_data.inv_adj_lst,
                                          max_degree=self.max_degree,
                                          max_num_nodes=self.num_nodes)
 
@@ -235,10 +241,15 @@ class DatasetManager:
                                                    n=self.num_nodes,
                                                    m=self.graph_data.embeddings.shape[1])
 
-        self.graph_data.neighborhoods = neighborhood_adj_lists(neighborhoods=self.graph_data.neighborhoods,
-                                                  max_degrees=self.max_neighborhood_degrees,
-                                                  max_num_nodes=self.num_nodes,
-                                                  mask_number=self.graph_data.num_nodes)
+        self.graph_data.out_neighborhoods = neighborhood_adj_lists(neighborhoods=self.graph_data.out_neighborhoods,
+                                                                   max_degrees=self.max_out_neighborhood_degrees,
+                                                                   max_num_nodes=self.num_nodes,
+                                                                   mask_number=self.graph_data.num_nodes)
+
+        self.graph_data.in_neighborhoods = neighborhood_adj_lists(neighborhoods=self.graph_data.in_neighborhoods,
+                                                                  max_degrees=self.max_in_neighborhood_degrees,
+                                                                  max_num_nodes=self.num_nodes,
+                                                                  mask_number=self.graph_data.num_nodes)
 
         self.graph_data.fetch_edge_lengths()
 

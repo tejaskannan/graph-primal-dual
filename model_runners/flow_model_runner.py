@@ -17,7 +17,8 @@ class FlowModelRunner(ModelRunner):
         embedding_size = kwargs['embedding_size']
         max_num_nodes = kwargs['max_num_nodes'] + 1
         max_degree = kwargs['max_degree']
-        max_neighborhood_degrees = kwargs['max_neighborhood_degrees']
+        max_out_neighborhood_degrees = kwargs['max_out_neighborhood_degrees']
+        max_in_neighborhood_degrees = kwargs['max_in_neighborhood_degrees']
 
         # Placeholder shapes
         node_shape = [b, max_num_nodes, self.num_node_features]
@@ -76,14 +77,23 @@ class FlowModelRunner(ModelRunner):
                                                               name='norm-edge-lengths-ph',
                                                               is_sparse=False)
 
-        neighborhood_phs = []
+        out_neighborhood_phs = []
+        in_neighborhood_phs = []
         for i in range(num_neighborhoods + 1):
-            shape = [b, max_num_nodes, max_neighborhood_degrees[i]]
-            ph = model.create_placeholder(dtype=tf.int32,
-                                          shape=shape,
-                                          name='neighborhood-{0}-ph'.format(i),
-                                          is_sparse=False)
-            neighborhood_phs.append(ph)
+            out_shape = [b, max_num_nodes, max_out_neighborhood_degrees[i]]
+            out_ph = model.create_placeholder(dtype=tf.int32,
+                                              shape=out_shape,
+                                              name='out-neighborhood-{0}-ph'.format(i),
+                                              is_sparse=False)
+
+            in_shape = [b, max_num_nodes, max_in_neighborhood_degrees[i]]
+            in_ph = model.create_placeholder(dtype=tf.int32,
+                                             shape=in_shape,
+                                             name='in-neighborhood-{0}-ph'.format(i),
+                                             is_sparse=False)
+
+            out_neighborhood_phs.append(out_ph)
+            in_neighborhood_phs.append(in_ph)
 
         return {
             'node_features': node_ph,
@@ -91,7 +101,8 @@ class FlowModelRunner(ModelRunner):
             'adj_lst': adj_ph,
             'inv_adj_lst': inv_adj_ph,
             'common_neighbors': common_out_neighbors_ph,
-            'neighborhoods': neighborhood_phs,
+            'out_neighborhoods': out_neighborhood_phs,
+            'in_neighborhoods': in_neighborhood_phs,
             'in_indices': in_indices_ph,
             'rev_indices': rev_indices_ph,
             'dropout_keep_prob': dropout_keep_ph,
@@ -106,7 +117,8 @@ class FlowModelRunner(ModelRunner):
         # Padding parameters
         max_degree = kwargs['max_degree']
         max_num_nodes = kwargs['max_num_nodes']
-        max_neighborhood_degrees = kwargs['max_neighborhood_degrees']
+        max_out_neighborhood_degrees = kwargs['max_out_neighborhood_degrees']
+        max_in_neighborhood_degrees = kwargs['max_in_neighborhood_degrees']
 
         # Fetch features for each sample in the given batch
         node_features = np.array([sample.node_features for sample in batch])
@@ -148,9 +160,14 @@ class FlowModelRunner(ModelRunner):
         }
 
         for i in range(self.params['num_neighborhoods'] + 1):
-            neighborhood = [sample.neighborhoods[i] for sample in batch]
-            ph = placeholders['neighborhoods'][i]
-            feed_dict[ph] = neighborhood
+            out_neighborhood = [sample.out_neighborhoods[i] for sample in batch]
+            in_neighborhood = [sample.in_neighborhoods[i] for sample in batch]
+
+            out_ph = placeholders['out_neighborhoods'][i]
+            feed_dict[out_ph] = out_neighborhood
+
+            in_ph = placeholders['in_neighborhoods'][i]
+            feed_dict[in_ph] = in_neighborhood
 
         return feed_dict
 

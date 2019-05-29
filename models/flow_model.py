@@ -39,7 +39,8 @@ class FlowModel(Model):
         common_neighbors = kwargs['common_neighbors']
 
         # List of B x V x D tensors containing padded adjacency lists for k neighborhood levels
-        neighborhoods = kwargs['neighborhoods']
+        out_neighborhoods = kwargs['out_neighborhoods']
+        in_neighborhoods = kwargs['in_neighborhoods']
 
         # B*V*D x 3 tensor containing 3D indices used to compute inflow
         in_indices = kwargs['in_indices']
@@ -113,7 +114,8 @@ class FlowModel(Model):
                                                     inv_adj_lst=inv_adj_lst,
                                                     node_indices=node_indices,
                                                     dropout_keep_prob=dropout_keep_prob,
-                                                    neighborhoods=neighborhoods,
+                                                    out_neighborhoods=out_neighborhoods,
+                                                    in_neighborhoods=in_neighborhoods,
                                                     num_nodes=num_nodes)
 
                 # Neighbor States, B x V x D x K
