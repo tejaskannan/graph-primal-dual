@@ -4,6 +4,7 @@ import networkx as nx
 import numpy as np
 import json
 import scipy.sparse as sp
+from annoy import AnnoyIndex
 from utils.utils import load_params, restore_params, create_node_embeddings
 from utils.utils import append_row_to_log, create_demands, file_index, find_max_sources_sinks
 from utils.utils import create_capacities, delete_if_exists, serialize_dict
@@ -115,8 +116,12 @@ def generate(params):
     serialize_dict(dictionary=source_sink_dict, file_path=os.path.join(dataset_folder, 'sources_sinks.pkl.gz'))
 
     # Generate and save paths between sources and sinks
-    paths = simple_paths(graph=graph, sources=sources, sinks=sinks, max_num_paths=params['max_num_paths'])
-    serialize_dict(dictionary=paths, file_path=os.path.join(dataset_folder, 'paths.pkl.gz'))
+    # paths = simple_paths(graph=graph, sources=sources, sinks=sinks, max_num_paths=params['max_num_paths'])
+    # serialize_dict(dictionary=paths, file_path=os.path.join(dataset_folder, 'paths.pkl.gz'))
+
+    demands_thresh = 0.1
+    source_index = AnnoyIndex(len(sources))
+    sink_index = AnnoyIndex(len(sinks))
 
     file_paths = ['train', 'valid', 'test']
     samples = [params['train_samples'], params['valid_samples'], params['test_samples']]
@@ -131,6 +136,23 @@ def generate(params):
         for i in range(num_samples):
             source_demands, sink_demands = create_demands(sources=sources, sinks=sinks)
 
+            # Ensure training demands not too close to either validation or test demands
+            if file_path == 'train':
+                source_index.add_item(i, source_demands)
+                sink_index.add_item(i, sink_demands)
+            else:
+                _, source_dist = source_index.get_nns_by_vector(source_demands, n=1, include_distances=True)
+                _, sink_dist = source_index.get_nns_by_vector(sink_demands, n=1, include_distances=True)
+
+                retries = 0
+                while source_dist[0] < demands_thresh and sink_dist[0] < demands_thresh:
+                    source_demands, sink_demands = create_demands(sources=sources, sinks=sinks)
+                    _, source_dist = source_index.get_nns_by_vector(source_demands, n=1, include_distances=True)
+                    _, sink_dist = source_index.get_nns_by_vector(sink_demands, n=1, include_distances=True)
+
+                    assert retries < 1000, 'Retried too many times.'
+                    retries += 1
+
             dataset.append((source_demands, sink_demands))
 
             if (i+1) % WRITE_THRESHOLD == 0:
@@ -143,6 +165,10 @@ def generate(params):
             index, _ = file_index(i)
             write(dataset=dataset, folder=series_folder, index=index)
         print('Completed {0}.'.format(file_path))
+
+        if file_path == 'train':
+            source_index.build(10)
+            sink_index.build(10)
 
 
 def random_walks(graph_name, unique_neighborhoods):

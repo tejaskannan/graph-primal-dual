@@ -171,6 +171,9 @@ def farthest_nodes(graph, num_sources, num_sinks):
         max_len = -BIG_NUMBER
         for u in graph.nodes():
 
+            if u >= n_nodes:
+                continue
+
             min_len = BIG_NUMBER
             for v in nodes:
                 if (u, v) in lengths:
