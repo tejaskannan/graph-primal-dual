@@ -48,6 +48,16 @@ def main():
     elif args.generate:
         generate(params['generate'])
     elif args.test:
+        if args.slsqp:
+            model_params['optimizer'] = {
+                'use_optimizer': True,
+                'optimizer_name': 'slsqp'
+            }
+        elif args.trust_constr:
+            model_params['optimizer'] = {
+                'use_optimizer': True,
+                'optimizer_name': 'trust_constr'
+            }
         mcf_solver = FlowModelRunner(params=model_params)
         mcf_solver.test(args.model)
     elif args.random_walks:

@@ -52,7 +52,11 @@ args = parser.parse_args()
 params = load_params(params_file_path=args.params)
 
 # Load target dataset into Pandas
-target_file = os.path.join(MODEL_FOLDER, params['target_path'], COSTS_FILE)
+costs_file = COSTS_FILE
+if 'target_optimizer' in params:
+    costs_file = 'costs-{0}.csv'.format(params['target_optimizer'])
+
+target_file = os.path.join(MODEL_FOLDER, params['target_path'], costs_file)
 target_df = pd.read_csv(target_file)
 
 output_folder = os.path.join(OUTPUT_BASE, params['output_folder'])
@@ -71,7 +75,9 @@ baseline_names = [baseline['name'] for baseline in params['baselines']]
 
 df = pd.DataFrame()
 
-for field in params['fields']:
+target_fields = params['target_fields'] if 'target_fields' in params else params['fields']
+
+for target_field, field in zip(target_fields, params['fields']):
     
     # Initialize data dictionary
     data = {
@@ -88,8 +94,8 @@ for field in params['fields']:
         baseline_df = pd.read_csv(baseline_path)
 
         numeric_baseline = pd.to_numeric(baseline_df[field])
-        percent_diff = 100 * ((numeric_baseline - target_df[field]) / target_df[field])
-        abs_diff = numeric_baseline - target_df[field]
+        percent_diff = 100 * ((numeric_baseline - target_df[target_field]) / target_df[target_field])
+        abs_diff = numeric_baseline - target_df[target_field]
         
         data[SERIES_FIELD].append(field)
         data[BASELINE_FIELD].append(baseline['name'])
@@ -106,10 +112,21 @@ df.set_index([SERIES_FIELD, BASELINE_FIELD], inplace=True)
 latex_table = df.to_latex(formatters=formatters, column_format='llcccc', multirow=True, multicolumn=True)
         
 field_paths = [field.lower().replace(' ', '-') for field in params['fields']]
-out_path = os.path.join(output_folder, '-'.join(field_paths) + '.tex')
+out_filename = '-'.join(field_paths)
+if 'target_optimizer' in params:
+    out_filename += '-' + params['target_optimizer']
+out_filename += '.tex'
+out_path = os.path.join(output_folder, out_filename)
+
 with open(out_path, 'w') as out_file:
     out_file.write(bold_labels(latex_table))
 
-params_path = os.path.join(output_folder, 'params.json')
+
+params_filename = 'params'
+if 'target_optimizer' in params:
+    params_filename += '-' + params['target_optimizer']
+params_filename += '.json'
+out_path = os.path.join(output_folder, out_filename)
+params_path = os.path.join(output_folder, params_filename)
 with open(params_path, 'w') as params_file:
     params_file.write(json.dumps(params))

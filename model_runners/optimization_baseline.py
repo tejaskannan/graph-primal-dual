@@ -8,7 +8,7 @@ from utils.utils import features_to_demands, append_row_to_log
 from utils.constants import PARAMS_FILE, WRITE_THRESHOLD
 from core.plot import plot_road_flow_graph
 from core.dataset import DatasetManager, Series
-from os import mkdir
+from os import mkdir, remove
 from os.path import exists
 
 
@@ -37,8 +37,12 @@ class OptimizationBaseline:
 
         test_graph = self.dataset.graph_data.graph
 
-        cost_headers = ['Index', 'Graph', 'Flow Cost', 'Time (sec)']
+        cost_headers = ['Index', 'Graph', 'Flow Cost', 'Time (sec)', 'Num Iters']
         costs_path = self.output_folder + 'costs.csv'
+
+        if exists(costs_path):
+            remove(costs_path)
+
         append_row_to_log(cost_headers, costs_path)
 
         # Save parameters
@@ -50,7 +54,8 @@ class OptimizationBaseline:
         self.dataset.load(series=Series.TEST)
         test_samples = [sample for sample in self.dataset.dataset[Series.TEST] if sample.graph_name == self.graph_name]
 
-        step = int(1.0 / self.params['plot_fraction'])
+        # step = int(1.0 / self.params['plot_fraction'])
+        step = 100
         plot_indices = set(range(0, len(test_samples), step))
 
         initial = None
@@ -67,7 +72,7 @@ class OptimizationBaseline:
             flow_mat = self._flow_matrix(test_graph, flows)
             initial = flows
 
-            append_row_to_log([index, self.graph_name, result.fun, end - start], costs_path)
+            append_row_to_log([index, self.graph_name, result.fun, end - start, result.nit], costs_path)
 
             # Add demands to graph
             flow_graph = test_graph.copy()
@@ -83,8 +88,6 @@ class OptimizationBaseline:
 
             if (index + 1) % WRITE_THRESHOLD == 0:
                 print('Completed {0} instances.'.format(index + 1))
-
-            # nx.write_gexf(flow_graph, '{0}graph-{1}-{2}.gexf'.format(self.output_folder, self.graph_name, index))
 
     def _flow_matrix(self, graph, flows):
         num_nodes = graph.number_of_nodes()

@@ -40,7 +40,7 @@ class FixedModel(Model):
                 sparsemax = SparseMax(epsilon=SMALL_NUMBER)
                 normalized_weights = sparsemax(inputs=masked_proportions, mask=adj_mask)
             else:
-                normalized_weights = tf.nn.softmax(inputs=masked_proportions, axis=-1)
+                normalized_weights = tf.nn.softmax(masked_proportions, axis=-1)
 
             flow, pflow = mcf_solver(pred_weights=normalized_weights,
                                      demand=demands,

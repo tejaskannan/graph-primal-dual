@@ -8,7 +8,8 @@ import os.path
 mpl.use('pgf')
 pgf_with_pdflatex = {
     'pgf.texsystem': 'lualatex',
-    'pgf.rcfonts': False
+    'pgf.rcfonts': False,
+    'font.family': 'serif'
 }
 mpl.rcParams.update(pgf_with_pdflatex)
 

@@ -58,7 +58,6 @@ class FixedBaseline(ModelRunner):
         # Padding parameters
         max_degree = kwargs['max_degree']
         max_num_nodes = kwargs['max_num_nodes']
-        max_neighborhood_degrees = kwargs['max_neighborhood_degrees']
 
         # Fetch features for each sample in the given batch
         demands = np.array([sample.demands for sample in batch])

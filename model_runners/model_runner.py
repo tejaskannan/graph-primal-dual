@@ -10,6 +10,7 @@ from utils.constants import BIG_NUMBER, LINE
 from utils.graph_utils import add_features
 from core.plot import plot_road_flow_graph
 from core.dataset import DatasetManager, Series
+from models.optimization_models import SLSQP, TrustConstr
 
 
 PRINT_THRESHOLD = 100
@@ -200,7 +201,13 @@ class ModelRunner:
                                                    shuffle=False)
         # Iniitalize Testing Log
         log_headers = ['Test Instance', 'Graph', 'Flow Cost', 'Dual Cost', 'Time (sec)']
-        log_path = model_path + 'costs.csv'
+
+        if self.params['optimizer']['use_optimizer']:
+            log_headers += ['Flow with Optimizer', 'Num Iters']
+            log_path = model_path + 'costs-{0}.csv'.format(self.params['optimizer']['optimizer_name'])
+        else:
+            log_path = model_path + 'costs.csv'
+
         delete_if_exists(log_path)
         append_row_to_log(log_headers, log_path)
 
@@ -243,6 +250,25 @@ class ModelRunner:
 
                 demands = np.array(batch[j].demands)
 
+                if self.params['optimizer']['use_optimizer']:
+                    adj_lst = batch[j].adj_lst
+                    initial = np.zeros(shape=(graph.number_of_edges(),))
+                    edge_index = 0
+                    for i in range(flow.shape[0]):
+                        for j in range(flow.shape[1]):
+                            if adj_lst[i, j] != batch[j].num_nodes:
+                                initial[edge_index] = flow[i, j]
+                                edge_index += 1
+
+                    if self.params['optimizer']['optimizer_name'] == 'trust_constr':
+                        optimizer_model = TrustConstr(params=self.params)
+                    elif self.params['optimizer']['optimizer_name'] == 'slsqp':
+                        optimizer_model = SLSQP(params=self.params)
+
+                    optimizer_demands = demands.reshape(-1)
+                    flows_per_iter, result = optimizer_model.optimize(graph=graph, demands=optimizer_demands, initial=initial)
+                    opt_cost, num_iters = result.fun, result.nit
+
                 node_features = {
                     'demand': demands
                 }
@@ -272,7 +298,10 @@ class ModelRunner:
                                      num_nodes=num_nodes)
 
                 # Log Outputs
-                append_row_to_log([index, graph_name, flow_cost, dual_cost, avg_time], log_path)
+                row = [index, graph_name, flow_cost, dual_cost, avg_time]
+                if self.params['optimizer']['use_optimizer']:
+                    row += [opt_cost, num_iters]
+                append_row_to_log(row, log_path)
 
     def create_placeholders(self, model, **kwargs):
         raise NotImplementedError()
