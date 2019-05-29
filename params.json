@@ -1,22 +1,22 @@
 {
 	"generate": {
-		"train_samples": 1000,
-		"valid_samples": 100,
-		"test_samples": 100,
-		"graph_name": "cambridge-pembroke-200",
-		"osm_query":  "Pembroke College, Cambridge, United Kingdom",
-		"distance": 200,
+		"train_samples": 50000,
+		"valid_samples": 5000,
+		"test_samples": 5000,
+		"graph_name": "london-1600",
+		"osm_query":  "Leicester Square, London, UK",
+		"distance": 1600,
 		"is_address": true,
-		"dataset_name": "cambridge-pembroke-dist-100-samples-1000-farthest",
-		"num_sources": 2,
-		"num_sinks": 2,
-		"source_sink_strategy": "random",
+		"dataset_name": "london-dist-1600-samples-50000-farthest",
+		"num_sources": 10,
+		"num_sinks": 10,
+		"source_sink_strategy": "farthest",
 		"max_num_paths": 10
 	},
 	"model": {
 		"name": "neighborhood",
 		"graph_name": "cambridge-pembroke",
-		"graph_title": "Cambridge-Pembroke",
+		"graph_title": "Trust Region on Cambridge Graph",
 		"dataset_name": "cambridge-pembroke-dist-500-samples-10000-farthest",
 		"learning_rate": 0.001,
 		"dual_momentum": 0.9,
@@ -52,13 +52,17 @@
 		"plot_fraction": 0.001, 
 		"plot_weight_samples": 25,
 		"sparse": false,
-		"use_sparsemax": true,
-		"unique_neighborhoods": false,
+		"use_sparsemax": false,
+		"unique_neighborhoods": true,
 		"use_capacities": false,
 		"batch_params": {
 			"selection_beg": 1e8,
 			"selection_end": 1e2,
 			"sort_freq": 0.5
+		},
+		"optimizer": {
+			"use_optimizer": true,
+			"optimizer_name": "slsqp"
 		}
 	}
 }

@@ -64,10 +64,6 @@ class FlowModelRunner(ModelRunner):
                                                 shape=num_nodes_shape,
                                                 name='num-nodes-ph',
                                                 is_sparse=False)
-        common_out_neighbors_ph = model.create_placeholder(dtype=tf.int32,
-                                                           shape=common_neighbors_shape,
-                                                           name='common-neighbors-ph',
-                                                           is_sparse=False)
         edge_lengths_ph = model.create_placeholder(dtype=tf.float32,
                                                    shape=adj_shape,
                                                    name='edge-lengths-ph',
@@ -100,7 +96,6 @@ class FlowModelRunner(ModelRunner):
             'demands': demands_ph,
             'adj_lst': adj_ph,
             'inv_adj_lst': inv_adj_ph,
-            'common_neighbors': common_out_neighbors_ph,
             'out_neighborhoods': out_neighborhood_phs,
             'in_neighborhoods': in_neighborhood_phs,
             'in_indices': in_indices_ph,
@@ -124,7 +119,6 @@ class FlowModelRunner(ModelRunner):
         node_features = np.array([sample.node_features for sample in batch])
         demands = np.array([sample.demands for sample in batch])
         adj_lsts = np.array([sample.adj_lst for sample in batch])
-        common_neighbors = np.array([sample.common_out_neighbors for sample in batch])
         inv_adj_lsts = np.array([sample.inv_adj_lst for sample in batch])
         num_nodes = np.array([sample.num_nodes for sample in batch])
         edge_lengths = np.array([sample.edge_lengths for sample in batch])
@@ -150,7 +144,6 @@ class FlowModelRunner(ModelRunner):
             placeholders['demands']: demands,
             placeholders['adj_lst']: adj_lsts,
             placeholders['inv_adj_lst']: inv_adj_lsts,
-            placeholders['common_neighbors']: common_neighbors,
             placeholders['edge_lengths']: edge_lengths,
             placeholders['norm_edge_lengths']: norm_edge_lengths,
             placeholders['dropout_keep_prob']: dropout_keep,

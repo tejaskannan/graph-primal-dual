@@ -35,9 +35,6 @@ class FlowModel(Model):
         # B x V x D tensor of normalized edge lengths
         norm_edge_lengths = kwargs['norm_edge_lengths']
 
-        # B x V x 2D tensor of commmon outgoing neighbors
-        common_neighbors = kwargs['common_neighbors']
-
         # List of B x V x D tensors containing padded adjacency lists for k neighborhood levels
         out_neighborhoods = kwargs['out_neighborhoods']
         in_neighborhoods = kwargs['in_neighborhoods']

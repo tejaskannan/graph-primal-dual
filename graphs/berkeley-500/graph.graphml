@@ -1523,7 +1523,7 @@
     <edge id="57" source="53055194" target="53055195">
       <data key="d9">LINESTRING (564422.2897443949 4192089.156349225, 564491.0796964676 4192100.259866242, 564516.0002152992 4192104.350375714, 564528.049817954 4192105.488115964)</data>
       <data key="d10">tertiary</data>
-      <data key="d16">['3', '4']</data>
+      <data key="d16">['4', '3']</data>
       <data key="d11">106.83000000000001</data>
       <data key="d12">25 mph</data>
       <data key="d13">Hearst Avenue</data>
@@ -1543,7 +1543,7 @@
     <edge id="59" source="53055195" target="53055194">
       <data key="d9">LINESTRING (564528.049817954 4192105.488115964, 564516.0002152992 4192104.350375714, 564491.0796964676 4192100.259866242, 564422.2897443949 4192089.156349225)</data>
       <data key="d10">tertiary</data>
-      <data key="d16">['3', '4']</data>
+      <data key="d16">['4', '3']</data>
       <data key="d11">106.83000000000001</data>
       <data key="d12">25 mph</data>
       <data key="d13">Hearst Avenue</data>

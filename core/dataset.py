@@ -187,6 +187,8 @@ class DatasetManager:
         self.sources = source_sink_dict['sources']
         self.sinks = source_sink_dict['sinks']
 
+        print(self.sources)
+
         self.params = params
         self.dataset = {}
         self.graph_data = None
@@ -231,7 +233,7 @@ class DatasetManager:
                                          max_num_nodes=self.num_nodes)
 
         self.graph_data.common_out_neighbors = pad_adj_list(adj_lst=self.graph_data.common_out_neighbors,
-                                                            max_degree=2*self.max_degree,
+                                                            max_degree=self.max_degree**2,
                                                             max_num_nodes=self.num_nodes,
                                                             mask_number=self.graph_data.num_nodes)
 

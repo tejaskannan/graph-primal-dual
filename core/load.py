@@ -30,12 +30,15 @@ def save_graph(target, graph_name, distance=1000, is_address=True):
     graph_data = graph_proj.graph
     serialize_dict(dictionary=graph_data, file_path=path.join(folder_path, 'graph_data.pkl.gz'))
 
-    ox.save_graphml(graph_proj, filename='graph.graphml', folder=folder_path, gephi=True)
-
+    # We make the graph strongly connected to ensure that any combination of source / sink
+    # constitutes a valid problem
     graph_component = ox.get_largest_component(graph_proj, strongly=True).to_directed()
 
     # Save pictures of the graph
     plot_road_graph(graph_component, graph_name=graph_name, file_path=path.join(folder_path, 'graph'))
+
+    # Save graph
+    ox.save_graphml(graph_component, filename='graph.graphml', folder=folder_path, gephi=True)
 
     # Save a selection of graph-wide stats.
     stats_file = path.join(folder_path, 'stats.csv')
@@ -64,11 +67,10 @@ def load_graph(graph_name):
     graph.graph['crs'] = graph_data['crs']
     graph.graph['name'] = graph_data['name']
 
-    graph = ox.project_graph(graph, to_crs=graph_data['crs'])
+    if not nx.is_strongly_connected(graph):
+        graph = ox.get_largest_component(graph, strongly=True)
 
-    # We make the graph strongly connected to ensure that any combination of source / sink
-    # constitutes a valid problem
-    graph = ox.get_largest_component(graph, strongly=True)
+    graph = ox.project_graph(graph, to_crs=graph_data['crs'])
 
     node_mapping = {node: i for i, node in enumerate(graph.nodes())}
     graph = nx.relabel_nodes(graph, node_mapping)
