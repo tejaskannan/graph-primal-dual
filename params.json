@@ -1,15 +1,15 @@
 {
 	"generate": {
-		"train_samples": 50000,
-		"valid_samples": 5000,
-		"test_samples": 5000,
-		"graph_name": "london-1600",
-		"osm_query":  "Leicester Square, London, UK",
-		"distance": 1600,
+		"train_samples": 2000,
+		"valid_samples": 200,
+		"test_samples": 200,
+		"graph_name": "berkeley-500",
+		"osm_query":  "Shattuck Avenue, Berkeley, CA",
+		"distance": 500,
 		"is_address": true,
-		"dataset_name": "london-dist-1600-samples-50000-farthest",
-		"num_sources": 10,
-		"num_sinks": 10,
+		"dataset_name": "berkeley-dist-500-samples-2000-farthest",
+		"num_sources": 4,
+		"num_sinks": 4,
 		"source_sink_strategy": "farthest",
 		"max_num_paths": 10
 	},
@@ -36,12 +36,12 @@
 		"decoder_hidden": [32, 32],
 		"output_folder": "trained_models",
 		"cost_fn": {
-			"name": "quadratic",
+			"name": "log",
 			"use_edges": false,
 			"edge_factor": 0.1,
 			"options": {
 				"a": 1.0,
-				"b": 0.0,
+				"b": 1.0,
 				"c": 0.0,
 				"d": 0.0
 			}
@@ -52,7 +52,7 @@
 		"plot_fraction": 0.001, 
 		"plot_weight_samples": 25,
 		"sparse": false,
-		"use_sparsemax": false,
+		"use_sparsemax": true,
 		"unique_neighborhoods": true,
 		"use_capacities": false,
 		"batch_params": {
@@ -61,7 +61,7 @@
 			"sort_freq": 0.5
 		},
 		"optimizer": {
-			"use_optimizer": true,
+			"use_optimizer": false,
 			"optimizer_name": "slsqp"
 		}
 	}
