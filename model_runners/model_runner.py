@@ -74,11 +74,10 @@ class ModelRunner:
         convergence_count = 0
         prev_loss = BIG_NUMBER
 
-        # Sparse batches must be size 1 due to the lack of support for 3D sparse operations
-        # in tensorflow
         batch_size = self.params['batch_size']
 
         print(self.dataset.graph_data.adj_lst)
+        print(self.dataset.graph_data.inv_adj_lst)
 
         for epoch in range(self.params['epochs']):
 

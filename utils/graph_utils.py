@@ -124,7 +124,7 @@ def random_walk_neighborhoods(adj_matrix, k, unique_neighborhoods=True):
 
 
 def adjacency_list(graph):
-    adj_lst = list(map(list, iter(graph.adj.values())))
+    adj_lst = list(map(lambda x: list(sorted(x)), iter(graph.adj.values())))
     max_degree = max(map(lambda x: len(x), adj_lst))
     return adj_lst, max_degree
 
