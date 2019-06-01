@@ -171,9 +171,7 @@ def farthest_nodes(graph, num_sources, num_sinks):
         max_len = -BIG_NUMBER
         for u in graph.nodes():
 
-            if u >= n_nodes:
-                continue
-
+            # Minimum distance to any of the already-selected nodes
             min_len = BIG_NUMBER
             for v in nodes:
                 if (u, v) in lengths:
@@ -185,7 +183,9 @@ def farthest_nodes(graph, num_sources, num_sinks):
                     lengths[(u, v)] = path_length
                     length = path_length
                 min_len = min(min_len, length)
-                
+            
+            # Select node whose closest distance to any selected vertex
+            # is maximized
             if min_len > max_len:
                 max_len = min_len
                 max_node = u

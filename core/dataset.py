@@ -188,6 +188,7 @@ class DatasetManager:
         self.sinks = source_sink_dict['sinks']
 
         print(self.sources)
+        print(self.sinks)
 
         self.params = params
         self.dataset = {}

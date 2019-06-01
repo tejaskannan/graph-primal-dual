@@ -78,6 +78,8 @@ class ModelRunner:
         # in tensorflow
         batch_size = self.params['batch_size']
 
+        print(self.dataset.graph_data.adj_lst)
+
         for epoch in range(self.params['epochs']):
 
             print(LINE)
@@ -118,7 +120,7 @@ class ModelRunner:
             valid_batches = self.dataset.create_batches(series=Series.VALID,
                                                         batch_size=batch_size,
                                                         shuffle=True)
-            num_valid_batches = self.dataset.num_batches(series=Series.VALID, batch_size=batch_size)
+            num_valid_batches = self.dataset.num_batches(series=Series.TEST, batch_size=batch_size)
             valid_losses = []
             for i, batch in enumerate(valid_batches):
 
@@ -164,6 +166,8 @@ class ModelRunner:
                 break
 
     def test(self, model_path=None):
+        self.params['optimizer']['use_optimizer'] = False
+
         # Load Graphs
         graph = self.dataset.graph_data.graph
 
@@ -217,14 +221,17 @@ class ModelRunner:
         num_test_samples = num_test_batches * batch_size
 
         step = int(1.0 / self.params['plot_fraction'])
+        # step = 100
         plot_indices = set(range(0, num_test_samples, step))
+
+        print(self.dataset.graph_data.adj_lst)
 
         for i, batch in enumerate(test_batches):
 
             feed_dict = self.create_feed_dict(placeholders=ph_dict,
                                               batch=batch,
                                               batch_size=batch_size,
-                                              data_series=Series.VALID,
+                                              data_series=Series.TEST,
                                               max_degree=self.dataset.max_degree,
                                               max_num_nodes=self.dataset.num_nodes,
                                               max_out_neighborhood_degrees=self.dataset.max_out_neighborhood_degrees,

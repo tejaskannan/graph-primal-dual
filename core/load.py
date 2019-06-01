@@ -64,6 +64,7 @@ def load_graph(graph_name):
 
     graph_data = deserialize_dict(file_path=path.join(folder_path, 'graph_data.pkl.gz'))
     graph = ox.load_graphml(filename='graph.graphml', folder=folder_path)
+    # graph = nx.MultiDiGraph(nx.read_graphml(path.join(folder_path, 'graph.graphml'), node_type=int))
     graph.graph['crs'] = graph_data['crs']
     graph.graph['name'] = graph_data['name']
 
