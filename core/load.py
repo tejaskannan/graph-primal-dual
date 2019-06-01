@@ -73,10 +73,18 @@ def load_graph(graph_name):
 
     graph = ox.project_graph(graph, to_crs=graph_data['crs'])
 
-    node_mapping = {node: i for i, node in enumerate(graph.nodes())}
+    node_mapping = {node: i for i, node in enumerate(sorted(graph.nodes()))}
     graph = nx.relabel_nodes(graph, node_mapping)
 
-    return graph.to_directed()
+    # Ensure nodes and edges are ordered consistently
+    G = nx.MultiDiGraph()
+    for node, data in sorted(graph.nodes(data=True), key=lambda t: t[0]):
+        G.add_node(node, **data)
+
+    for src, dst, key, data in sorted(graph.edges(keys=True, data=True), key=lambda t: (t[0], t[1])):
+        G.add_edge(src, dst, key=key, **data)
+
+    return G.to_directed()
 
 
 def write(dataset, folder, index):
