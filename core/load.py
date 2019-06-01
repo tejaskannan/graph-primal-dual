@@ -65,13 +65,9 @@ def load_graph(graph_name):
     graph_data = deserialize_dict(file_path=path.join(folder_path, 'graph_data.pkl.gz'))
     graph = ox.load_graphml(filename='graph.graphml', folder=folder_path)
     # graph = nx.MultiDiGraph(nx.read_graphml(path.join(folder_path, 'graph.graphml'), node_type=int))
-    graph.graph['crs'] = graph_data['crs']
-    graph.graph['name'] = graph_data['name']
 
     if not nx.is_strongly_connected(graph):
         graph = ox.get_largest_component(graph, strongly=True)
-
-    graph = ox.project_graph(graph, to_crs=graph_data['crs'])
 
     node_mapping = {node: i for i, node in enumerate(sorted(graph.nodes()))}
     graph = nx.relabel_nodes(graph, node_mapping)
@@ -81,8 +77,15 @@ def load_graph(graph_name):
     for node, data in sorted(graph.nodes(data=True), key=lambda t: t[0]):
         G.add_node(node, **data)
 
-    for src, dst, key, data in sorted(graph.edges(keys=True, data=True), key=lambda t: (t[0], t[1])):
-        G.add_edge(src, dst, key=key, **data)
+    for src, dst, data in sorted(graph.edges(data=True), key=lambda t: (t[0], t[1])):
+        # Remove parallel edges and self-loops
+        if src == dst or (src in G and dst in G[src]):
+            continue
+        G.add_edge(src, dst, key=0, **data)
+
+    G.graph['crs'] = graph_data['crs']
+    G.graph['name'] = graph_data['name']
+    G = ox.project_graph(G, to_crs=graph_data['crs'])
 
     return G.to_directed()
 

@@ -31,11 +31,15 @@ def add_features(graph, node_features, edge_features):
 
     # Add edge features
     adj_lst, _ = adjacency_list(graph)
+    edge_attr = {(src, dst, 0): {} for src, dst in graph.edges()}
     for name, values in edge_features.items():
-        for node, lst in enumerate(adj_lst):
+        for node in graph.nodes():
+            lst = adj_lst[node]
             for i, neighbor in enumerate(lst):
                 v = {name: float(values[node, i])}
                 graph.add_edge(node, neighbor, key=0, **v)
+             
+    # nx.set_edge_attributes(graph, values=edge_attr)
 
     return graph
 
@@ -135,7 +139,6 @@ def simple_paths(graph, sources, sinks, max_num_paths):
     # Dictionary from (source, sink) to list of paths
     all_paths = {}
 
-
     def compute_paths(source, sink, cutoff, max_num_paths):
         paths = list(nx.all_simple_paths(graph, source, sink, cutoff=cutoff))
         paths = sorted(paths, key=len)[:max_num_paths]
@@ -190,6 +193,7 @@ def farthest_nodes(graph, num_sources, num_sinks):
                 max_len = min_len
                 max_node = u
 
+        assert max_node is not None, 'No node found.'
         nodes.append(max_node)
 
     return nodes[:num_sources], nodes[num_sources:]
@@ -205,7 +209,7 @@ def farthest_sink_nodes(graph, num_sources, num_sinks):
     sources = np.random.choice(a=list(graph.nodes()), replace=False, size=num_sources)
     
     node_distances = []
-    for u in graph.nodes():
+    for u in sorted(graph.nodes()):
         distances = [nx.shortest_path_length(graph, source=u, target=v) for v in sources]
         node_distances.append(distances)
 

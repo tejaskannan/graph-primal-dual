@@ -51,7 +51,8 @@ def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False)
             node_sizes[i] = 4
             node_colors[i] = node_cmap(node_normalizer(demand))
 
-    values = [v for (src, dst, v) in graph.edges.data(field)]
+    values = [v for _, _, v in graph.edges.data(field)]
+    # values = list(nx.get_edge_attributes(graph, name=field).values())
     edge_normalizer = colors.Normalize(vmin=np.min(values), vmax=np.max(values))
 
     edge_colors = [edge_cmap(edge_normalizer(x)) for x in values]
@@ -203,6 +204,7 @@ def plot_directed(graph, node_size, node_color, node_edgecolor, edge_linewidth, 
         lines.append(list(zip(xs, ys)))
 
     # add the lines to the axis as a linecollection
+    # ISSUE: edge color not in the same order as graph.edges
     lc = LineCollection(lines, colors=edge_color, linewidths=edge_linewidth, alpha=1.0, zorder=2)
     ax.add_collection(lc)
 

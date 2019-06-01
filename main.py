@@ -88,9 +88,9 @@ def generate(params):
         target = params['osm_query']
         distance = params.get('distance', 1000)
         is_address = params['is_address']
-        graph = save_graph(target=target, graph_name=graph_name, distance=distance, is_address=is_address)
-    else:
-        graph = load_graph(graph_name=graph_name)
+        save_graph(target=target, graph_name=graph_name, distance=distance, is_address=is_address)
+
+    graph = load_graph(graph_name=graph_name)
 
     dataset_name = params['dataset_name']
     dataset_folder = os.path.join('datasets', dataset_name)

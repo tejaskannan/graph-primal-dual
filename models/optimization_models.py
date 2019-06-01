@@ -7,7 +7,7 @@ class OptimizeBaseline:
 
     def __init__(self, params):
         self.max_iters = params['flow_iters']
-        self.threshold = params['early_stop_threshold']
+        self.threshold = min(params['early_stop_threshold'], 1e-7)
         self.cost_fn = get_cost_function(params['cost_fn'])
 
     def optimize(self, graph, demands, initial):

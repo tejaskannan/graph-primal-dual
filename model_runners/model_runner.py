@@ -76,9 +76,6 @@ class ModelRunner:
 
         batch_size = self.params['batch_size']
 
-        print(self.dataset.graph_data.adj_lst)
-        print(self.dataset.graph_data.inv_adj_lst)
-
         for epoch in range(self.params['epochs']):
 
             print(LINE)
@@ -220,10 +217,7 @@ class ModelRunner:
         num_test_samples = num_test_batches * batch_size
 
         step = int(1.0 / self.params['plot_fraction'])
-        # step = 100
         plot_indices = set(range(0, num_test_samples, step))
-
-        print(self.dataset.graph_data.adj_lst)
 
         for i, batch in enumerate(test_batches):
 

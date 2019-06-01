@@ -67,12 +67,6 @@ class Model:
             pickle.dump(self.params, out_file)
 
         with self._sess.graph.as_default():
-            trainable_variables = self._sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-            decoder_var = [var for var in trainable_variables if var.name == 'flow-model/dual-decoder-output/bias:0']
-            decoder_var = decoder_var[0]
-            print_op = tf.print(decoder_var)
-            self._sess.run(print_op)
-
             model_path = MODEL_FILE.format(output_folder, self.name)
             saver = tf.train.Saver()
             saver.save(self._sess, model_path)
@@ -82,9 +76,3 @@ class Model:
             model_path = MODEL_FILE.format(output_folder, self.name)
             saver = tf.train.Saver()
             saver.restore(self._sess, model_path)
-
-            trainable_variables = self._sess.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-            decoder_var = [var for var in trainable_variables if var.name == 'flow-model/dual-decoder-output/bias:0']
-            decoder_var = decoder_var[0]
-            print_op = tf.print(decoder_var)
-            self._sess.run(print_op)
