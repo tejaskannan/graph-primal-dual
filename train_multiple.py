@@ -1,7 +1,9 @@
 import subprocess
 import os
+from utils.utils import load_params
 
 params_folder = 'model_params'
+datasets_folder = 'datasets'
 params = ['cambridge_neighborhood_softmax_quadratic.json', 'cambridge_neighborhood_sparsemax_quadratic.json',
           'sf_neighborhood_softmax_quadratic.json', 'sf_neighborhood_sparsemax_quadratic.json',
           'sf_gated_gat_softmax_quadratic.json', 'sf_neighborhood_softmax_cubic.json',
@@ -9,7 +11,11 @@ params = ['cambridge_neighborhood_softmax_quadratic.json', 'cambridge_neighborho
 
 # Ensure that all files exist
 for params_file in params:
-    assert os.path.exists(os.path.join(params_folder, params_file))
+    params_path = os.path.join(params_folder, params_file)
+    assert os.path.exists(params_path)
+
+    params_dict = load_params(params_path)
+    assert os.path.exists(os.path.join(datasets_folder, params_dict['model']['dataset_name']))
 
 print('Checked all files.')
 

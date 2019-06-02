@@ -17,7 +17,7 @@
 		"name": "neighborhood",
 		"graph_name": "cambridge-500",
 		"graph_title": "Neighborhood+Sparsemax on Cambridge Graph",
-		"dataset_name": "cambridge-500-samples-100-farthest",
+		"dataset_name": "cambridge-500-samples-10000-farthest",
 		"learning_rate": 0.001,
 		"dual_momentum": 0.9,
 		"dual_step_size": 0.01,
