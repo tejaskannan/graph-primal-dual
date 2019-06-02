@@ -76,6 +76,12 @@ class ModelRunner:
 
         batch_size = self.params['batch_size']
 
+        # Log training start time
+        time_log = self.output_folder + 'time.csv'
+        delete_if_exists(time_log)
+        start_time = datetime.now()
+        append_row_to_log(['Start Time', start_time.strftime('%m-%d-%Y-%H-%M-%S')], time_log)
+
         for epoch in range(self.params['epochs']):
 
             print(LINE)
@@ -160,6 +166,11 @@ class ModelRunner:
             if convergence_count >= self.params['patience']:
                 print('Early Stopping.')
                 break
+
+        # Log ending time
+        end_time = datetime.now()
+        append_row_to_log(['End Time', end_time.strftime('%m-%d-%Y-%H-%M-%S')], time_log)
+        append_row_to_log(['Delta', str(end_time - start_time)], time_log)
 
     def test(self, model_path=None):
         self.params['optimizer']['use_optimizer'] = False

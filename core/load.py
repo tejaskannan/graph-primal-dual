@@ -56,6 +56,10 @@ def save_graph(target, graph_name, distance=1000, is_address=True):
     append_row_to_log(['Average Out Degree', avg_out_deg], stats_file)
     append_row_to_log(['Diameter', diam], stats_file)
 
+    cleaned_target = target.replace('\"', '').replace('\'', '').replace(',', '')
+    query = '{0}; Dist: {1}'.format(cleaned_target, distance) if is_address else cleaned_target
+    append_row_to_log(['Query', query], stats_file)
+
     return graph_component
 
 

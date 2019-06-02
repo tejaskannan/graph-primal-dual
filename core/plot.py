@@ -158,6 +158,7 @@ def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False)
         os.mkdir(pgf_folder)
 
     plt.savefig(os.path.join(pgf_folder, 'graph.pgf'))
+    plt.close()
 
 
 def plot_directed(graph, node_size, node_color, node_edgecolor, edge_linewidth, edge_color, node_zorder):

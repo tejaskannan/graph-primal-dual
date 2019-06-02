@@ -38,8 +38,6 @@ def add_features(graph, node_features, edge_features):
             for i, neighbor in enumerate(lst):
                 v = {name: float(values[node, i])}
                 graph.add_edge(node, neighbor, key=0, **v)
-             
-    # nx.set_edge_attributes(graph, values=edge_attr)
 
     return graph
 
@@ -182,7 +180,10 @@ def farthest_nodes(graph, num_sources, num_sinks):
                 elif (v, u) in lengths:
                     length = lengths[(v, u)]
                 else:
-                    path_length = nx.shortest_path_length(graph, source=u, target=v)
+                    forward_path_length = nx.shortest_path_length(graph, source=u, target=v)
+                    backward_path_length = nx.shortest_path_length(graph, source=u, target=v)
+                    path_length = min(forward_path_length, backward_path_length)
+
                     lengths[(u, v)] = path_length
                     length = path_length
                 min_len = min(min_len, length)
