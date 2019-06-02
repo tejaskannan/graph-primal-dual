@@ -79,12 +79,16 @@ def load_graph(graph_name):
     # Ensure nodes and edges are ordered consistently
     G = nx.MultiDiGraph()
     for node, data in sorted(graph.nodes(data=True), key=lambda t: t[0]):
+        data['demand'] = 0
         G.add_node(node, **data)
 
     for src, dst, data in sorted(graph.edges(data=True), key=lambda t: (t[0], t[1])):
         # Remove parallel edges and self-loops
         if src == dst or (src in G and dst in G[src]):
             continue
+
+        # Dummy data for compatibility with plotter
+        data['zero'] = 0
         G.add_edge(src, dst, key=0, **data)
 
     G.graph['crs'] = graph_data['crs']

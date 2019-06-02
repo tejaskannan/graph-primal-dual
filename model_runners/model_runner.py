@@ -22,10 +22,12 @@ class ModelRunner:
         self.params = params
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
         cost_fn_name = params['cost_fn']['name']
-        self.output_folder = '{0}/{1}-{2}-{3}-{4}/'.format(params['output_folder'],
+        normalizer = 'sparsemax' if params['use_sparsemax'] else 'softmax'
+        self.output_folder = '{0}/{1}-{2}-{3}-{4}-{5}/'.format(params['output_folder'],
                                                            params['name'],
                                                            params['graph_name'],
                                                            cost_fn_name,
+                                                           normalizer,
                                                            self.timestamp)
         
         self.num_node_features = 2

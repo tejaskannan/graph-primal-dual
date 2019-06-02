@@ -12,7 +12,7 @@ from utils.graph_utils import random_walk_neighborhoods, simple_paths
 from utils.graph_utils import random_sources_sinks, farthest_nodes, farthest_sink_nodes
 from utils.constants import *
 from core.load import load_embeddings, write, save_graph, load_graph
-from core.plot import plot_graph
+from core.plot import plot_graph, plot_road_flow_graph
 from model_runners.fixed_baseline import FixedBaseline
 from model_runners.optimization_baseline import OptimizationBaseline
 from model_runners.flow_model_runner import FlowModelRunner
@@ -108,6 +108,14 @@ def generate(params):
         sources, sinks = farthest_sink_nodes(graph, num_sources=params['num_sources'], num_sinks=params['num_sinks'])
     else:
         sources, sinks = farthest_nodes(graph, num_sources=params['num_sources'], num_sinks=params['num_sinks'])
+
+    G = graph.copy()
+    for source in sources:
+        G.add_node(source, demand=-1)
+    for sink in sinks:
+        G.add_node(sink, demand=1)
+    file_path = os.path.join(dataset_folder, 'graph')
+    plot_road_flow_graph(graph=G, field='zero', graph_name=graph_name, file_path=file_path)
     
     source_sink_dict = {
         'sources': sources,

@@ -181,7 +181,7 @@ def farthest_nodes(graph, num_sources, num_sinks):
                     length = lengths[(v, u)]
                 else:
                     forward_path_length = nx.shortest_path_length(graph, source=u, target=v)
-                    backward_path_length = nx.shortest_path_length(graph, source=u, target=v)
+                    backward_path_length = nx.shortest_path_length(graph, source=v, target=u)
                     path_length = min(forward_path_length, backward_path_length)
 
                     lengths[(u, v)] = path_length
@@ -193,6 +193,8 @@ def farthest_nodes(graph, num_sources, num_sinks):
             if min_len > max_len:
                 max_len = min_len
                 max_node = u
+
+        print('{0}, Len: {1}'.format(max_node, max_len))
 
         assert max_node is not None, 'No node found.'
         nodes.append(max_node)
