@@ -579,25 +579,22 @@ class AttentionNeighborhood(Layer):
 
         dropout_keep_prob = kwargs['dropout_keep_prob']
 
-        agg_layers = []
-        for i in range(len(neighborhoods)):
-            if self.use_adj_lists:
-                agg_layer = AdjGAT(output_size=self.output_size,
-                                   num_heads=self.num_heads,
-                                   activation=self.activation,
-                                   name='{0}-adj-GAT-{1}'.format(self.name, i))
+        if self.use_adj_lists:
+            agg_layer = AdjGAT(output_size=self.output_size,
+                               num_heads=self.num_heads,
+                               activation=self.activation,
+                               name='{0}-adj-GAT'.format(self.name))
+        else:
+            if self.is_sparse:
+                agg_layer = SparseGAT(output_size=self.output_size,
+                                      num_heads=self.num_heads,
+                                      activation=self.activation,
+                                      name='{0}-sparse-GAT'.format(self.name))
             else:
-                if self.is_sparse:
-                    agg_layer = SparseGAT(output_size=self.output_size,
-                                          num_heads=self.num_heads,
-                                          activation=self.activation,
-                                          name='{0}-sparse-GAT-{1}'.format(self.name, i))
-                else:
-                    agg_layer = GAT(output_size=self.output_size,
-                                    num_heads=self.num_heads,
-                                    activation=self.activation,
-                                    name='{0}-GAT-{1}'.format(self.name, i))
-            agg_layers.append(agg_layer)
+                agg_layer = GAT(output_size=self.output_size,
+                                num_heads=self.num_heads,
+                                activation=self.activation,
+                                name='{0}-GAT'.format(self.name))
 
             # Layer to compute attention weights for each aggregated neighborhood
         attn_layer = MLP(hidden_sizes=[],
@@ -612,19 +609,19 @@ class AttentionNeighborhood(Layer):
 
             # V x F tensor of aggregated node features over the given neighborhood
             if self.use_adj_lists:
-                neighborhood_agg = agg_layers[i](inputs=inputs,
+                neighborhood_agg = agg_layer(inputs=inputs,
                                                  adj_lst=neighborhood_mat,
                                                  mask_index=kwargs['mask_index'],
                                                  weight_dropout_keep=dropout_keep_prob,
                                                  attn_dropout_keep=dropout_keep_prob)
             else:
                 if self.is_sparse:
-                    neighborhood_agg = agg_layers[i](inputs=inputs,
+                    neighborhood_agg = agg_layer(inputs=inputs,
                                                      adj_matrix=neighborhood_mat,
                                                      weight_dropout_keep=dropout_keep_prob,
                                                      attn_dropout_keep=dropout_keep_prob)
                 else:
-                    neighborhood_agg = agg_layers[i](inputs=inputs,
+                    neighborhood_agg = agg_layer(inputs=inputs,
                                                      bias=neighborhood_mat,
                                                      weight_dropout_keep=dropout_keep_prob,
                                                      attn_dropout_keep=dropout_keep_prob)
