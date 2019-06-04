@@ -5,11 +5,10 @@ import argparse
 import os
 from utils.utils import load_params
 
-MODEL_FOLDER = '../trained_models'
 COSTS_FILE = 'costs.csv'
 OUTPUT_BASE = '../comparisons'
 
-BASELINE_FIELD = 'Baseline'
+BASELINE_FIELD = 'Model'
 AVG_PERC_FIELD = 'Mean % Increase'
 STD_PERC_FIELD = 'Std Dev for %'
 AVG_ABS_FIELD = 'Mean Increase'
@@ -51,12 +50,14 @@ args = parser.parse_args()
 
 params = load_params(params_file_path=args.params)
 
+model_folder = params['base_folder']
+
 # Load target dataset into Pandas
 costs_file = COSTS_FILE
 if 'target_optimizer' in params:
     costs_file = 'costs-{0}.csv'.format(params['target_optimizer'])
 
-target_file = os.path.join(MODEL_FOLDER, params['target_path'], costs_file)
+target_file = os.path.join(model_folder, params['target_path'], costs_file)
 target_df = pd.read_csv(target_file)
 
 output_folder = os.path.join(OUTPUT_BASE, params['output_folder'])
@@ -90,7 +91,7 @@ for target_field, field in zip(target_fields, params['fields']):
     }
 
     for baseline in params['baselines']:
-        baseline_path = os.path.join(MODEL_FOLDER, baseline['path'], COSTS_FILE)
+        baseline_path = os.path.join(model_folder, baseline['path'], COSTS_FILE)
         baseline_df = pd.read_csv(baseline_path)
 
         numeric_baseline = pd.to_numeric(baseline_df[field])

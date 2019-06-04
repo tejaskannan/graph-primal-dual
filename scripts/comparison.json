@@ -1,12 +1,12 @@
 {
-    "target_path": "neighborhood-cambridge-pembroke-quadratic-05-28-2019-22-31-41",
+    "target_path": "neighborhood-sf-market-500-quadratic-sparsemax-farthest",
     "target_name": "neighborhood",
-    "target_optimizer": "slsqp",
     "baselines": [
-        { "path": "slsqp-cambridge-pembroke-quadratic", "name": "SLSQP" },
-        { "path": "trust_constr-cambridge-pembroke-quadratic", "name": "Trust Region" }
+        { "path": "slsqp-sf-market-500-quadratic", "name": "SLSQP" },
+        { "path": "neighborhood-sf-market-500-quadratic-softmax-farthest", "name": "Neighborhood+Softmax" },
+        { "path": "gated-gat-sf-market-500-quadratic-softmax-farthest", "name": "Gated-GAT+Softmax" } 
     ],
-    "output_folder": "neighborhood-slsqp-cambridge-pembroke-quadratic",
-    "fields": ["Flow Cost", "Num Iters"],
-    "target_fields": ["Flow with Optimizer", "Num Iters"]
+    "base_folder": "../final_models/san-francisco",
+    "output_folder": "neighborhood-sf-500-quadratic",
+    "fields": ["Flow Cost"]
 }

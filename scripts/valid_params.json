@@ -1,0 +1,14 @@
+{
+    "models": [
+        {
+            "name": "Neighborhood, 10 Steps",
+            "path": "../final_models/cambridge-quadratic/neighborhood-cambridge-500-quadratic-softmax-farthest"
+        },
+        {
+            "name": "Neighborhood, 1 Step",
+            "path": "../final_models/1-layer/neighborhood-cambridge-500-quadratic-softmax-1-layer"
+        }
+    ],
+    "save_folder": "../figures/layers",
+    "after": 5
+}

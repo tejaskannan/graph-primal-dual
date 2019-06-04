@@ -1,0 +1,10 @@
+{
+    "model1": {
+        "name": "Neighborhood+Sparsemax",
+        "path": "../final_models/san-francisco/neighborhood-sf-market-500-quadratic-sparsemax-farthest"
+    },
+    "model2": {
+        "name": "Neighborhood+Softmax",
+        "path": "../final_models/san-francisco/gated-gat-sf-market-500-quadratic-softmax-farthest"
+    }
+}

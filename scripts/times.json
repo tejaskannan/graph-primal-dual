@@ -1,0 +1,32 @@
+{
+    "series": [
+        {
+            "name": "$x^2$",
+            "groups": [
+                {
+                    "name": "Cambridge-500",
+                    "path": "../final_models/cambridge-quadratic/trust_constr-cambridge-500-quadratic"
+                },
+                {
+                    "name": "SF-500",
+                    "path": "../final_models/san-francisco-quadratic/trust_constr-sf-market-500-quadratic"
+                }
+            ]
+        },
+        {
+            "name": "$e^x-1$",
+            "groups": [
+                {
+                    "name": "Cambridge-500",
+                    "path": "../final_models/cambridge-exp/trust_constr-cambridge-500-exp"
+                },
+                {
+                    "name": "SF-500",
+                    "path": "../final_models/san-francisco-exp/trust_constr-sf-market-500-exp"
+                }
+            ]
+        }
+    ],
+    "title": "Median Flow Computation Time using Trust Region Optimization",
+    "output_file": "../figures/trust-region-times"
+}

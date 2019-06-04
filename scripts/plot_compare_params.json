@@ -1,0 +1,48 @@
+{
+    "series": [
+        {
+            "name": "$x^2$",
+            "target": {
+                "name": "Neighborhood+Sparsemax",
+                "path": "../final_models/cambridge-quadratic/neighborhood-cambridge-500-quadratic-sparsemax-farthest"
+            },
+            "groups": [
+                {
+                    "name": "Neighborhood+Softmax",
+                    "path": "../final_models/cambridge-quadratic/neighborhood-cambridge-500-quadratic-softmax-farthest"
+                },
+                {
+                    "name": "Trust Region",
+                    "path": "../final_models/cambridge-quadratic/trust_constr-cambridge-500-quadratic"
+                },
+                {
+                    "name": "SLSQP",
+                    "path": "../final_models/cambridge-quadratic/slsqp-cambridge-500-quadratic"
+                }
+            ]
+        },
+        {
+            "name": "$e^x-1$",
+            "target": {
+                "name": "Neighborhood+Sparsemax",
+                "path": "../final_models/cambridge-exp/neighborhood-cambridge-500-exp-sparsemax-farthest"
+            },
+            "groups": [
+                {
+                    "name": "Neighborhood+Softmax",
+                    "path": "../final_models/cambridge-exp/neighborhood-cambridge-500-exp-softmax-farthest"
+                },
+                {
+                    "name": "Trust Region",
+                    "path": "../final_models/cambridge-exp/trust_constr-cambridge-500-exp"
+                },
+                {
+                    "name": "SLSQP",
+                    "path": "../final_models/cambridge-exp/slsqp-cambridge-500-exp"
+                }
+            ]
+        }
+    ],
+    "title": "Flow Costs Relative to Neighborhood+Sparsemax Model\non the Cambridge-500 Graph",
+    "output_file": "../figures/cambridge-500-costs"
+}
