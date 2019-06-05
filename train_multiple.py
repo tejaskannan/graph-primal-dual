@@ -4,10 +4,7 @@ from utils.utils import load_params
 
 params_folder = 'model_params'
 datasets_folder = 'datasets'
-params = ['cambridge_neighborhood_softmax_exp.json', 'cambridge_neighborhood_sparsemax_exp.json',
-          'sf_neighborhood_softmax_exp.json', 'sf_neighborhood_sparsemax_exp.json',
-          'sf_gated_gat_softmax_exp.json', 'sf_gated_gat_sparsemax_quadratic.json',
-          'sf_gated_gat_sparsemax_exp.json']
+params = ['dublin_neighborhood_sparsemax_exp.json', 'dublin_gated_gat_sparsemax_exp.json']
 
 # Ensure that all files exist
 for params_file in params:

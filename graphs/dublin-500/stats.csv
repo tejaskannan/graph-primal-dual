@@ -1,5 +1,6 @@
-Number of Nodes,211
-Number of Edges,441
-Average In Degree,2.090047393364929
-Average Out Degree,2.090047393364929
-Diameter,26
+Number of Nodes,211,,,
+Number of Edges,441,,,
+Average In Degree,2.09004739336493,,,
+Average Out Degree,2.09004739336493,,,
+Diameter,26,,,
+Query,St Patrick’s Cathedral Dublin Ireland,,,Dist: 500
