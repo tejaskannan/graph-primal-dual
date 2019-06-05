@@ -1,0 +1,68 @@
+{
+	"generate": {
+		"train_samples": 15000,
+		"valid_samples": 1500,
+		"test_samples": 1500,
+		"graph_name": "london-500",
+		"osm_query":  "Leicester Square, London, UK",
+		"distance": 500,
+		"is_address": true,
+		"dataset_name": "london-15000-farthest",
+		"num_sources": 4,
+		"num_sinks": 4,
+		"source_sink_strategy": "farthest",
+		"max_num_paths": 10
+	},
+	"model": {
+		"name": "gated-gat",
+		"graph_name": "dublin-500",
+		"graph_title": "Gated GAT+Sparsemax on London Graph",
+		"dataset_name": "london-15000-farthest",
+		"learning_rate": 0.001,
+		"dual_momentum": 0.9,
+		"dual_step_size": 0.01,
+		"gradient_clip": 1,
+		"batch_size": 100,
+		"epochs": 100,
+		"patience": 5,
+		"early_stop_threshold": 1e-5,
+		"graph_layers": 44,
+		"num_heads": 3,
+		"node_encoding": 32,
+		"num_neighborhoods": 2,
+		"node_embedding_size": 8,
+		"dropout_keep_prob": 1.0,
+		"encoder_hidden": [32],
+		"decoder_hidden": [32, 32],
+		"output_folder": "trained_models",
+		"cost_fn": {
+			"name": "exp",
+			"use_edges": false,
+			"edge_factor": 0.1,
+			"options": {
+				"a": 1.0,
+				"b": 0.0,
+				"c": 0.0,
+				"d": 0.0
+			}
+		},
+		"flow_iters": 1000,
+		"dual_iters": 500,
+		"plot_flows": true,
+		"plot_fraction": 0.01, 
+		"plot_weight_samples": 25,
+		"sparse": false,
+		"use_sparsemax": true,
+		"unique_neighborhoods": true,
+		"use_capacities": false,
+		"batch_params": {
+			"selection_beg": 1e8,
+			"selection_end": 1e2,
+			"sort_freq": 0.5
+		},
+		"optimizer": {
+			"use_optimizer": false,
+			"optimizer_name": "slsqp"
+		}
+	}
+}
