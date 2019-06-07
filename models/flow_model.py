@@ -54,6 +54,9 @@ class FlowModel(Model):
         # Scalar Int
         max_num_nodes = kwargs['max_num_nodes']
 
+        # B x 1 tensor of true costs (if given)
+        true_costs = kwargs['true_costs']
+
         with self._sess.graph.as_default():
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
 
@@ -146,13 +149,6 @@ class FlowModel(Model):
                 # B x V x D
                 node_weights = tf.squeeze(node_weights, axis=-1)
 
-                # # B x V x D, node weights augmented by destinations
-                # inv_mask = tf.cast(tf.equal(inv_adj_lst, mask_indices), tf.float32)
-                # node_weights = destination_attn(node_weights=node_weights,
-                #                                 in_indices=in_indices,
-                #                                 rev_indices=rev_indices,
-                #                                 mask=inv_mask)
-
                 # Mask out nonexistent neighbors before normalization, B x V x D
                 pred_weights = (-BIG_NUMBER * mask) + node_weights
 
@@ -178,6 +174,23 @@ class FlowModel(Model):
                     flow_cost = tf.reduce_sum(self.cost_fn.apply(flow), axis=[1, 2])
 
                 flow_cost = tf.debugging.check_numerics(flow_cost, 'Flow Cost has Inf or NaN.')
+
+                # Handle special case where the true cost is available
+                if self.params['use_true_cost']:
+                    self.loss = (flow_cost - true_costs)
+                    self.loss_op = tf.reduce_mean(self.loss)
+
+                    # Named outputs
+                    self.output_ops['flow'] = flow
+                    self.output_ops['flow_cost'] = flow_cost
+                    self.output_ops['normalized_weights'] = normalized_weights
+                    self.output_ops['dual_cost'] = true_costs
+                    self.output_ops['pred_weights'] = pred_weights
+                    self.output_ops['dual_flow'] = tf.zeros_like(flow)
+                    self.output_ops['dual_idx'] = tf.zeros_like(flow_cost)
+
+                    self.optimizer_op = self._build_optimizer_op()
+                    return
 
                 # Compute Dual Problem and associated cost
                 dual_decoder = MLP(hidden_sizes=self.params['decoder_hidden'],
@@ -228,11 +241,6 @@ class FlowModel(Model):
                 dual_cost = tf.debugging.check_numerics(dual_cost, 'Dual Cost has Inf or NaN.')
 
                 # tf.summary.histogram('Duality Gap', flow_cost - dual_cost)
-
-                # Add a regularizer to penalize incentivize the model to produce a tree
-                # nonzero_prop = tf.cast(normalized_weights > SMALL_NUMBER, dtype=tf.int32)
-                # nonzero_reg = tf.expand_dims(tf.reduce_sum(nonzero_prop, axis=[1, 2]), axis=-1) / num_nodes
-                # nonzero_reg = tf.cast(tf.squeeze(nonzero_reg, axis=-1), dtype=tf.float32)
 
                 self.loss = (flow_cost - dual_cost)
                 self.loss_op = tf.reduce_mean(self.loss)

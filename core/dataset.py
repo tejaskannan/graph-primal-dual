@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import networkx as nx
+import pandas as pd
 from enum import Enum
 from os import path
 from bisect import bisect_right
@@ -31,14 +32,15 @@ class Counters:
 
 class Sample:
 
-    def __init__(self, demands, graph_name, max_num_nodes):
-        self.demands = expand_sparse_matrix(demands, n=max_num_nodes, m=1)
+    def __init__(self, demands, graph_name, true_cost):
+        self.demands = demands
         self.graph_name = graph_name
+        self.true_cost = true_cost
 
 
 class BatchSample:
 
-    def __init__(self, node_features, demands, graph_data):
+    def __init__(self, node_features, demands, true_cost, graph_data):
         self.node_features = node_features
         self.demands = demands
         self.adj_lst = graph_data.adj_lst
@@ -55,6 +57,7 @@ class BatchSample:
         self.common_out_neighbors = graph_data.common_out_neighbors
         self.edge_lengths = graph_data.edge_lengths
         self.normalized_edge_lengths = graph_data.normalized_edge_lengths
+        self.true_cost = true_cost
 
 
 class GraphData:
@@ -266,6 +269,11 @@ class DatasetManager:
 
         print('Started loading {0} {1} samples for graph {2}.'.format(num_samples, series.name, graph_name))
 
+        true_costs = None
+        costs_path = path.join(folder, 'costs.csv')
+        if path.exists(costs_path):
+            true_costs = pd.read_csv(costs_path)
+
         for file_index in range(num_files):
             # Load demands as Sparse CSR matrices to save memory.
             demands = read(folder=folder,
@@ -274,8 +282,14 @@ class DatasetManager:
                            sinks=self.sinks,
                            num_nodes=self.num_nodes)
 
-            self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, max_num_nodes=self.num_nodes)
-                                     for demand in demands]
+            if true_costs is not None:
+                lower, upper = file_index * WRITE_THRESHOLD, (file_index + 1) * WRITE_THRESHOLD
+                sample_true_costs = true_costs['Flow Cost'][lower:upper]
+            else:
+                sample_true_costs = np.zeros(shape=(len(demands),))
+
+            self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, true_cost=sample_true_costs[i])
+                                     for i, demand in enumerate(demands)]
 
         assert len(self.dataset[series]) == num_samples
         print('Completed loading graph {0} for {1}.'.format(graph_name, series.name))
@@ -298,6 +312,7 @@ class DatasetManager:
                 node_features = demands_to_features(demands)
                 b = BatchSample(node_features=node_features,
                                 demands=demands,
+                                true_cost=sample.true_cost,
                                 graph_data=self.graph_data)
                 batch.append(b)
 
@@ -357,6 +372,7 @@ class DatasetManager:
             node_features = demands_to_features(demands)
             b = BatchSample(node_features=node_features,
                             demands=demands,
+                            true_cost=sample.true_cost,
                             graph_data=self.graph_data)
             batch.append(b)
             indices.append(index)

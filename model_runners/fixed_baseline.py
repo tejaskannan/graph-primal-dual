@@ -62,7 +62,7 @@ class FixedBaseline(ModelRunner):
         # Fetch features for each sample in the given batch
         demands = np.array([sample.demands for sample in batch])
         adj_lsts = np.array([sample.adj_lst for sample in batch])
-        num_nodes = np.array([sample.num_nodes for sample in batch])
+        num_nodes = np.array([sample.num_nodes for sample in batch]).reshape(-1, 1)
 
         # 3D indexing used for flow computation and correction
         batch_indices = np.arange(start=0, stop=batch_size)
@@ -84,7 +84,7 @@ class FixedBaseline(ModelRunner):
         feed_dict = {
             placeholders['demands']: demands,
             placeholders['adj_lst']: adj_lsts,
-            placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
+            placeholders['num_nodes']: num_nodes,
             placeholders['in_indices']: in_indices,
             placeholders['flow_proportions']: flow_proportions
         }

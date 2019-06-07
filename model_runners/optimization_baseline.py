@@ -51,11 +51,11 @@ class OptimizationBaseline:
             pickle.dump(self.params, out_file)
 
         # Load test dataset
-        self.dataset.load(series=Series.TEST)
-        test_samples = [sample for sample in self.dataset.dataset[Series.TEST] if sample.graph_name == self.graph_name]
+        series = Series.TEST
+        self.dataset.load(series=series)
+        test_samples = [sample for sample in self.dataset.dataset[series] if sample.graph_name == self.graph_name]
 
-        # step = int(1.0 / self.params['plot_fraction'])
-        step = 100
+        step = int(1.0 / self.params['plot_fraction'])
         plot_indices = set(range(0, len(test_samples), step))
 
         initial = None

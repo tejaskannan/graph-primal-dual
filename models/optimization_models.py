@@ -89,6 +89,7 @@ class SLSQP(OptimizeBaseline):
                                    x0=initial,
                                    bounds=bounds,
                                    method='SLSQP',
+                                   jac='2-point',
                                    constraints=[constraint],
                                    callback=callback,
                                    options=options)

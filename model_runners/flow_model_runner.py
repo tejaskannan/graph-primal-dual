@@ -72,6 +72,10 @@ class FlowModelRunner(ModelRunner):
                                                               shape=adj_shape,
                                                               name='norm-edge-lengths-ph',
                                                               is_sparse=False)
+        true_costs_ph = model.create_placeholder(dtype=tf.float32,
+                                                 shape=(b,),
+                                                 name='true-costs-ph',
+                                                 is_sparse=False)
 
         out_neighborhood_phs = []
         in_neighborhood_phs = []
@@ -104,7 +108,8 @@ class FlowModelRunner(ModelRunner):
             'edge_lengths': edge_lengths_ph,
             'norm_edge_lengths': normalized_edge_lengths_ph,
             'num_nodes': num_nodes_ph,
-            'max_num_nodes': max_num_nodes
+            'max_num_nodes': max_num_nodes,
+            'true_costs': true_costs_ph
         }
 
     def create_feed_dict(self, placeholders, batch, batch_size, data_series, **kwargs):
@@ -124,6 +129,7 @@ class FlowModelRunner(ModelRunner):
         edge_lengths = np.array([sample.edge_lengths for sample in batch])
         norm_edge_lengths = np.array([sample.normalized_edge_lengths for sample in batch])
         dropout_keep = self.params['dropout_keep_prob'] if data_series == Series.TRAIN else 1.0
+        true_costs = np.array([sample.true_cost for sample in batch])
 
         # 3D indexing used for flow computation and correction
         batch_indices = np.arange(start=0, stop=batch_size)
@@ -149,7 +155,8 @@ class FlowModelRunner(ModelRunner):
             placeholders['dropout_keep_prob']: dropout_keep,
             placeholders['num_nodes']: np.reshape(num_nodes, [-1, 1]),
             placeholders['in_indices']: in_indices,
-            placeholders['rev_indices']: rev_indices
+            placeholders['rev_indices']: rev_indices,
+            placeholders['true_costs']: true_costs
         }
 
         for i in range(self.params['num_neighborhoods'] + 1):

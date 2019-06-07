@@ -23,11 +23,13 @@ class ModelRunner:
         self.timestamp = datetime.now().strftime('%m-%d-%Y-%H-%M-%S')
         cost_fn_name = params['cost_fn']['name']
         normalizer = 'sparsemax' if params['use_sparsemax'] else 'softmax'
-        self.output_folder = '{0}/{1}-{2}-{3}-{4}-{5}/'.format(params['output_folder'],
+        true_cost = '-true-cost' if params['use_true_cost'] else ''
+        self.output_folder = '{0}/{1}-{2}-{3}-{4}-{5}{6}/'.format(params['output_folder'],
                                                            params['name'],
                                                            params['graph_name'],
                                                            cost_fn_name,
                                                            normalizer,
+                                                           true_cost,
                                                            self.timestamp)
         
         self.num_node_features = 2
@@ -229,6 +231,8 @@ class ModelRunner:
         num_test_batches = self.dataset.num_batches(series=Series.TEST, batch_size=batch_size)
         num_test_samples = num_test_batches * batch_size
 
+        self.params['plot_fraction'] = 0.01
+        # self.params['plot_flows'] = False
         step = int(1.0 / self.params['plot_fraction'])
         plot_indices = set(range(0, num_test_samples, step))
 
@@ -294,7 +298,7 @@ class ModelRunner:
                                           node_features=node_features,
                                           edge_features=edge_features)
 
-                if self.params['plot_flows'] and index in plot_indices:
+                if self.params['plot_flows'] and index == 400:
                     flow_path = '{0}flows-{1}-{2}'.format(model_path, graph_name, index)
                     prop_path = '{0}flow-prop-{1}-{2}'.format(model_path, graph_name, index)
                     attn_weight_path = '{0}attn-weights-{1}-{2}'.format(model_path, graph_name, index)
