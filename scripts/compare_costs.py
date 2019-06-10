@@ -6,14 +6,14 @@ import os
 from utils.utils import load_params
 
 COSTS_FILE = 'costs.csv'
-OUTPUT_BASE = '../comparisons'
+OUTPUT_BASE = '../figures'
 
 BASELINE_FIELD = 'Model'
-AVG_PERC_FIELD = 'Mean % Increase'
-STD_PERC_FIELD = 'Std Dev for %'
-AVG_ABS_FIELD = 'Mean Increase'
-STD_ABS_FIELD = 'Std Dev'
-SERIES_FIELD = 'Metric'
+AVG_PERC_FIELD = 'Median % Increase'
+STD_PERC_FIELD = 'IQR for %'
+AVG_ABS_FIELD = 'Median Increase'
+STD_ABS_FIELD = 'IQR'
+SERIES_FIELD = 'Graph'
 
 def bold_labels(latex_table):
     lines = []
@@ -85,10 +85,10 @@ for target_field, field in zip(target_fields, params['fields']):
         SERIES_FIELD: [],
         BASELINE_FIELD: [],
         AVG_ABS_FIELD: [],
-        STD_ABS_FIELD: [],
         AVG_PERC_FIELD: [],
-        STD_PERC_FIELD: []
     }
+
+    print(np.median(target_df[target_field]))
 
     for baseline in params['baselines']:
         baseline_path = os.path.join(model_folder, baseline['path'], COSTS_FILE)
@@ -97,13 +97,17 @@ for target_field, field in zip(target_fields, params['fields']):
         numeric_baseline = pd.to_numeric(baseline_df[field])
         percent_diff = 100 * ((numeric_baseline - target_df[target_field]) / target_df[target_field])
         abs_diff = numeric_baseline - target_df[target_field]
+
+        print(baseline['name'])
+        print('Median: {0}'.format(np.median(baseline_df[field])))
+        print('Min: {0}'.format(len(np.where(percent_diff < 0))))
         
         data[SERIES_FIELD].append(field)
         data[BASELINE_FIELD].append(baseline['name'])
-        data[AVG_PERC_FIELD].append(np.average(percent_diff))
-        data[STD_PERC_FIELD].append(np.std(percent_diff))
-        data[AVG_ABS_FIELD].append(np.average(abs_diff))
-        data[STD_ABS_FIELD].append(np.std(abs_diff))     
+        data[AVG_PERC_FIELD].append(np.median(percent_diff))
+        # data[STD_PERC_FIELD].append(np.percentile(percent_diff, 75) - np.percentile(percent_diff, 25))
+        data[AVG_ABS_FIELD].append(np.median(abs_diff))
+        # data[STD_ABS_FIELD].append(np.percentile(abs_diff, 75) - np.percentile(abs_diff, 25))     
 
     field_df = pd.DataFrame.from_dict(data=data)
     df = df.append(field_df)
@@ -121,7 +125,6 @@ out_path = os.path.join(output_folder, out_filename)
 
 with open(out_path, 'w') as out_file:
     out_file.write(bold_labels(latex_table))
-
 
 params_filename = 'params'
 if 'target_optimizer' in params:

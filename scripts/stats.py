@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 import scipy.stats as stats
 import os
 import pandas as pd
@@ -18,6 +19,13 @@ name2, model2_path = model_params['model2']['name'], model_params['model2']['pat
 df1 = pd.read_csv(os.path.join(model1_path, 'costs.csv'))
 df2 = pd.read_csv(os.path.join(model2_path, 'costs.csv'))
 
-stat, p_value = stats.ttest_ind(a=df1['Flow Cost'], b=df2['Flow Cost'])
-print(stat)
-print(p_value)
+fc1 = df1['Flow Cost']
+fc2 = df2['Flow Cost']
+
+print('{0} {1}'.format(np.average(df1['Flow Cost']), np.std(df1['Flow Cost'])))
+print('{0} {1}'.format(np.average(df2['Flow Cost']), np.std(df2['Flow Cost'])))
+
+diff = df1['Flow Cost'] - df2['Flow Cost']
+stat, p_value = stats.wilcoxon(x=diff)
+print('t-stat: {0}'.format(stat))
+print('p-value: {0}'.format(p_value))

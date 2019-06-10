@@ -53,10 +53,11 @@ fig, ax = plt.subplots()
 cmap = cm.get_cmap('Spectral')
 
 shift = 0.5
-offsets = np.linspace(start=-shift, stop=shift, num=len(xs), endpoint=True)
+offsets = np.linspace(start=-shift, stop=shift, num=len(ys), endpoint=True)
+colors = np.linspace(start=0.1, stop=0.9, num=len(ys), endpoint=True)
 for i, name in enumerate(ys.keys()):
     errors = [lower_errors[name], upper_errors[name]]
-    ax.bar(ind + offsets[i] * width, ys[name], width, yerr=errors, label=name, color=cmap(offsets[i] + shift))
+    ax.bar(ind + offsets[i] * width, ys[name], width, yerr=errors, label=name, color=cmap(colors[i]))
 
 ax.set_xticks(ind)
 ax.set_xticklabels(xs)

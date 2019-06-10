@@ -56,15 +56,19 @@ if not os.path.exists(output_folder):
 out_path = os.path.join(output_folder, 'losses')
 
 cmap = cm.get_cmap(name='Spectral')
+cmap.set_under(color=cmap(0.1))
+cmap.set_over(color=cmap(0.9))
 
 fig, ax = plt.subplots()
 ax.set_xlabel(X_LABEL)
 ax.set_ylabel(Y_LABEL)
 ax.set_title(full_title)
 
-losses_df[names].plot(ax=ax, colormap=cmap)
+colors_range = np.linspace(start=0.1, stop=0.9, num=len(names), endpoint=True)
+colors = [cmap(colors_range[i]) for i in range(len(names))]
+losses_df[names].plot(ax=ax, color=colors)
 plt.legend(loc='best')
-# plt.hlines(y=0, xmin=0, xmax=len(losses_df), colors='k', linestyles=':')
+
 plt.savefig(out_path + '.pdf')
 plt.savefig(out_path + '.pgf')
 
@@ -74,8 +78,7 @@ ax.set_ylabel(Y_LABEL)
 ax.set_title(after_title)
 
 after_df = losses_df[names][after:]
-after_df.plot(ax=ax, colormap=cmap)
-# plt.hlines(y=0, xmin=after, xmax=len(losses_df), colors='k', linestyles=':')
+after_df.plot(ax=ax, color=colors)
 
 plt.legend(loc='best')
 plt.savefig(out_path + '-after.pdf')

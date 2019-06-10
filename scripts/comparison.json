@@ -1,12 +1,10 @@
 {
-    "target_path": "neighborhood-sf-market-500-quadratic-sparsemax-farthest",
+    "target_path": "neighborhood-nyc-1000-quadratic-sparsemax",
     "target_name": "neighborhood",
     "baselines": [
-        { "path": "slsqp-sf-market-500-quadratic", "name": "SLSQP" },
-        { "path": "neighborhood-sf-market-500-quadratic-softmax-farthest", "name": "Neighborhood+Softmax" },
-        { "path": "gated-gat-sf-market-500-quadratic-softmax-farthest", "name": "Gated-GAT+Softmax" } 
+        { "path": "gated-gat-nyc-1000-quadratic-sparsemax", "name": "Gated GAT" }
     ],
-    "base_folder": "../final_models/san-francisco",
-    "output_folder": "neighborhood-sf-500-quadratic",
+    "base_folder": "../final_models/nyc",
+    "output_folder": "gated_gat_nyc",
     "fields": ["Flow Cost"]
 }

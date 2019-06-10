@@ -1,14 +1,22 @@
 {
     "models": [
         {
-            "name": "Neighborhood, 10 Steps",
+            "name": "Neighborhood+Sparsemax, Cambridge-500",
+            "path": "../final_models/cambridge-quadratic/neighborhood-cambridge-500-quadratic-sparsemax-farthest"
+        },
+        {
+            "name": "Neighborhood+Softmax, Cambridge-500",
             "path": "../final_models/cambridge-quadratic/neighborhood-cambridge-500-quadratic-softmax-farthest"
         },
         {
-            "name": "Neighborhood, 1 Step",
-            "path": "../final_models/1-layer/neighborhood-cambridge-500-quadratic-softmax-1-layer"
+            "name": "Neighborhood+Sparsemax, SF-500",
+            "path": "../final_models/san-francisco-quadratic/neighborhood-sf-market-500-quadratic-sparsemax-farthest"
+        },
+        {
+            "name": "Neighborhood+Softmax, SF-500",
+            "path": "../final_models/san-francisco-quadratic/neighborhood-sf-market-500-quadratic-softmax-farthest"
         }
     ],
-    "save_folder": "../figures/layers",
+    "save_folder": "../figures/valid_losses",
     "after": 5
 }
