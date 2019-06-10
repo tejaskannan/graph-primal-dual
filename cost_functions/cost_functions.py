@@ -186,8 +186,7 @@ class Tanh(CostFunction):
 
 
 def apply_with_capacities(cost_fn, x, capacities):
-    # If the value violated the capacity, an exponential penalty is applied 
-    
+    # If the value violated the capacity, an exponential penalty is applied
     # Some constant to produce near-asymptotic behavior
     beta = 20
 

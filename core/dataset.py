@@ -124,7 +124,8 @@ class GraphData:
     def set_edge_indices(self, adj_lst, inv_adj_lst, max_degree, max_num_nodes):
         dim0 = np.prod(adj_lst.shape)
 
-        # These arrays hold 2D coordinates
+        # These arrays hold 2D coordinates which are used to gather
+        # incoming and outgoing neighbors within tensorflow
         self.in_indices = np.zeros(shape=(dim0, 2))
         self.rev_indices = np.zeros(shape=(dim0, 2))
         self.opp_indices = np.zeros(shape=(dim0, 2))
@@ -285,10 +286,12 @@ class DatasetManager:
             if true_costs is not None:
                 lower, upper = file_index * WRITE_THRESHOLD, (file_index + 1) * WRITE_THRESHOLD
                 sample_true_costs = true_costs['Flow Cost'][lower:upper]
+                offset = file_index * WRITE_THRESHOLD
             else:
                 sample_true_costs = np.zeros(shape=(len(demands),))
+                offset = 0
 
-            self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, true_cost=sample_true_costs[i])
+            self.dataset[series] += [Sample(demands=demand, graph_name=graph_name, true_cost=sample_true_costs[i + offset])
                                      for i, demand in enumerate(demands)]
 
         assert len(self.dataset[series]) == num_samples

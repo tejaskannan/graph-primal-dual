@@ -19,7 +19,7 @@ def save_graph(target, graph_name, distance=1000, is_address=True):
         graph = ox.graph_from_address(address=target, distance=distance, network_type='drive')
     else:
         graph = ox.graph_from_place(query=target, network_type='drive')
-    
+
     # Project graph
     graph_proj = ox.project_graph(graph)
 
@@ -134,7 +134,6 @@ def read(folder, file_index, sources, sinks, num_nodes):
 
         sp_mat = sp.csr_matrix(demands)
         dataset.append(sp_mat)
-
 
     return dataset
 

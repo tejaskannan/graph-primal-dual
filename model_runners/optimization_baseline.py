@@ -64,9 +64,6 @@ class OptimizationBaseline:
             demands = np.array(sample.demands.todense())
             demands = np.reshape(demands, newshape=(demands.shape[0],))
 
-            if index not in plot_indices:
-                continue
-
             start = time()
             flows_per_iter, result = self.optimizer.optimize(graph=test_graph, demands=demands, initial=initial)
             end = time()

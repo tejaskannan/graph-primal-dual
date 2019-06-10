@@ -48,7 +48,7 @@ def max_degrees(graphs, k, unique_neighborhoods=True):
     max_degrees = np.zeros(shape=(k+1,))
     for adj in adj_matrices:
         neighborhoods = random_walk_neighborhoods(adj, k=k, unique_neighborhoods=unique_neighborhoods)
-        degrees = [np.max(mat.sum(axis=-1)) for mat in neighborhoods]        
+        degrees = [np.max(mat.sum(axis=-1)) for mat in neighborhoods]
         max_degrees = np.maximum(max_degrees, degrees)
 
     return max_degrees
@@ -187,7 +187,7 @@ def farthest_nodes(graph, num_sources, num_sinks):
                     lengths[(u, v)] = path_length
                     length = path_length
                 min_len = min(min_len, length)
-            
+
             # Select node whose closest distance to any selected vertex
             # is maximized
             if min_len > max_len:
@@ -210,7 +210,7 @@ def farthest_sink_nodes(graph, num_sources, num_sinks):
     """
 
     sources = np.random.choice(a=list(graph.nodes()), replace=False, size=num_sources)
-    
+
     node_distances = []
     for u in sorted(graph.nodes()):
         distances = [nx.shortest_path_length(graph, source=u, target=v) for v in sources]

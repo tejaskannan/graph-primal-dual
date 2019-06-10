@@ -34,7 +34,7 @@ def plot_road_graph(graph, graph_name, file_path):
 def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False):
     n_nodes = graph.number_of_nodes()
 
-    edge_cmap = cm.get_cmap(name='Spectral_r')
+    edge_cmap = cm.get_cmap(name='coolwarm')
     node_cmap = cm.get_cmap(name='viridis')
 
     node_sizes = np.full(shape=(n_nodes,), fill_value=1)
@@ -53,7 +53,7 @@ def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False)
 
     values = [v for _, _, v in graph.edges.data(field)]
     # values = list(nx.get_edge_attributes(graph, name=field).values())
-    edge_normalizer = colors.Normalize(vmin=np.min(values), vmax=np.max(values))
+    edge_normalizer = colors.Normalize(vmin=0, vmax=0.5)
 
     edge_colors = [edge_cmap(edge_normalizer(x)) for x in values]
 
@@ -62,15 +62,17 @@ def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False)
                                    node_color=node_colors,
                                    node_edgecolor=node_colors,
                                    node_zorder=3,
-                                   edge_color=edge_colors,
-                                   edge_linewidth=0.7)
+                                   edge_cmap=edge_cmap,
+                                   edge_linewidth=0.7,
+                                   field=field)
 
     edge_scalar_map = cm.ScalarMappable(norm=edge_normalizer, cmap=edge_cmap)
     edge_scalar_map.set_array(values)
 
     cax = fig.add_axes([0.05, 0.08, 0.4, 0.02])
     edge_cbar = fig.colorbar(edge_scalar_map, cax=cax, orientation='horizontal')
-    edge_cbar.set_label(field.replace('_', ' ').capitalize())
+    # edge_cbar.set_label(field.replace('_', ' ').capitalize())
+    edge_cbar.set_label('Proportion of flow sent along reverse edge')
 
     demands_scalar_map = cm.ScalarMappable(norm=node_normalizer, cmap=node_cmap)
     demands_scalar_map.set_array(demands)
@@ -138,11 +140,11 @@ def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False)
     adjust_text(demands_text, x=label_xs, y=label_ys, ax=ax, precision=0.1,
                 expand_text=(1.01, 1.05), expand_points=(1.01, 1.05),
                 force_text=(0.01, 0.25), force_points=(0.01, 0.25))
-    fig.suptitle('Computed Flows for ' + graph_name, fontsize=12)
+    fig.suptitle('Computed Flows for ' + graph_name, fontsize=14)
 
     legend_str = '\n'.join(legend_text)
     bbox_props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    cax = fig.add_axes([0.05, 0.85, 0.1, 0.1])
+    cax = fig.add_axes([0.02, 0.88, 0.1, 0.1])
     cax.text(x=0.0, y=0.0, s=legend_str, verticalalignment='top', fontsize=10, bbox=bbox_props)
 
     # Turn off axis labels
@@ -161,7 +163,7 @@ def plot_road_flow_graph(graph, field, graph_name, file_path, label_edges=False)
     plt.close()
 
 
-def plot_directed(graph, node_size, node_color, node_edgecolor, edge_linewidth, edge_color, node_zorder):
+def plot_directed(graph, node_size, node_color, node_edgecolor, edge_linewidth, edge_cmap, node_zorder, field):
     """
     Version of OSMNX plot_graph function (https://github.com/gboeing/osmnx/blob/master/osmnx/plot.py#L284)
     which adjusts edges to make directed edges visible.
@@ -187,12 +189,40 @@ def plot_directed(graph, node_size, node_color, node_edgecolor, edge_linewidth, 
     ax.set_facecolor(bgcolor)
 
     lines = []
-    for u, v, data in graph.edges(keys=False, data=True):
+    edge_linewidth = []
+    edge_color = []
+    i = 0
+    for i, (u, v, data) in enumerate(graph.edges(keys=False, data=True)):
+
+        # Skip back edges which have larger flow
+        forward_cost = graph[u][v][0][field] if graph[u][v][0][field] > 1e-5 else 1e-5
+        if u in graph[v]:
+            back_cost = graph[v][u][0][field] if graph[v][u][0][field] > 1e-5 else 1e-5
+
+            if forward_cost < back_cost:
+                continue
+            elif back_cost >= forward_cost and abs(forward_cost - back_cost) < SMALL_NUMBER and v < u:
+                continue
+
+            edge_linewidth.append((forward_cost + back_cost) * 4)
+
+            # Prevent forward-backward comparison if the values are very small
+            if forward_cost < 1e-4:
+                frac = 0.0
+            else:
+                frac = (back_cost) / (forward_cost + back_cost)
+        else:
+            edge_linewidth.append(forward_cost * 4)
+            frac = 0.0
+
+        edge_color.append(edge_cmap(frac * 2))
+        i += 1
+
         if 'geometry' in data:
             # if it has a geometry attribute (a list of line segments), add them
             # to the list of lines to plot
             xs, ys = data['geometry'].xy
-            xs, ys = shift_points(xs, ys, edge_linewidth)
+            # xs, ys = shift_points(xs, ys, edge_linewidth)
         else:
             # if it doesn't have a geometry attribute, the edge is a straight
             # line from node to node
@@ -200,12 +230,11 @@ def plot_directed(graph, node_size, node_color, node_edgecolor, edge_linewidth, 
             x2, y2 = graph.nodes[v]['x'], graph.nodes[v]['y']
 
             # adjust edges to view in both directions
-            xs, ys = shift_points([x1, x2], [y1, y2], edge_linewidth)
+            # xs, ys = shift_points([x1, x2], [y1, y2], edge_linewidth)
 
         lines.append(list(zip(xs, ys)))
 
-    # add the lines to the axis as a linecollection
-    # ISSUE: edge color not in the same order as graph.edges
+    # edge_linewidth = np.exp(edge_linewidth) - 0.9
     lc = LineCollection(lines, colors=edge_color, linewidths=edge_linewidth, alpha=1.0, zorder=2)
     ax.add_collection(lc)
 
@@ -213,14 +242,14 @@ def plot_directed(graph, node_size, node_color, node_edgecolor, edge_linewidth, 
     ax.scatter(node_Xs, node_Ys, s=node_size, c=node_color, alpha=1.0, edgecolor=node_edgecolor, zorder=node_zorder)
 
     # # Add arrows to each line
-    arrow_style = '->, head_width=0.1, head_length=0.1'
-    for line, color in zip(lines, edge_color):
+    arrow_style = '->, head_width=0.2, head_length=0.1'
+    for i, (line, color) in enumerate(zip(lines, edge_color)):
 
         mid = int(len(line) / 2)
         start, end = line[mid-1], line[mid]
 
         ax.annotate('', xy=end, xycoords='data', xytext=start, textcoords='data', zorder=1,
-                    arrowprops=dict(arrowstyle=arrow_style, lw=edge_linewidth, connectionstyle='arc3', color=color))
+                    arrowprops=dict(arrowstyle=arrow_style, lw=min(edge_linewidth[i], 1.5), connectionstyle='arc3', color=color))
 
     # set the extent of the figure
     margin = 0.02
@@ -280,53 +309,6 @@ def plot_costs(costs_lst, out_path):
     plt.close()
 
 
-def plot_flow_graph_adj(graph, use_flow_props, file_path, use_node_weights=True):
-    edge_cmap = cm.get_cmap(name='Reds')
-    node_cmap = cm.get_cmap(name='viridis')
-
-    agraph = nx.drawing.nx_agraph.to_agraph(graph)
-    agraph.node_attr['style'] = 'filled'
-    agraph.graph_attr['pad'] = 2.0
-    agraph.graph_attr['overlap'] = 'scalexy'
-    agraph.graph_attr['sep'] = 1.0
-
-    if use_node_weights:
-        weights = [w for _, w in graph.nodes.data('node_weight')]
-        min_weight = min(weights)
-        max_weight = max(weights)
-
-    for node, data in graph.nodes(data=True):
-        n = agraph.get_node(node)
-
-        demand = data['demand']
-        if demand > 0.0:
-            n.attr['shape'] = 'diamond'
-        elif demand < 0.0:
-            n.attr['shape'] = 'square'
-        n.attr['label'] = str(round(demand, 2))
-
-        if use_node_weights:
-            normalized_weight = (data['node_weight'] - min_weight) / (max_weight - min_weight)
-            rgb = node_cmap(normalized_weight)[:3]
-            n.attr['fillcolor'] = colors.rgb2hex(rgb)
-            n.attr['fontcolor'] = font_color(rgb)
-        else:
-            n.attr['fillcolor'] = '#BAD7E6'
-
-    flow_label = 'flow_proportion' if use_flow_props else 'flow'
-    flow_vals = [v for _, _, v in graph.edges.data(flow_label)]
-
-    max_flow_val = max(flow_vals)
-    for src, dst, val in graph.edges.data(flow_label):
-        e = agraph.get_edge(src, dst)
-
-        e.attr['color'] = colors.rgb2hex(edge_cmap(val / max_flow_val)[:3])
-        if abs(val) > SMALL_NUMBER:
-            e.attr['label'] = str(round(val, 2))
-
-    agraph.draw(file_path, prog='neato')
-
-
 # Flows is a |V| x |V| matrix of flow values
 def plot_flow_graph(graph, flows, file_path, use_node_weights=True):
     cmap = cm.get_cmap(name='Reds')
@@ -368,70 +350,6 @@ def plot_flow_graph(graph, flows, file_path, use_node_weights=True):
         e.attr['color'] = colors.rgb2hex(cmap(flow / max_flow_val)[:3])
         if abs(flow) > SMALL_NUMBER:
             e.attr['label'] = str(round(flow, 2))
-            e.attr['labeldistance'] = '3'
-    agraph.draw(file_path, prog='neato')
-
-
-def plot_graph(graph, file_path):
-    agraph = nx.drawing.nx_agraph.to_agraph(graph)
-
-    agraph.node_attr['style'] = 'filled'
-    agraph.node_attr['fillcolor'] = '#BAD7E6'
-
-    agraph.graph_attr['pad'] = 2.0
-    agraph.graph_attr['overlap'] = 'scalexy'
-    agraph.graph_attr['sep'] = 1.3
-
-    agraph.draw(file_path, prog='neato')
-
-
-# Flows is a |V| x |V| sparse tensor value
-def plot_flow_graph_sparse(graph, flows, file_path, use_node_weights=True):
-    cmap = cm.get_cmap(name='Reds')
-    node_cmap = cm.get_cmap(name='viridis')
-
-    agraph = nx.drawing.nx_agraph.to_agraph(graph)
-    agraph.node_attr['style'] = 'filled'
-    agraph.graph_attr['pad'] = 2.0
-    agraph.graph_attr['overlap'] = 'scalexy'
-    agraph.graph_attr['sep'] = 1.0
-
-    if use_node_weights:
-        node_weights = [w for _, w in graph.nodes('node_weight')]
-        min_weight = np.min(node_weights)
-        max_weight = np.max(node_weights)
-
-    for node, data in graph.nodes(data=True):
-        n = agraph.get_node(node)
-        demand = data['demand']
-        if demand > 0.0:
-            n.attr['shape'] = 'diamond'
-        elif demand < 0.0:
-            n.attr['shape'] = 'square'
-        n.attr['label'] = str(round(demand, 2))
-
-        if use_node_weights:
-            normalized_weight = (data['node_weight'] - min_weight) / (max_weight - min_weight)
-            rgb = node_cmap(normalized_weight)[:3]
-            n.attr['fillcolor'] = colors.rgb2hex(rgb)
-            n.attr['fontcolor'] = font_color(rgb)
-        else:
-            n.attr['fillcolor'] = '#BAD7E6'
-
-    for src, dest in graph.edges():
-        e = agraph.get_edge(src, dest)
-        e.attr['color'] = colors.rgb2hex(cmap(0.0)[:3])
-
-    max_flow_val = np.max(flows.values)
-    min_flow_val = min(0.0, np.min(flows.values))
-    for edge, val in zip(flows.indices, flows.values):
-        if not graph.has_edge(*edge):
-            continue
-
-        e = agraph.get_edge(edge[0], edge[1])
-        e.attr['color'] = colors.rgb2hex(cmap(val / max_flow_val)[:3])
-        if abs(val) > SMALL_NUMBER:
-            e.attr['label'] = str(round(val, 2))
             e.attr['labeldistance'] = '3'
     agraph.draw(file_path, prog='neato')
 

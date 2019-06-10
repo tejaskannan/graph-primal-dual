@@ -22,50 +22,15 @@ def load_params(params_file_path):
     return params
 
 
-def add_features(graph, demands, flows, proportions, node_weights):
-    graph = graph.copy()
-
-    for node in graph.nodes():
-        graph.add_node(node, demand=float(demands[node, 0] - demands[node, 1]),
-                       node_weight=float(node_weights[node][0]))
-
-    edge_dict = {}
-    for src, dest, key in graph.edges(keys=True):
-        flow = float(flows[src, dest])
-        prop = float(proportions[src, dest])
-        edge_dict[src, dest, key] = {'flow': flow, 'flow_proportion': prop}
-
-    nx.set_edge_attributes(graph, edge_dict)
-    return graph
-
-
-def add_features_sparse(graph, demands, flows, proportions, node_weights):
-    graph = graph.copy()
-
-    for node in graph.nodes():
-        graph.add_node(node, demand=float(demands[node, 0] - demands[node, 1]),
-                       node_weight=float(node_weights[node][0]))
-
-    for edge, flow in zip(flows.indices, flows.values):
-        if graph.has_edge(*edge):
-            graph.add_edge(edge[0], edge[1], flow=float(flow))
-
-    for edge, prop in zip(proportions.indices, proportions.values):
-        if graph.has_edge(*edge):
-            graph.add_edge(edge[0], edge[1], proportion=float(prop))
-
-    return graph
-
-
 def neighborhood_batch(adj_matrices, k, unique_neighborhoods=True):
     """
     adj_matrices is a list of length B, each element is the adj matrix for the bth sample
     k is the number of neighborhood levels to compute
     """
 
-    neighborhood_levels = [] # B x K x N x D_k
-    num_nodes = [] # B
-    max_degrees = [] # B x K
+    neighborhood_levels = []  # B x K x N x D_k
+    num_nodes = []  # B
+    max_degrees = []  # B x K
     for adj in adj_matrices:
         neighborhoods, _ = neighborhood_adj_lists(adj, k, unique_neighborhoods)
 
@@ -75,12 +40,12 @@ def neighborhood_batch(adj_matrices, k, unique_neighborhoods=True):
         neighborhood_levels.append(neighborhoods)
         num_nodes.append(adj.shape[0])
 
-    neighborhood_batches = [] # K x B x N x D_k
+    neighborhood_batches = []  # K x B x N x D_k
 
     for i in range(k):
         max_degree = max(map(lambda d: d[i], max_degrees))
 
-        neighborhood_batch = [pad_adj_list(nbrhood[i], max_degree, n) 
+        neighborhood_batch = [pad_adj_list(nbrhood[i], max_degree, n)
                               for nbrhood, n in zip(neighborhood_levels, num_nodes)]
         neighborhood_batches.append(np.array(neighborhood_batch))
 
@@ -174,30 +139,6 @@ def create_node_embeddings(graph, neighborhoods):
     return np.array(embeddings)
 
 
-def create_node_bias(graph):
-    bias_mat = np.eye(graph.number_of_nodes(), dtype=float)
-    for src, dest in graph.edges():
-        bias_mat[src, dest] = 1.0
-    return -BIG_NUMBER * (1.0 - bias_mat)
-
-
-def adj_mat_to_node_bias(adj_mat):
-    bias_mat = adj_mat.todense()
-    return -BIG_NUMBER * (1.0 - bias_mat)
-
-
-def gcn_aggregator(adj):
-    num_nodes = adj.shape[0]
-    adj_hat = adj + np.eye(num_nodes)
-
-    sqrt_degrees = 1.0 / np.sqrt(np.sum(adj_hat, axis=-1))
-
-    degree_mat = np.zeros_like(adj_hat)
-    np.fill_diagonal(degree_mat, sqrt_degrees)
-
-    return degree_mat.dot(adj_hat.dot(degree_mat))
-
-
 def create_obs_indices(dim1, dim2):
     x1 = np.arange(0, dim1)
     x2 = np.arange(0, dim2)
@@ -207,20 +148,6 @@ def create_obs_indices(dim1, dim2):
     a = np.reshape(a, [-1, 1], order='F')
     b = np.reshape(b, [-1, 1], order='F')
     return np.concatenate([a, b], axis=-1).astype(np.int32)
-
-
-def create_edge_bias(graph):
-    bias_mat = np.eye(graph.number_of_edges(), dtype=float)
-    for src, dest in graph.edges():
-        for node in graph.predecessors(src):
-            bias_mat[src, node] = 1.0
-
-        for node in graph.successors(src):
-            bias_mat[src, node] = 1.0
-
-        for node in graph.successors(dest):
-            bias_mat[src, node] = 1.0
-    return -BIG_NUMBER * (1.0 - bias_mat)
 
 
 def softmax(arr):
@@ -246,9 +173,9 @@ def sparse_matrix_to_tensor_multiple(sparse_mat, k):
     for i in range(k):
         for j in range(num_indices):
             index = i * num_indices + j
-            indices_expanded[index][0] = i # Repetition Number
+            indices_expanded[index][0] = i  # Repetition Number
             for t in range(1, indices.shape[1]+1):
-                indices_expanded[index][t] = indices[j,t-1]
+                indices_expanded[index][t] = indices[j, t-1]
 
     data_expanded = np.repeat(mat.data, repeats=k, axis=0)
     return tf.SparseTensorValue(indices_expanded, data_expanded, expanded_shape)
@@ -294,7 +221,7 @@ def find_max_sources_sinks(trips, num_sources, num_sinks):
     sources = np.argsort(a=-production)[:num_sources]
 
     # For now, we prevent sources from also being sinks
-    consumption = np.sum(trips, axis=0)    
+    consumption = np.sum(trips, axis=0)
     consumption[sources] = 0
     sinks = np.argsort(a=-consumption)[:num_sinks]
 

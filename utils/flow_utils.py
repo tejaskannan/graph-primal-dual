@@ -1,15 +1,15 @@
 import tensorflow as tf
-from utils.constants import BIG_NUMBER, FLOW_THRESHOLD, SMALL_NUMBER
+from utils.constants import BIG_NUMBER, FLOW_THRESHOLD, SMALL_NUMBER, FLOW_MAX
 from utils.tf_utils import masked_gather
 
 
 def mcf_solver(pred_weights, demand, in_indices, max_iters, name='mcf-solver'):
     """
-    pred_weights: B x (V+1) x D tensor
-    demand: B x (V+1) x 1 tensor
-    inv_adj_list: B x (V+1) x D tensor
+    pred_weights: B x V x D tensor
+    demand: B x V x 1 tensor
+    inv_adj_list: B x V x D tensor
 
-    Returns: B x (V+1) x D tensor containing flow volumes
+    Returns: B x V x D tensor containing flow volumes
     """
 
     def body(flow, prev_flow):
@@ -24,7 +24,7 @@ def mcf_solver(pred_weights, demand, in_indices, max_iters, name='mcf-solver'):
 
         # Determine outgoing flows using computed weights, B x (V+1) x D tensor
         prev_flow = flow
-        flow = tf.clip_by_value(pred_weights * adjusted_inflow, 0, BIG_NUMBER)
+        flow = tf.clip_by_value(pred_weights * adjusted_inflow, 0, FLOW_MAX)
         return [flow, prev_flow]
 
     def cond(flow, prev_flow):
@@ -74,8 +74,8 @@ def directional_mcf_solver(pred_weights, demand, in_indices, num_in_neighbors, m
 
         # Determine outgoing flows using computed weights, B x V x D tensor
         next_flow = tf.where(inflow_tiled > demand_tiled,
-                            x=tf.reduce_sum(adjusted_flow, axis=-2),
-                            y=tf.zeros_like(prev_flow))
+                             x=tf.reduce_sum(adjusted_flow, axis=-2),
+                             y=tf.zeros_like(prev_flow))
 
         return [next_flow, flow]
 
@@ -189,7 +189,7 @@ def correct_proportions(source_demands, sink_demands, proportions, source_dest_m
     # B x (K1 * K2 + K1 + K2) x (K1 + K2)
     A_T = tf.transpose(A, perm=[0, 2, 1])
     rhs = tf.concat([A_T, zero], axis=1)
-    
+
     # B x (K1 * K2 + K1 + K2) x (K1 * K2 + K1 + K2)
     mat = tf.concat([lhs, rhs], axis=2)
 
@@ -211,7 +211,7 @@ def correct_proportions(source_demands, sink_demands, proportions, source_dest_m
         sol = tf.linalg.lstsq(matrix=mat, rhs=target, fast=False, name='v-step')
 
         # B x (K1 * K2) x 1
-        delta_v = sol[:,:n*m,:]
+        delta_v = sol[:, :n*m, :]
 
         next_v = v + step_size * delta_v
         return [next_v, v, step_size * beta]
