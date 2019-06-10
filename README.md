@@ -2,7 +2,7 @@
 
 This project uses graph neural networks to solve the uncapacitated minimum cost flow problem. The graph neural network is trained without labelled data. This technique uses separate models for the primal and dual problems, and these models are trained with the goal of minimizing the expected duality gap. This project is the subject of my Cambridge ACS dissertation.
 
-# Usage
+## Usage
 The command below specifies how to train new model. The model parameters are specified through a parameters JSON file. Examples of such files are in the folder ```model_params```.
 ```
 python main.py --train --params <params-json-file>
