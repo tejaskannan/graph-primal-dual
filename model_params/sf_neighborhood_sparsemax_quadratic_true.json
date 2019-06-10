@@ -51,7 +51,6 @@
 		"plot_flows": true,
 		"plot_fraction": 0.001, 
 		"plot_weight_samples": 25,
-		"sparse": false,
 		"use_sparsemax": true,
 		"unique_neighborhoods": true,
 		"use_capacities": false,
