@@ -309,51 +309,6 @@ def plot_costs(costs_lst, out_path):
     plt.close()
 
 
-# Flows is a |V| x |V| matrix of flow values
-def plot_flow_graph(graph, flows, file_path, use_node_weights=True):
-    cmap = cm.get_cmap(name='Reds')
-    node_cmap = cm.get_cmap(name='viridis')
-
-    agraph = nx.drawing.nx_agraph.to_agraph(graph)
-    agraph.node_attr['style'] = 'filled'
-    agraph.graph_attr['pad'] = 2.0
-    agraph.graph_attr['overlap'] = 'scalexy'
-    agraph.graph_attr['sep'] = 1.0
-
-    if use_node_weights:
-        node_weights = [w for _, w in graph.nodes('node_weight')]
-        min_weight = np.min(node_weights)
-        max_weight = np.max(node_weights)
-
-    for node, data in graph.nodes(data=True):
-        n = agraph.get_node(node)
-        demand = data['demand']
-        if demand > 0.0:
-            n.attr['shape'] = 'diamond'
-        elif demand < 0.0:
-            n.attr['shape'] = 'square'
-        n.attr['label'] = str(round(demand, 2))
-
-        if use_node_weights:
-            normalized_weight = (data['node_weight'] - min_weight) / (max_weight - min_weight)
-            rgb = node_cmap(normalized_weight)[:3]
-            n.attr['fillcolor'] = colors.rgb2hex(rgb)
-            n.attr['fontcolor'] = font_color(rgb)
-        else:
-            n.attr['fillcolor'] = '#BAD7E6'
-
-    max_flow_val = np.max(flows)
-    min_flow_val = min(0.0, np.min(flows))
-    for src, dest in graph.edges():
-        flow = flows[src, dest]
-        e = agraph.get_edge(src, dest)
-        e.attr['color'] = colors.rgb2hex(cmap(flow / max_flow_val)[:3])
-        if abs(flow) > SMALL_NUMBER:
-            e.attr['label'] = str(round(flow, 2))
-            e.attr['labeldistance'] = '3'
-    agraph.draw(file_path, prog='neato')
-
-
 def plot_weights(weight_matrix, file_path, num_nodes, num_samples=-1):
     if weight_matrix.ndim == 3:
         weight_matrix = weight_matrix[0]
