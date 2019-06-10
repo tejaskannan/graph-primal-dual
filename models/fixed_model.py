@@ -5,6 +5,7 @@ from cost_functions.cost_functions import get_cost_function
 from utils.flow_utils import mcf_solver
 from core.layers import SparseMax
 
+
 class FixedModel(Model):
 
     def __init__(self, params, name='fixed-model'):
@@ -29,7 +30,7 @@ class FixedModel(Model):
         # B*V*D x 3 tensor containing 3D indices used to compute inflow
         in_indices = kwargs['in_indices']
 
-        with self._sess.graph.as_default():        
+        with self._sess.graph.as_default():
             mask_indices = tf.expand_dims(num_nodes, axis=-1)
             mask = tf.cast(tf.equal(adj_lst, mask_indices), tf.float32)
             adj_mask = 1.0 - mask

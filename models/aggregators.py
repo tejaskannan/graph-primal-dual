@@ -50,6 +50,7 @@ class Neighborhood(Aggregator):
         in_neighborhoods = kwargs['in_neighborhoods']
         num_nodes = kwargs['num_nodes']
 
+        # Aggregate information over all neighborhoods
         out_encoding, _ = self.out_neighborhood_agg(inputs=node_states,
                                                     neighborhoods=out_neighborhoods,
                                                     mask_index=num_nodes,
@@ -60,9 +61,11 @@ class Neighborhood(Aggregator):
                                                   mask_index=num_nodes,
                                                   dropout_keep_prob=dropout_keep_prob)
 
+        # Combine incoming and outgoing neighborhood states
         next_encoding = self.combiner(inputs=tf.concat([out_encoding, in_encoding], axis=-1),
                                       dropout_keep_prob=dropout_keep_prob)
 
+        # GRU update
         node_encoding = self.node_gru(inputs=next_encoding,
                                       state=node_states,
                                       dropout_keep_prob=dropout_keep_prob)
@@ -99,7 +102,6 @@ class GAT(Aggregator):
 
         self.use_gru_gate = use_gru_gate
 
-
     def __call__(self, node_states, dropout_keep_prob, **kwargs):
         adj_lst = kwargs['adj_lst']
         inv_adj_lst = kwargs['inv_adj_lst']
@@ -108,12 +110,13 @@ class GAT(Aggregator):
         # B x V x 1
         node_indices = tf.expand_dims(kwargs['node_indices'], axis=-1)
 
+        # Aggregate information from neighbors using GAT
         out_neighbor_indices = tf.concat([adj_lst, node_indices], axis=-1)
         out_encoding = self.out_node_gat(inputs=node_states,
-                                     adj_lst=out_neighbor_indices,
-                                     mask_index=num_nodes,
-                                     weight_dropout_keep=dropout_keep_prob,
-                                     attn_dropout_keep=dropout_keep_prob)
+                                         adj_lst=out_neighbor_indices,
+                                         mask_index=num_nodes,
+                                         weight_dropout_keep=dropout_keep_prob,
+                                         attn_dropout_keep=dropout_keep_prob)
 
         in_neighbor_indices = tf.concat([inv_adj_lst, node_indices], axis=-1)
         in_encoding = self.in_node_gat(inputs=node_states,
@@ -142,7 +145,6 @@ class GGNN(Aggregator):
         self.node_gru = GRU(output_size=output_size,
                             activation=activation,
                             name='{0}-node-gat-gru'.format(name))
-
 
     def __call__(self, node_states, dropout_keep_prob, **kwargs):
         adj_lst = kwargs['adj_lst']

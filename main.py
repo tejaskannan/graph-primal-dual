@@ -25,7 +25,6 @@ def main():
     parser.add_argument('--train', action='store_true', help='Flag to specify training.')
     parser.add_argument('--generate', action='store_true', help='Flag to specify dataset generation.')
     parser.add_argument('--test', action='store_true', help='Flag to specify testing.')
-    parser.add_argument('--random-walks', action='store_true')
     parser.add_argument('--slsqp', action='store_true', help='Flag to specify using SLSQP baseline.')
     parser.add_argument('--trust-constr', action='store_true', help='Flag to specify using Trust Constraint baseline.')
     parser.add_argument('--fixed', action='store_true', help='Flag to specify using the Fixed Proportions baseline.')
@@ -116,7 +115,7 @@ def generate(params):
         G.add_node(sink, demand=1)
     file_path = os.path.join(dataset_folder, 'graph')
     plot_road_flow_graph(graph=G, field='zero', graph_name=graph_name, file_path=file_path)
-    
+
     source_sink_dict = {
         'sources': sources,
         'sinks': sinks
@@ -139,7 +138,7 @@ def generate(params):
         series_folder = os.path.join(dataset_folder, file_path)
         if not os.path.exists(series_folder):
             os.mkdir(series_folder)
-        
+
         dataset = []
         for i in range(num_samples):
             source_demands, sink_demands = create_demands(sources=sources, sinks=sinks)
@@ -163,6 +162,7 @@ def generate(params):
 
             dataset.append((source_demands, sink_demands))
 
+            # Periodically write to output files
             if (i+1) % WRITE_THRESHOLD == 0:
                 index, _ = file_index(i)
                 write(dataset=dataset, folder=series_folder, index=index)
@@ -177,38 +177,6 @@ def generate(params):
         if file_path == 'train':
             source_index.build(10)
             sink_index.build(10)
-
-
-def random_walks(graph_name, unique_neighborhoods):
-    # Load graph
-    graph_path = 'graphs/{0}.tntp'.format(graph_name)
-    graph = load_to_networkx(path=graph_path)
-
-    adj = nx.adjacency_matrix(graph)
-    neighborhoods = random_walk_neighborhoods(adj, k=20, unique_neighborhoods=unique_neighborhoods)
-
-    total = graph.number_of_nodes()**2
-
-    limit = int(unique_neighborhoods)
-    count = 0
-
-    print('Graph: {0}'.format(graph_name))
-    print('Number of Entries: {0}'.format(total))
-    for i, mat in enumerate(neighborhoods):
-        nonzero = mat.count_nonzero()
-        frac = (total - nonzero) / total
-        print('Frac of zero entries for walks of length {0}: {1}'.format(i, frac))
-
-        count += 1
-
-        if frac == limit:
-            break
-
-    print(LINE)
-
-    max_degrees = [np.max(mat.sum(axis=-1)) for mat in neighborhoods]        
-    for i in range(count):
-        print('Maximum out degree at neighborhood level {0}: {1}'.format(i, max_degrees[i]))
 
 
 if __name__ == '__main__':

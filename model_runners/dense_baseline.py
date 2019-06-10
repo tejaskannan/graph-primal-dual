@@ -57,7 +57,6 @@ class DenseBaseline:
 
         num_samples = self.params['batch_size']
         max_iters = self.params['flow_iters']
-        # max_iters = 10
 
         times = []
         min_costs = []
@@ -82,7 +81,7 @@ class DenseBaseline:
 
             # Insert Demand values into node features
             for k in range(demands.shape[0]):
-                node_features[:,k,0] = demands[k][0]
+                node_features[:, k, 0] = demands[k][0]
 
             # Optimize repeatedly
             j = 0
@@ -137,12 +136,11 @@ class DenseBaseline:
                                       proportions=flow_proportions)
             plot_flow_graph(flow_graph, flows, '{0}flows-{1}.png'.format(self.output_folder, i))
             plot_flow_graph(flow_graph, flow_proportions, '{0}flow-prop-{1}.png'.format(self.output_folder, i))
-        
+
             all_costs.append(costs)
             costs = []
 
         plot_costs(all_costs, '{0}costs.png'.format(self.output_folder))
-
 
     def create_placeholders(self, model, num_nodes):
         node_ph = model.create_placeholder(dtype=tf.float32,
