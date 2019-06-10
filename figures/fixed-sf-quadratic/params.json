@@ -1,0 +1,1 @@
+{"target_path": "neighborhood-sf-market-500-quadratic-sparsemax-farthest", "target_name": "neighborhood", "baselines": [{"path": "random-sf-market-500-quadratic", "name": "Random"}, {"path": "uniform-sf-market-500-quadratic", "name": "Uniform"}], "base_folder": "../final_models/san-francisco-quadratic", "output_folder": "fixed-sf-quadratic", "fields": ["Flow Cost"]}

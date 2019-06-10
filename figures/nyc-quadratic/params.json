@@ -1,0 +1,1 @@
+{"target_path": "neighborhood-nyc-1000-quadratic-sparsemax-06-03-2019-10-11-50", "target_name": "neighborhood", "baselines": [{"path": "gated-gat-nyc-1000-quadratic-sparsemax-06-04-2019-16-40-06", "name": "Gated GAT"}], "base_folder": "../trained_models", "output_folder": "nyc-quadratic", "fields": ["Flow Cost"]}

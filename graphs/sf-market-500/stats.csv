@@ -1,5 +1,6 @@
-Number of Nodes,65
-Number of Edges,152
-Average In Degree,2.3384615384615386
-Average Out Degree,2.3384615384615386
-Diameter,13
+Number of Nodes,65,,,
+Number of Edges,152,,,
+Average In Degree,2.33846153846154,,,
+Average Out Degree,2.33846153846154,,,
+Diameter,13,,,
+Query,"555 Market Street, San Francisco, USA",,,Dist: 500

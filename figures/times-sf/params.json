@@ -1,0 +1,1 @@
+{"target_path": "neighborhood-sf-market-500-quadratic-sparsemax-farthest", "target_name": "neighborhood", "baselines": [{"path": "trust_constr-sf-market-500-quadratic", "name": "Trust Region"}, {"path": "slsqp-sf-market-500-quadratic", "name": "SLSQP"}], "base_folder": "../final_models/san-francisco-quadratic", "output_folder": "times-sf", "fields": ["Time (sec)"]}

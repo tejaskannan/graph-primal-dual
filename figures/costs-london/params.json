@@ -1,0 +1,1 @@
+{"target_path": "neighborhood-london-500-quadratic-sparsemax", "target_name": "neighborhood", "baselines": [{"path": "gated-gat-london-500-quadratic-sparsemax", "name": "Gated GAT"}], "base_folder": "../final_models/london", "output_folder": "costs-london", "fields": ["Flow Cost"]}

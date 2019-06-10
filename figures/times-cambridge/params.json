@@ -1,0 +1,1 @@
+{"target_path": "neighborhood-cambridge-500-exp-sparsemax-farthest", "target_name": "neighborhood", "baselines": [{"path": "trust_constr-cambridge-500-exp", "name": "Trust Region"}, {"path": "slsqp-cambridge-500-exp", "name": "SLSQP"}], "base_folder": "../final_models/cambridge-exp", "output_folder": "times-cambridge", "fields": ["Time (sec)"]}

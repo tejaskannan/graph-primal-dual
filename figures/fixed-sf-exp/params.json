@@ -1,0 +1,1 @@
+{"target_path": "neighborhood-sf-market-500-exp-sparsemax-farthest", "target_name": "neighborhood", "baselines": [{"path": "random-sf-market-500-exp", "name": "Random"}, {"path": "uniform-sf-market-500-exp", "name": "Uniform"}], "base_folder": "../final_models/san-francisco-exp", "output_folder": "fixed-sf-exp", "fields": ["Flow Cost"]}
